@@ -19,6 +19,7 @@ from arduino_ide.ui.project_explorer import ProjectExplorer
 from arduino_ide.ui.console_panel import ConsolePanel
 from arduino_ide.ui.variable_watch import VariableWatch
 from arduino_ide.ui.status_display import StatusDisplay
+from arduino_ide.ui.context_panel import ContextPanel
 from arduino_ide.ui.plotter_panel import PlotterPanel
 from arduino_ide.ui.problems_panel import ProblemsPanel
 from arduino_ide.ui.output_panel import OutputPanel
@@ -414,6 +415,13 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.status_dock)
         self.tabifyDockWidget(self.board_dock, self.status_dock)
 
+        # Context Panel (right, tabbed with other panels)
+        self.context_dock = QDockWidget("Context Help", self)
+        self.context_panel = ContextPanel()
+        self.context_dock.setWidget(self.context_panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.context_dock)
+        self.tabifyDockWidget(self.status_dock, self.context_dock)
+
         # Console Panel (bottom)
         self.console_dock = QDockWidget("Console", self)
         self.console_panel = ConsolePanel()
@@ -468,6 +476,9 @@ class MainWindow(QMainWindow):
 
         # Connect cursor position changes to status bar
         editor_container.editor.cursorPositionChanged.connect(self.update_cursor_position)
+
+        # Connect function clicks to context panel
+        editor_container.editor.function_clicked.connect(self.context_panel.update_context)
 
         index = self.editor_tabs.addTab(editor_container, filename)
         self.editor_tabs.setCurrentIndex(index)
