@@ -5,11 +5,13 @@ Displays real-time plots of serial data
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QComboBox, QCheckBox, QSpinBox
+    QLabel, QComboBox, QCheckBox, QSpinBox, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QPainter, QPen, QColor
+from PySide6.QtGui import QPainter, QPen, QColor, QFont
 import re
+import csv
+from datetime import datetime
 
 
 class PlotWidget(QWidget):
@@ -18,6 +20,7 @@ class PlotWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.data_series = []  # List of data points for each series
+        self.series_labels = []  # Labels for each series
         self.max_points = 500
         self.colors = [
             QColor(52, 152, 219),   # Blue
@@ -29,7 +32,7 @@ class PlotWidget(QWidget):
         ]
         self.setMinimumHeight(300)
 
-    def add_data_point(self, values):
+    def add_data_point(self, values, labels=None):
         """Add a data point (can be multiple series)"""
         if not isinstance(values, list):
             values = [values]
@@ -37,6 +40,11 @@ class PlotWidget(QWidget):
         # Initialize series if needed
         while len(self.data_series) < len(values):
             self.data_series.append([])
+            # Generate default label if not provided
+            if labels and len(labels) > len(self.series_labels):
+                self.series_labels.append(labels[len(self.series_labels)])
+            else:
+                self.series_labels.append(f"Series {len(self.series_labels) + 1}")
 
         # Add values to each series
         for i, value in enumerate(values):
@@ -50,6 +58,7 @@ class PlotWidget(QWidget):
     def clear_data(self):
         """Clear all data"""
         self.data_series = []
+        self.series_labels = []
         self.update()
 
     def paintEvent(self, event):
@@ -126,6 +135,23 @@ class PlotWidget(QWidget):
 
                 painter.drawLine(int(x1), int(y1), int(x2), int(y2))
 
+        # Draw legend
+        if self.series_labels:
+            legend_x = width - margin - 120
+            legend_y = margin + 10
+            legend_spacing = 20
+
+            for idx, label in enumerate(self.series_labels):
+                color = self.colors[idx % len(self.colors)]
+
+                # Draw color box
+                painter.fillRect(legend_x, legend_y + idx * legend_spacing, 15, 10, color)
+
+                # Draw label text
+                painter.setPen(QColor(200, 200, 200))
+                painter.setFont(QFont("Arial", 9))
+                painter.drawText(legend_x + 20, legend_y + idx * legend_spacing + 9, label)
+
 
 class PlotterPanel(QWidget):
     """Serial plotter panel for visualizing data"""
@@ -152,6 +178,11 @@ class PlotterPanel(QWidget):
         clear_btn = QPushButton("Clear")
         clear_btn.clicked.connect(self.clear_plot)
         control_layout.addWidget(clear_btn)
+
+        # Export CSV button
+        export_btn = QPushButton("Export CSV")
+        export_btn.clicked.connect(self.export_to_csv)
+        control_layout.addWidget(export_btn)
 
         control_layout.addWidget(QLabel("Max Points:"))
 
@@ -200,6 +231,55 @@ class PlotterPanel(QWidget):
         """Handle max points change"""
         self.plot_widget.max_points = value
         self.status_label.setText(f"Max points set to {value}")
+
+    def export_to_csv(self):
+        """Export plot data to CSV file"""
+        if not self.plot_widget.data_series or not any(self.plot_widget.data_series):
+            self.status_label.setText("No data to export")
+            return
+
+        # Open file dialog
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"plotter_data_{timestamp}.csv"
+
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Plot Data",
+            default_filename,
+            "CSV Files (*.csv);;All Files (*)"
+        )
+
+        if not filename:
+            return
+
+        try:
+            with open(filename, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+
+                # Write header
+                headers = ['Index'] + [
+                    self.plot_widget.series_labels[i] if i < len(self.plot_widget.series_labels)
+                    else f"Series {i+1}"
+                    for i in range(len(self.plot_widget.data_series))
+                ]
+                writer.writerow(headers)
+
+                # Find max length
+                max_length = max(len(series) for series in self.plot_widget.data_series if series)
+
+                # Write data rows
+                for i in range(max_length):
+                    row = [i]
+                    for series in self.plot_widget.data_series:
+                        if i < len(series):
+                            row.append(series[i])
+                        else:
+                            row.append('')
+                    writer.writerow(row)
+
+            self.status_label.setText(f"Data exported to {filename}")
+        except Exception as e:
+            self.status_label.setText(f"Export failed: {str(e)}")
 
     def add_data(self, data_string):
         """Parse and add data from serial input
