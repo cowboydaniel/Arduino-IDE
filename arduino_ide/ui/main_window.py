@@ -400,9 +400,6 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.BottomDockWidgetArea, self.serial_dock)
         self.tabifyDockWidget(self.console_dock, self.serial_dock)
 
-        # Connect status display to serial monitor
-        self.status_display.connect_serial_monitor(self.serial_monitor)
-
         # Show console by default
         self.console_dock.raise_()
 
@@ -414,14 +411,16 @@ class MainWindow(QMainWindow):
         if filename.endswith(".ino"):
             editor_container.editor.setPlainText(self.get_arduino_template())
 
-        # Connect editor changes to pin usage update
+        # Connect editor changes to pin usage update and status display
         editor_container.editor.textChanged.connect(self.update_pin_usage)
+        editor_container.editor.textChanged.connect(self.update_status_display)
 
         index = self.editor_tabs.addTab(editor_container, filename)
         self.editor_tabs.setCurrentIndex(index)
 
-        # Initial pin usage update
+        # Initial updates
         self.update_pin_usage()
+        self.update_status_display()
 
         return editor_container
 
@@ -502,6 +501,8 @@ void loop() {
         self.console_panel.append_output(f"Selected board: {board_name}")
         # Update board panel
         self.board_panel.update_board_info(board_name)
+        # Update status display with new board specs
+        self.status_display.update_board(board_name)
 
     def on_port_changed(self, port_name):
         """Handle port selection change"""
@@ -733,7 +734,15 @@ void loop() {
             code_text = current_widget.editor.toPlainText()
             self.board_panel.update_pin_usage(code_text)
 
+    def update_status_display(self):
+        """Update real-time status display from current editor"""
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget and hasattr(current_widget, 'editor'):
+            code_text = current_widget.editor.toPlainText()
+            self.status_display.update_from_code(code_text)
+
     def on_tab_changed(self, index):
-        """Handle tab change - update pin usage for new tab"""
+        """Handle tab change - update pin usage and status for new tab"""
         if index >= 0:
             self.update_pin_usage()
+            self.update_status_display()
