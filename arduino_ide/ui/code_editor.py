@@ -142,7 +142,10 @@ class ArduinoSyntaxHighlighter(QSyntaxHighlighter):
         self.keyword_format.setFontWeight(QFont.Bold)
 
         self.type_format = QTextCharFormat()
-        self.type_format.setForeground(QColor("#4EC9B0"))  # Teal
+        self.type_format.setForeground(QColor("#4EC9B0"))  # Cyan
+
+        self.object_format = QTextCharFormat()
+        self.object_format.setForeground(QColor("#4EC9B0"))  # Cyan
 
         self.function_format = QTextCharFormat()
         self.function_format.setForeground(QColor("#DCDCAA"))  # Yellow
@@ -155,10 +158,13 @@ class ArduinoSyntaxHighlighter(QSyntaxHighlighter):
         self.comment_format.setFontItalic(True)
 
         self.number_format = QTextCharFormat()
-        self.number_format.setForeground(QColor("#B5CEA8"))  # Light green
+        self.number_format.setForeground(QColor("#D19A66"))  # Orange
 
         self.preprocessor_format = QTextCharFormat()
         self.preprocessor_format.setForeground(QColor("#C586C0"))  # Purple
+
+        self.constant_format = QTextCharFormat()
+        self.constant_format.setForeground(QColor("#C586C0"))  # Purple
 
         # Define patterns
         self.keywords = [
@@ -206,6 +212,11 @@ class ArduinoSyntaxHighlighter(QSyntaxHighlighter):
             "PI", "HALF_PI", "TWO_PI"
         ]
 
+        # Define objects
+        self.objects = [
+            "Serial", "Wire", "SPI", "EEPROM"
+        ]
+
     def highlightBlock(self, text):
         """Highlight a block of text"""
 
@@ -223,12 +234,26 @@ class ArduinoSyntaxHighlighter(QSyntaxHighlighter):
                 self.setFormat(match.start(), match.end() - match.start(),
                              self.type_format)
 
-        # Arduino functions and constants
-        for func in self.arduino_functions + self.constants:
+        # Arduino functions
+        for func in self.arduino_functions:
             pattern = r'\b' + re.escape(func) + r'\b'
             for match in re.finditer(pattern, text):
                 self.setFormat(match.start(), match.end() - match.start(),
                              self.function_format)
+
+        # Arduino constants
+        for constant in self.constants:
+            pattern = r'\b' + re.escape(constant) + r'\b'
+            for match in re.finditer(pattern, text):
+                self.setFormat(match.start(), match.end() - match.start(),
+                             self.constant_format)
+
+        # Objects
+        for obj in self.objects:
+            pattern = r'\b' + re.escape(obj) + r'\b'
+            for match in re.finditer(pattern, text):
+                self.setFormat(match.start(), match.end() - match.start(),
+                             self.object_format)
 
         # Numbers
         pattern = r'\b\d+\.?\d*\b'
