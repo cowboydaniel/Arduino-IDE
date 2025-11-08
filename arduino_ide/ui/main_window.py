@@ -113,6 +113,7 @@ class MainWindow(QMainWindow):
         self.editor_tabs.setTabsClosable(True)
         self.editor_tabs.setMovable(True)
         self.editor_tabs.tabCloseRequested.connect(self.close_tab)
+        self.editor_tabs.currentChanged.connect(self.on_tab_changed)
 
         # Create initial editor
         self.create_new_editor("sketch.ino")
@@ -389,8 +390,15 @@ class MainWindow(QMainWindow):
         if filename.endswith(".ino"):
             editor_container.editor.setPlainText(self.get_arduino_template())
 
+        # Connect editor changes to pin usage update
+        editor_container.editor.textChanged.connect(self.update_pin_usage)
+
         index = self.editor_tabs.addTab(editor_container, filename)
         self.editor_tabs.setCurrentIndex(index)
+
+        # Initial pin usage update
+        self.update_pin_usage()
+
         return editor_container
 
     def get_arduino_template(self):
@@ -650,6 +658,9 @@ void loop() {
         editor_container = self.create_new_editor(f"{example_name}.ino")
         editor_container.editor.setPlainText(example_code)
 
+        # Update pin usage for the example
+        self.update_pin_usage()
+
     def load_library_example(self, library_name, example_name):
         """Load a library example sketch"""
         self.console_panel.append_output(f"Loading library example: {library_name}/{example_name}")
@@ -682,3 +693,15 @@ void loop() {
         """Handle window close"""
         self.save_state()
         event.accept()
+
+    def update_pin_usage(self):
+        """Update pin usage overview from current editor"""
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget and hasattr(current_widget, 'editor'):
+            code_text = current_widget.editor.toPlainText()
+            self.board_panel.update_pin_usage(code_text)
+
+    def on_tab_changed(self, index):
+        """Handle tab change - update pin usage for new tab"""
+        if index >= 0:
+            self.update_pin_usage()
