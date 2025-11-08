@@ -17,6 +17,7 @@ from arduino_ide.ui.board_panel import BoardPanel
 from arduino_ide.ui.project_explorer import ProjectExplorer
 from arduino_ide.ui.console_panel import ConsolePanel
 from arduino_ide.ui.variable_watch import VariableWatch
+from arduino_ide.ui.status_display import StatusDisplay
 from arduino_ide.services.theme_manager import ThemeManager
 
 
@@ -192,6 +193,13 @@ class MainWindow(QMainWindow):
         serial_action.triggered.connect(self.toggle_serial_monitor)
         tools_menu.addAction(serial_action)
 
+        status_action = QAction("Real-time Status", self)
+        status_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_S)
+        status_action.triggered.connect(self.toggle_status_display)
+        tools_menu.addAction(status_action)
+
+        tools_menu.addSeparator()
+
         board_action = QAction("Board Manager...", self)
         tools_menu.addAction(board_action)
 
@@ -346,6 +354,12 @@ class MainWindow(QMainWindow):
         serial_btn.triggered.connect(self.toggle_serial_monitor)
         main_toolbar.addAction(serial_btn)
 
+        # Real-time Status
+        status_btn = QAction("⚡ Status", self)
+        status_btn.setToolTip("Toggle Real-time Status Display")
+        status_btn.triggered.connect(self.toggle_status_display)
+        main_toolbar.addAction(status_btn)
+
     def create_dock_widgets(self):
         """Create dockable panels"""
         # Project Explorer (left)
@@ -366,6 +380,13 @@ class MainWindow(QMainWindow):
         self.watch_dock.setWidget(self.variable_watch)
         self.addDockWidget(Qt.RightDockWidgetArea, self.watch_dock)
 
+        # Status Display (right, tabbed with board panel)
+        self.status_dock = QDockWidget("Real-time Status", self)
+        self.status_display = StatusDisplay()
+        self.status_dock.setWidget(self.status_display)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.status_dock)
+        self.tabifyDockWidget(self.board_dock, self.status_dock)
+
         # Console Panel (bottom)
         self.console_dock = QDockWidget("Console", self)
         self.console_panel = ConsolePanel()
@@ -378,6 +399,9 @@ class MainWindow(QMainWindow):
         self.serial_dock.setWidget(self.serial_monitor)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.serial_dock)
         self.tabifyDockWidget(self.console_dock, self.serial_dock)
+
+        # Connect status display to serial monitor
+        self.status_display.connect_serial_monitor(self.serial_monitor)
 
         # Show console by default
         self.console_dock.raise_()
@@ -458,6 +482,14 @@ void loop() {
         else:
             self.serial_dock.show()
             self.serial_dock.raise_()
+
+    def toggle_status_display(self):
+        """Show/hide real-time status display"""
+        if self.status_dock.isVisible():
+            self.status_dock.hide()
+        else:
+            self.status_dock.show()
+            self.status_dock.raise_()
 
     def show_about(self):
         """Show about dialog"""
