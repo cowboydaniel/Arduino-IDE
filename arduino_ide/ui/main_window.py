@@ -7,15 +7,75 @@ from PySide6.QtWidgets import (
     QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget
 )
 from PySide6.QtCore import Qt, QSettings
-from PySide6.QtGui import QAction, QKeySequence, QIcon
+from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor
 
-from arduino_ide.ui.code_editor import CodeEditor
+from arduino_ide.ui.code_editor import CodeEditor, BreadcrumbBar, CodeMinimap
 from arduino_ide.ui.serial_monitor import SerialMonitor
 from arduino_ide.ui.board_panel import BoardPanel
 from arduino_ide.ui.project_explorer import ProjectExplorer
 from arduino_ide.ui.console_panel import ConsolePanel
 from arduino_ide.ui.variable_watch import VariableWatch
 from arduino_ide.services.theme_manager import ThemeManager
+
+
+class EditorContainer(QWidget):
+    """Container widget that combines breadcrumb, editor, and minimap"""
+
+    def __init__(self, filename="untitled.ino", parent=None):
+        super().__init__(parent)
+        self.filename = filename
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Setup the editor container layout"""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Breadcrumb bar at top
+        self.breadcrumb = BreadcrumbBar()
+        layout.addWidget(self.breadcrumb)
+
+        # Horizontal layout for editor and minimap
+        editor_layout = QHBoxLayout()
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.setSpacing(0)
+
+        # Code editor
+        self.editor = CodeEditor(file_path=self.filename)
+        editor_layout.addWidget(self.editor)
+
+        # Minimap on the right
+        self.minimap = CodeMinimap()
+        editor_layout.addWidget(self.minimap)
+
+        layout.addLayout(editor_layout)
+
+        # Connect signals
+        self.editor.textChanged.connect(self.sync_minimap)
+        self.editor.cursorPositionChanged.connect(self.update_breadcrumb)
+        self.minimap.clicked.connect(self.jump_to_line)
+
+        # Initial sync
+        self.sync_minimap()
+        self.update_breadcrumb()
+
+    def sync_minimap(self):
+        """Sync minimap content with editor"""
+        self.minimap.setPlainText(self.editor.toPlainText())
+
+    def update_breadcrumb(self):
+        """Update breadcrumb with current location"""
+        cursor = self.editor.textCursor()
+        line_num = cursor.blockNumber() + 1
+        function_name = self.editor.get_current_function()
+        self.breadcrumb.update_breadcrumb(self.filename, function_name, line_num)
+
+    def jump_to_line(self, line_number):
+        """Jump to a specific line from minimap click"""
+        cursor = QTextCursor(self.editor.document().findBlockByNumber(line_number))
+        self.editor.setTextCursor(cursor)
+        self.editor.centerCursor()
 
 
 class MainWindow(QMainWindow):
@@ -241,15 +301,15 @@ class MainWindow(QMainWindow):
 
     def create_new_editor(self, filename="untitled.ino"):
         """Create a new editor tab"""
-        editor = CodeEditor()
+        editor_container = EditorContainer(filename)
 
         # Set default Arduino template
         if filename.endswith(".ino"):
-            editor.setPlainText(self.get_arduino_template())
+            editor_container.editor.setPlainText(self.get_arduino_template())
 
-        index = self.editor_tabs.addTab(editor, filename)
+        index = self.editor_tabs.addTab(editor_container, filename)
         self.editor_tabs.setCurrentIndex(index)
-        return editor
+        return editor_container
 
     def get_arduino_template(self):
         """Get default Arduino sketch template"""
