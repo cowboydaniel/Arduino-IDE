@@ -4,10 +4,12 @@ Main window for Arduino IDE Modern
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget
+    QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget,
+    QComboBox, QLabel
 )
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, QTimer
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor
+import serial.tools.list_ports
 
 from arduino_ide.ui.code_editor import CodeEditor, BreadcrumbBar, CodeMinimap
 from arduino_ide.ui.serial_monitor import SerialMonitor
@@ -86,11 +88,17 @@ class MainWindow(QMainWindow):
         self.settings = QSettings()
         self.theme_manager = ThemeManager()
 
+        # Current build configuration
+        self.build_config = "Release"
+
         self.init_ui()
         self.create_menus()
         self.create_toolbars()
         self.create_dock_widgets()
         self.restore_state()
+
+        # Setup port auto-refresh timer
+        self.setup_port_refresh()
 
         # Apply theme
         self.theme_manager.apply_theme("dark")
@@ -235,31 +243,105 @@ class MainWindow(QMainWindow):
         main_toolbar.setMovable(False)
         self.addToolBar(main_toolbar)
 
+        # Board selector
+        main_toolbar.addWidget(QLabel("Board: "))
+        self.board_selector = QComboBox()
+        self.board_selector.setMinimumWidth(200)
+        self.board_selector.addItems([
+            "Arduino Uno",
+            "Arduino Mega 2560",
+            "Arduino Nano",
+            "Arduino Leonardo",
+            "Arduino Pro Mini",
+            "ESP32 Dev Module",
+            "ESP8266 NodeMCU",
+            "Arduino Due"
+        ])
+        self.board_selector.currentTextChanged.connect(self.on_board_changed)
+        main_toolbar.addWidget(self.board_selector)
+
+        main_toolbar.addSeparator()
+
+        # Port selector
+        main_toolbar.addWidget(QLabel("Port: "))
+        self.port_selector = QComboBox()
+        self.port_selector.setMinimumWidth(150)
+        self.refresh_ports()
+        self.port_selector.currentTextChanged.connect(self.on_port_changed)
+        main_toolbar.addWidget(self.port_selector)
+
+        # Port refresh button
+        refresh_port_btn = QAction("🔄", self)
+        refresh_port_btn.setToolTip("Refresh Ports")
+        refresh_port_btn.triggered.connect(self.refresh_ports)
+        main_toolbar.addAction(refresh_port_btn)
+
+        main_toolbar.addSeparator()
+
+        # Build configuration selector
+        main_toolbar.addWidget(QLabel("Config: "))
+        self.config_selector = QComboBox()
+        self.config_selector.setMinimumWidth(100)
+        self.config_selector.addItems(["Release", "Debug"])
+        self.config_selector.currentTextChanged.connect(self.on_config_changed)
+        main_toolbar.addWidget(self.config_selector)
+
+        main_toolbar.addSeparator()
+
+        # Verify and Upload buttons
         verify_btn = QAction("✓ Verify", self)
+        verify_btn.setToolTip("Verify/Compile Sketch")
         verify_btn.triggered.connect(self.verify_sketch)
         main_toolbar.addAction(verify_btn)
 
         upload_btn = QAction("→ Upload", self)
+        upload_btn.setToolTip("Upload Sketch to Board")
         upload_btn.triggered.connect(self.upload_sketch)
         main_toolbar.addAction(upload_btn)
 
+        # Upload & Monitor combo button
+        upload_monitor_btn = QAction("⬆️📡 Upload & Monitor", self)
+        upload_monitor_btn.setToolTip("Upload and Open Serial Monitor")
+        upload_monitor_btn.triggered.connect(self.upload_and_monitor)
+        main_toolbar.addAction(upload_monitor_btn)
+
         main_toolbar.addSeparator()
 
+        # File operations
         new_btn = QAction("+ New", self)
+        new_btn.setToolTip("New Sketch")
         new_btn.triggered.connect(self.new_file)
         main_toolbar.addAction(new_btn)
 
         open_btn = QAction("📁 Open", self)
+        open_btn.setToolTip("Open Sketch")
         open_btn.triggered.connect(self.open_file)
         main_toolbar.addAction(open_btn)
 
         save_btn = QAction("💾 Save", self)
+        save_btn.setToolTip("Save Sketch")
         save_btn.triggered.connect(self.save_file)
         main_toolbar.addAction(save_btn)
 
         main_toolbar.addSeparator()
 
+        # Quick access to Examples
+        examples_btn = QAction("📚 Examples", self)
+        examples_btn.setToolTip("Open Example Sketches")
+        examples_btn.triggered.connect(self.show_examples)
+        main_toolbar.addAction(examples_btn)
+
+        # Quick access to Libraries
+        libraries_btn = QAction("📦 Libraries", self)
+        libraries_btn.setToolTip("Manage Libraries")
+        libraries_btn.triggered.connect(self.show_libraries)
+        main_toolbar.addAction(libraries_btn)
+
+        main_toolbar.addSeparator()
+
+        # Serial Monitor
         serial_btn = QAction("📡 Serial Monitor", self)
+        serial_btn.setToolTip("Toggle Serial Monitor")
         serial_btn.triggered.connect(self.toggle_serial_monitor)
         main_toolbar.addAction(serial_btn)
 
@@ -373,6 +455,213 @@ void loop() {
         """Show about dialog"""
         # TODO: Implement about dialog
         pass
+
+    def on_board_changed(self, board_name):
+        """Handle board selection change"""
+        self.status_bar.showMessage(f"Board changed to: {board_name}")
+        self.console_panel.append_output(f"Selected board: {board_name}")
+        # Update board panel
+        self.board_panel.update_board_info(board_name)
+
+    def on_port_changed(self, port_name):
+        """Handle port selection change"""
+        if port_name:
+            self.status_bar.showMessage(f"Port changed to: {port_name}")
+            self.console_panel.append_output(f"Selected port: {port_name}")
+
+    def on_config_changed(self, config):
+        """Handle build configuration change"""
+        self.build_config = config
+        self.status_bar.showMessage(f"Build configuration: {config}")
+        self.console_panel.append_output(f"Build configuration changed to: {config}")
+
+    def refresh_ports(self):
+        """Refresh available serial ports"""
+        current_port = self.port_selector.currentText() if hasattr(self, 'port_selector') else None
+
+        # Get list of available ports
+        ports = serial.tools.list_ports.comports()
+        port_list = [f"{port.device} - {port.description}" for port in ports]
+
+        # Update combo box
+        if hasattr(self, 'port_selector'):
+            self.port_selector.clear()
+            if port_list:
+                self.port_selector.addItems(port_list)
+                # Try to restore previous selection
+                if current_port:
+                    index = self.port_selector.findText(current_port)
+                    if index >= 0:
+                        self.port_selector.setCurrentIndex(index)
+            else:
+                self.port_selector.addItem("No ports available")
+
+        return port_list
+
+    def setup_port_refresh(self):
+        """Setup automatic port refresh timer"""
+        self.port_refresh_timer = QTimer(self)
+        self.port_refresh_timer.timeout.connect(self.refresh_ports)
+        # Refresh ports every 3 seconds
+        self.port_refresh_timer.start(3000)
+
+    def upload_and_monitor(self):
+        """Upload sketch and open serial monitor"""
+        self.console_panel.append_output("Uploading sketch and opening serial monitor...")
+        self.upload_sketch()
+        # Show serial monitor after upload
+        if not self.serial_dock.isVisible():
+            self.serial_dock.show()
+        self.serial_dock.raise_()
+        self.status_bar.showMessage("Upload complete - Serial monitor opened")
+
+    def show_examples(self):
+        """Show examples menu/dialog"""
+        examples_menu = QMenu(self)
+
+        # Basic examples
+        basic_menu = examples_menu.addMenu("01.Basics")
+        basic_menu.addAction("Blink").triggered.connect(lambda: self.load_example("Blink"))
+        basic_menu.addAction("AnalogReadSerial").triggered.connect(lambda: self.load_example("AnalogReadSerial"))
+        basic_menu.addAction("DigitalReadSerial").triggered.connect(lambda: self.load_example("DigitalReadSerial"))
+
+        # Digital examples
+        digital_menu = examples_menu.addMenu("02.Digital")
+        digital_menu.addAction("Button").triggered.connect(lambda: self.load_example("Button"))
+        digital_menu.addAction("Debounce").triggered.connect(lambda: self.load_example("Debounce"))
+        digital_menu.addAction("StateChangeDetection").triggered.connect(lambda: self.load_example("StateChangeDetection"))
+
+        # Analog examples
+        analog_menu = examples_menu.addMenu("03.Analog")
+        analog_menu.addAction("AnalogInput").triggered.connect(lambda: self.load_example("AnalogInput"))
+        analog_menu.addAction("Fading").triggered.connect(lambda: self.load_example("Fading"))
+        analog_menu.addAction("Smoothing").triggered.connect(lambda: self.load_example("Smoothing"))
+
+        # Communication examples
+        comm_menu = examples_menu.addMenu("04.Communication")
+        comm_menu.addAction("SerialEvent").triggered.connect(lambda: self.load_example("SerialEvent"))
+        comm_menu.addAction("SerialPassthrough").triggered.connect(lambda: self.load_example("SerialPassthrough"))
+
+        # Show menu at cursor position
+        examples_menu.exec_(self.mapToGlobal(self.rect().center()))
+
+    def show_libraries(self):
+        """Show libraries menu/dialog"""
+        libraries_menu = QMenu(self)
+
+        # Popular libraries
+        libraries_menu.addAction("Manage Libraries...").triggered.connect(self.open_library_manager)
+        libraries_menu.addSeparator()
+
+        # Quick access to common libraries
+        servo_menu = libraries_menu.addMenu("Servo")
+        servo_menu.addAction("Sweep Example").triggered.connect(lambda: self.load_library_example("Servo", "Sweep"))
+        servo_menu.addAction("Knob Example").triggered.connect(lambda: self.load_library_example("Servo", "Knob"))
+
+        stepper_menu = libraries_menu.addMenu("Stepper")
+        stepper_menu.addAction("stepper_oneRevolution").triggered.connect(lambda: self.load_library_example("Stepper", "stepper_oneRevolution"))
+
+        wifi_menu = libraries_menu.addMenu("WiFi")
+        wifi_menu.addAction("WiFiScan").triggered.connect(lambda: self.load_library_example("WiFi", "WiFiScan"))
+        wifi_menu.addAction("WiFiWebServer").triggered.connect(lambda: self.load_library_example("WiFi", "WiFiWebServer"))
+
+        # Show menu at cursor position
+        libraries_menu.exec_(self.mapToGlobal(self.rect().center()))
+
+    def load_example(self, example_name):
+        """Load an example sketch"""
+        self.console_panel.append_output(f"Loading example: {example_name}")
+        self.status_bar.showMessage(f"Loading example: {example_name}")
+
+        # Create example templates
+        examples = {
+            "Blink": """// Blink Example
+// Turns an LED on for one second, then off for one second, repeatedly
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(1000);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(1000);
+}
+""",
+            "AnalogReadSerial": """// AnalogReadSerial Example
+// Reads an analog input and prints the value to the serial monitor
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  int sensorValue = analogRead(A0);
+  Serial.println(sensorValue);
+  delay(1);
+}
+""",
+            "DigitalReadSerial": """// DigitalReadSerial Example
+// Reads a digital input and prints "H" or "L" to the serial monitor
+
+int pushButton = 2;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(pushButton, INPUT);
+}
+
+void loop() {
+  int buttonState = digitalRead(pushButton);
+  Serial.println(buttonState);
+  delay(1);
+}
+""",
+            "Button": """// Button Example
+// Turns on an LED when pressing a button
+
+const int buttonPin = 2;
+const int ledPin = 13;
+
+int buttonState = 0;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT);
+}
+
+void loop() {
+  buttonState = digitalRead(buttonPin);
+
+  if (buttonState == HIGH) {
+    digitalWrite(ledPin, HIGH);
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+}
+"""
+        }
+
+        # Get example code or use default
+        example_code = examples.get(example_name, f"// {example_name} Example\n// TODO: Add example code\n\nvoid setup() {{\n  \n}}\n\nvoid loop() {{\n  \n}}\n")
+
+        # Create new editor with example
+        editor_container = self.create_new_editor(f"{example_name}.ino")
+        editor_container.editor.setPlainText(example_code)
+
+    def load_library_example(self, library_name, example_name):
+        """Load a library example sketch"""
+        self.console_panel.append_output(f"Loading library example: {library_name}/{example_name}")
+        self.status_bar.showMessage(f"Loading example: {library_name}/{example_name}")
+        # TODO: Implement library example loading
+        editor_container = self.create_new_editor(f"{example_name}.ino")
+
+    def open_library_manager(self):
+        """Open library manager dialog"""
+        self.console_panel.append_output("Opening Library Manager...")
+        self.status_bar.showMessage("Library Manager (not yet implemented)")
+        # TODO: Implement library manager dialog
 
     def save_state(self):
         """Save window state"""

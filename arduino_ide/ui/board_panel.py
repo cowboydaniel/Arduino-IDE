@@ -77,8 +77,71 @@ class BoardPanel(QWidget):
 
     def update_board_info(self, board_type):
         """Update board information based on selected board"""
-        # TODO: Implement board-specific info
-        pass
+        # Board specifications database
+        board_specs = {
+            "Arduino Uno": {
+                "cpu": "ATmega328P",
+                "flash": "32 KB",
+                "ram": "2 KB",
+                "clock": "16 MHz"
+            },
+            "Arduino Mega 2560": {
+                "cpu": "ATmega2560",
+                "flash": "256 KB",
+                "ram": "8 KB",
+                "clock": "16 MHz"
+            },
+            "Arduino Nano": {
+                "cpu": "ATmega328P",
+                "flash": "32 KB",
+                "ram": "2 KB",
+                "clock": "16 MHz"
+            },
+            "Arduino Leonardo": {
+                "cpu": "ATmega32u4",
+                "flash": "32 KB",
+                "ram": "2.5 KB",
+                "clock": "16 MHz"
+            },
+            "Arduino Pro Mini": {
+                "cpu": "ATmega328P",
+                "flash": "32 KB",
+                "ram": "2 KB",
+                "clock": "8/16 MHz"
+            },
+            "ESP32 Dev Module": {
+                "cpu": "ESP32 Dual-Core",
+                "flash": "4 MB",
+                "ram": "520 KB",
+                "clock": "240 MHz"
+            },
+            "ESP8266 NodeMCU": {
+                "cpu": "ESP8266",
+                "flash": "4 MB",
+                "ram": "80 KB",
+                "clock": "80/160 MHz"
+            },
+            "Arduino Due": {
+                "cpu": "AT91SAM3X8E",
+                "flash": "512 KB",
+                "ram": "96 KB",
+                "clock": "84 MHz"
+            }
+        }
+
+        # Get specs for the board or use defaults
+        specs = board_specs.get(board_type, {
+            "cpu": "Unknown",
+            "flash": "Unknown",
+            "ram": "Unknown",
+            "clock": "Unknown"
+        })
+
+        # Update labels
+        self.cpu_label.setText(specs["cpu"])
+        self.flash_label.setText(specs["flash"])
+        self.ram_label.setText(specs["ram"])
+        self.clock_label.setText(specs["clock"])
 
     def set_port(self, port):
         """Set connected port"""
