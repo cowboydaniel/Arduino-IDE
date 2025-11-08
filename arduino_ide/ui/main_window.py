@@ -17,6 +17,7 @@ from arduino_ide.ui.board_panel import BoardPanel
 from arduino_ide.ui.project_explorer import ProjectExplorer
 from arduino_ide.ui.console_panel import ConsolePanel
 from arduino_ide.ui.variable_watch import VariableWatch
+from arduino_ide.ui.status_display import StatusDisplay
 from arduino_ide.services.theme_manager import ThemeManager
 
 
@@ -192,6 +193,13 @@ class MainWindow(QMainWindow):
         serial_action.triggered.connect(self.toggle_serial_monitor)
         tools_menu.addAction(serial_action)
 
+        status_action = QAction("Real-time Status", self)
+        status_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_S)
+        status_action.triggered.connect(self.toggle_status_display)
+        tools_menu.addAction(status_action)
+
+        tools_menu.addSeparator()
+
         board_action = QAction("Board Manager...", self)
         tools_menu.addAction(board_action)
 
@@ -346,6 +354,12 @@ class MainWindow(QMainWindow):
         serial_btn.triggered.connect(self.toggle_serial_monitor)
         main_toolbar.addAction(serial_btn)
 
+        # Real-time Status
+        status_btn = QAction("⚡ Status", self)
+        status_btn.setToolTip("Toggle Real-time Status Display")
+        status_btn.triggered.connect(self.toggle_status_display)
+        main_toolbar.addAction(status_btn)
+
     def create_dock_widgets(self):
         """Create dockable panels"""
         # Project Explorer (left)
@@ -365,6 +379,13 @@ class MainWindow(QMainWindow):
         self.variable_watch = VariableWatch()
         self.watch_dock.setWidget(self.variable_watch)
         self.addDockWidget(Qt.RightDockWidgetArea, self.watch_dock)
+
+        # Status Display (right, tabbed with board panel)
+        self.status_dock = QDockWidget("Real-time Status", self)
+        self.status_display = StatusDisplay()
+        self.status_dock.setWidget(self.status_display)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.status_dock)
+        self.tabifyDockWidget(self.board_dock, self.status_dock)
 
         # Console Panel (bottom)
         self.console_dock = QDockWidget("Console", self)
@@ -390,14 +411,16 @@ class MainWindow(QMainWindow):
         if filename.endswith(".ino"):
             editor_container.editor.setPlainText(self.get_arduino_template())
 
-        # Connect editor changes to pin usage update
+        # Connect editor changes to pin usage update and status display
         editor_container.editor.textChanged.connect(self.update_pin_usage)
+        editor_container.editor.textChanged.connect(self.update_status_display)
 
         index = self.editor_tabs.addTab(editor_container, filename)
         self.editor_tabs.setCurrentIndex(index)
 
-        # Initial pin usage update
+        # Initial updates
         self.update_pin_usage()
+        self.update_status_display()
 
         return editor_container
 
@@ -459,6 +482,14 @@ void loop() {
             self.serial_dock.show()
             self.serial_dock.raise_()
 
+    def toggle_status_display(self):
+        """Show/hide real-time status display"""
+        if self.status_dock.isVisible():
+            self.status_dock.hide()
+        else:
+            self.status_dock.show()
+            self.status_dock.raise_()
+
     def show_about(self):
         """Show about dialog"""
         # TODO: Implement about dialog
@@ -470,6 +501,8 @@ void loop() {
         self.console_panel.append_output(f"Selected board: {board_name}")
         # Update board panel
         self.board_panel.update_board_info(board_name)
+        # Update status display with new board specs
+        self.status_display.update_board(board_name)
 
     def on_port_changed(self, port_name):
         """Handle port selection change"""
@@ -701,7 +734,15 @@ void loop() {
             code_text = current_widget.editor.toPlainText()
             self.board_panel.update_pin_usage(code_text)
 
+    def update_status_display(self):
+        """Update real-time status display from current editor"""
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget and hasattr(current_widget, 'editor'):
+            code_text = current_widget.editor.toPlainText()
+            self.status_display.update_from_code(code_text)
+
     def on_tab_changed(self, index):
-        """Handle tab change - update pin usage for new tab"""
+        """Handle tab change - update pin usage and status for new tab"""
         if index >= 0:
             self.update_pin_usage()
+            self.update_status_display()
