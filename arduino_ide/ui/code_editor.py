@@ -19,6 +19,12 @@ try:
 except ImportError:
     Repo = None
 
+# Import suggestion analyzer
+import sys
+from pathlib import Path as PathLib
+sys.path.insert(0, str(PathLib(__file__).parent.parent / "services"))
+from suggestion_analyzer import SuggestionAnalyzer
+
 
 class BreadcrumbBar(QWidget):
     """Breadcrumb navigation showing file path and current function"""
@@ -274,6 +280,7 @@ class CodeEditor(QPlainTextEdit):
     - Auto-indentation
     - Code completion hints
     - Error squiggles
+    - Inline suggestions (tips, best practices)
     - Git diff markers
     - Code folding
     - Minimap
@@ -284,8 +291,12 @@ class CodeEditor(QPlainTextEdit):
 
         self.file_path = file_path
         self.errors = []  # List of (line_number, message) tuples
+        self.suggestions = []  # List of Suggestion objects
         self.folded_blocks = set()  # Set of line numbers that are folded
         self.git_changes = {}  # {line_number: 'added'|'modified'|'deleted'}
+
+        # Initialize suggestion analyzer
+        self.suggestion_analyzer = SuggestionAnalyzer()
 
         # Setup font
         font = QFont("Consolas, Monaco, Courier New")
@@ -362,10 +373,14 @@ class CodeEditor(QPlainTextEdit):
         self.error_check_timer.start(500)  # Check after 500ms of no typing
 
     def check_errors(self):
-        """Check for basic syntax errors"""
+        """Check for basic syntax errors and suggestions"""
         self.errors.clear()
+        self.suggestions.clear()
         text = self.toPlainText()
         lines = text.split('\n')
+
+        # Run suggestion analysis
+        self.suggestions = self.suggestion_analyzer.analyze(text)
 
         # Track brace/paren/bracket balance
         brace_stack = []
@@ -569,7 +584,7 @@ class CodeEditor(QPlainTextEdit):
             block_number += 1
 
     def highlight_current_line(self):
-        """Highlight the current line and show error squiggles"""
+        """Highlight the current line and show error squiggles and suggestions"""
         extra_selections = []
 
         # Highlight current line
@@ -596,6 +611,41 @@ class CodeEditor(QPlainTextEdit):
                 error_format.setUnderlineColor(QColor("#F48771"))  # Red
                 selection.format = error_format
 
+                extra_selections.append(selection)
+
+        # Add suggestion decorations
+        for suggestion in self.suggestions:
+            block = self.document().findBlockByNumber(suggestion.line_number - 1)
+            if block.isValid():
+                selection = QTextEdit.ExtraSelection()
+                selection.cursor = QTextCursor(block)
+
+                # If column and length are specified, highlight specific text
+                if suggestion.length > 0:
+                    selection.cursor.setPosition(block.position() + suggestion.column)
+                    selection.cursor.setPosition(
+                        block.position() + suggestion.column + suggestion.length,
+                        QTextCursor.KeepAnchor
+                    )
+                else:
+                    # Otherwise highlight the whole line
+                    selection.cursor.select(QTextCursor.LineUnderCursor)
+
+                # Different colors for different severity levels
+                suggestion_format = QTextCharFormat()
+                suggestion_format.setUnderlineStyle(QTextCharFormat.DotLine)  # Dotted line for suggestions
+
+                if suggestion.severity == 'tip':
+                    # Teal/cyan for tips (like the light bulb icon)
+                    suggestion_format.setUnderlineColor(QColor("#4EC9B0"))
+                elif suggestion.severity == 'info':
+                    # Blue for info
+                    suggestion_format.setUnderlineColor(QColor("#569CD6"))
+                elif suggestion.severity == 'warning':
+                    # Orange for warnings
+                    suggestion_format.setUnderlineColor(QColor("#CE9178"))
+
+                selection.format = suggestion_format
                 extra_selections.append(selection)
 
         self.setExtraSelections(extra_selections)
@@ -649,16 +699,29 @@ class CodeEditor(QPlainTextEdit):
             self.completer.popup().hide()
 
     def mouseMoveEvent(self, event):
-        """Show error tooltips on hover"""
+        """Show error and suggestion tooltips on hover"""
         cursor = self.cursorForPosition(event.pos())
         block_num = cursor.blockNumber() + 1
 
-        # Check if hovering over an error line
+        tooltip_shown = False
+
+        # Check if hovering over an error line (errors take priority)
         for line_num, message in self.errors:
             if line_num == block_num:
                 QToolTip.showText(event.globalPos(), message, self)
+                tooltip_shown = True
                 break
-        else:
+
+        # If no error, check for suggestions
+        if not tooltip_shown:
+            for suggestion in self.suggestions:
+                if suggestion.line_number == block_num:
+                    QToolTip.showText(event.globalPos(), suggestion.message, self)
+                    tooltip_shown = True
+                    break
+
+        # Hide tooltip if not hovering over error or suggestion
+        if not tooltip_shown:
             QToolTip.hideText()
 
         super().mouseMoveEvent(event)
