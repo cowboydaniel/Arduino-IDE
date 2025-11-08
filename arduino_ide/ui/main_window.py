@@ -417,6 +417,9 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.BottomDockWidgetArea, self.plotter_dock)
         self.tabifyDockWidget(self.serial_dock, self.plotter_dock)
 
+        # Connect serial monitor data to plotter
+        self.serial_monitor.data_received.connect(self.plotter_panel.append_output)
+
         # Problems (bottom, tabbed)
         self.problems_dock = QDockWidget("Problems", self)
         self.problems_panel = ProblemsPanel()
