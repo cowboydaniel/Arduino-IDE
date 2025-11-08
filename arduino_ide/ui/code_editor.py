@@ -5,9 +5,9 @@ Code editor with syntax highlighting and IntelliSense
 from PySide6.QtWidgets import (
     QPlainTextEdit, QWidget, QTextEdit, QCompleter, QLabel, QHBoxLayout,
     QVBoxLayout, QScrollBar, QToolTip, QMenu, QDialog, QFormLayout, QPushButton,
-    QListWidget, QListWidgetItem, QTextBrowser, QDialogButtonBox
+    QListWidget, QListWidgetItem, QTextBrowser, QDialogButtonBox, QStyledItemDelegate
 )
-from PySide6.QtCore import Qt, QRect, QSize, Signal, QStringListModel, QTimer, QPoint
+from PySide6.QtCore import Qt, QRect, QSize, Signal, QStringListModel, QTimer, QPoint, QAbstractListModel, QModelIndex
 from PySide6.QtGui import (
     QColor, QPainter, QTextFormat, QFont, QSyntaxHighlighter,
     QTextCharFormat, QPalette, QTextCursor, QPainterPath, QPen, QBrush, QAction
@@ -266,6 +266,275 @@ class ArduinoSyntaxHighlighter(QSyntaxHighlighter):
             start_index = text.find('/*', start_index + comment_length)
 
 
+class CompletionItem:
+    """Single completion item with text and description"""
+
+    def __init__(self, text, description="", snippet=None, type="function"):
+        self.text = text
+        self.description = description
+        self.snippet = snippet if snippet else text
+        self.type = type  # function, keyword, type, constant, snippet
+
+
+class CompletionDatabase:
+    """Database of Arduino API completions with descriptions"""
+
+    def __init__(self):
+        self.completions = {}
+        self.setup_arduino_api()
+
+    def setup_arduino_api(self):
+        """Setup Arduino API completions"""
+
+        # Serial class methods
+        self.completions['Serial'] = [
+            CompletionItem('println()', 'Send data with newline', 'println($0)', 'function'),
+            CompletionItem('print()', 'Send data without newline', 'print($0)', 'function'),
+            CompletionItem('printf()', 'Formatted printing', 'printf("$0")', 'function'),
+            CompletionItem('available()', 'Get number of bytes available to read', 'available()', 'function'),
+            CompletionItem('read()', 'Read incoming byte', 'read()', 'function'),
+            CompletionItem('write()', 'Write binary data', 'write($0)', 'function'),
+            CompletionItem('begin()', 'Initialize serial communication', 'begin(9600)', 'function'),
+            CompletionItem('end()', 'Close serial communication', 'end()', 'function'),
+            CompletionItem('flush()', 'Wait for outgoing data to complete', 'flush()', 'function'),
+            CompletionItem('peek()', 'Read byte without removing from buffer', 'peek()', 'function'),
+            CompletionItem('readString()', 'Read incoming data as String', 'readString()', 'function'),
+            CompletionItem('readBytes()', 'Read bytes into buffer', 'readBytes($0)', 'function'),
+            CompletionItem('setTimeout()', 'Set timeout for read operations', 'setTimeout($0)', 'function'),
+        ]
+
+        # Wire (I2C) class methods
+        self.completions['Wire'] = [
+            CompletionItem('begin()', 'Initialize I2C communication', 'begin()', 'function'),
+            CompletionItem('beginTransmission()', 'Begin transmission to I2C device', 'beginTransmission($0)', 'function'),
+            CompletionItem('endTransmission()', 'End transmission to I2C device', 'endTransmission()', 'function'),
+            CompletionItem('requestFrom()', 'Request bytes from I2C device', 'requestFrom($0)', 'function'),
+            CompletionItem('write()', 'Write data to I2C', 'write($0)', 'function'),
+            CompletionItem('available()', 'Get number of bytes available', 'available()', 'function'),
+            CompletionItem('read()', 'Read byte from I2C', 'read()', 'function'),
+            CompletionItem('setClock()', 'Set I2C clock speed', 'setClock($0)', 'function'),
+        ]
+
+        # String class methods
+        self.completions['String'] = [
+            CompletionItem('charAt()', 'Get character at index', 'charAt($0)', 'function'),
+            CompletionItem('compareTo()', 'Compare strings', 'compareTo($0)', 'function'),
+            CompletionItem('concat()', 'Concatenate strings', 'concat($0)', 'function'),
+            CompletionItem('endsWith()', 'Check if string ends with substring', 'endsWith($0)', 'function'),
+            CompletionItem('equals()', 'Compare strings for equality', 'equals($0)', 'function'),
+            CompletionItem('indexOf()', 'Find first occurrence of substring', 'indexOf($0)', 'function'),
+            CompletionItem('lastIndexOf()', 'Find last occurrence of substring', 'lastIndexOf($0)', 'function'),
+            CompletionItem('length()', 'Get string length', 'length()', 'function'),
+            CompletionItem('replace()', 'Replace substring', 'replace($0)', 'function'),
+            CompletionItem('startsWith()', 'Check if string starts with substring', 'startsWith($0)', 'function'),
+            CompletionItem('substring()', 'Get substring', 'substring($0)', 'function'),
+            CompletionItem('toCharArray()', 'Convert to char array', 'toCharArray($0)', 'function'),
+            CompletionItem('toInt()', 'Convert to integer', 'toInt()', 'function'),
+            CompletionItem('toLowerCase()', 'Convert to lowercase', 'toLowerCase()', 'function'),
+            CompletionItem('toUpperCase()', 'Convert to uppercase', 'toUpperCase()', 'function'),
+            CompletionItem('trim()', 'Remove whitespace', 'trim()', 'function'),
+        ]
+
+        # Global Arduino functions
+        self.completions['global'] = [
+            # Digital I/O
+            CompletionItem('pinMode()', 'Configure pin mode (INPUT/OUTPUT/INPUT_PULLUP)', 'pinMode($0, OUTPUT)', 'function'),
+            CompletionItem('digitalWrite()', 'Write digital value (HIGH/LOW)', 'digitalWrite($0, HIGH)', 'function'),
+            CompletionItem('digitalRead()', 'Read digital value from pin', 'digitalRead($0)', 'function'),
+
+            # Analog I/O
+            CompletionItem('analogRead()', 'Read analog value (0-1023)', 'analogRead($0)', 'function'),
+            CompletionItem('analogWrite()', 'Write PWM value (0-255)', 'analogWrite($0, 128)', 'function'),
+            CompletionItem('analogReference()', 'Set analog reference voltage', 'analogReference($0)', 'function'),
+
+            # Time
+            CompletionItem('delay()', 'Pause execution (milliseconds)', 'delay($0)', 'function'),
+            CompletionItem('delayMicroseconds()', 'Pause execution (microseconds)', 'delayMicroseconds($0)', 'function'),
+            CompletionItem('millis()', 'Get milliseconds since program start', 'millis()', 'function'),
+            CompletionItem('micros()', 'Get microseconds since program start', 'micros()', 'function'),
+
+            # Math
+            CompletionItem('abs()', 'Absolute value', 'abs($0)', 'function'),
+            CompletionItem('constrain()', 'Constrain value to range', 'constrain($0, min, max)', 'function'),
+            CompletionItem('map()', 'Map value from one range to another', 'map($0, fromLow, fromHigh, toLow, toHigh)', 'function'),
+            CompletionItem('max()', 'Maximum of two values', 'max($0, $1)', 'function'),
+            CompletionItem('min()', 'Minimum of two values', 'min($0, $1)', 'function'),
+            CompletionItem('pow()', 'Raise to power', 'pow($0, $1)', 'function'),
+            CompletionItem('sqrt()', 'Square root', 'sqrt($0)', 'function'),
+
+            # Random
+            CompletionItem('random()', 'Generate random number', 'random($0)', 'function'),
+            CompletionItem('randomSeed()', 'Initialize random number generator', 'randomSeed($0)', 'function'),
+
+            # Bits and Bytes
+            CompletionItem('bit()', 'Get bit value', 'bit($0)', 'function'),
+            CompletionItem('bitClear()', 'Clear bit', 'bitClear($0, $1)', 'function'),
+            CompletionItem('bitRead()', 'Read bit', 'bitRead($0, $1)', 'function'),
+            CompletionItem('bitSet()', 'Set bit', 'bitSet($0, $1)', 'function'),
+            CompletionItem('bitWrite()', 'Write bit', 'bitWrite($0, $1, $2)', 'function'),
+            CompletionItem('highByte()', 'Get high byte', 'highByte($0)', 'function'),
+            CompletionItem('lowByte()', 'Get low byte', 'lowByte($0)', 'function'),
+
+            # Interrupts
+            CompletionItem('attachInterrupt()', 'Attach interrupt handler', 'attachInterrupt(digitalPinToInterrupt($0), ISR, RISING)', 'function'),
+            CompletionItem('detachInterrupt()', 'Detach interrupt handler', 'detachInterrupt(digitalPinToInterrupt($0))', 'function'),
+            CompletionItem('interrupts()', 'Enable interrupts', 'interrupts()', 'function'),
+            CompletionItem('noInterrupts()', 'Disable interrupts', 'noInterrupts()', 'function'),
+
+            # Advanced I/O
+            CompletionItem('tone()', 'Generate tone on pin', 'tone($0, frequency)', 'function'),
+            CompletionItem('noTone()', 'Stop tone on pin', 'noTone($0)', 'function'),
+            CompletionItem('shiftOut()', 'Shift out data', 'shiftOut($0, clockPin, bitOrder, value)', 'function'),
+            CompletionItem('shiftIn()', 'Shift in data', 'shiftIn($0, clockPin, bitOrder)', 'function'),
+            CompletionItem('pulseIn()', 'Measure pulse duration', 'pulseIn($0, state)', 'function'),
+
+            # Structure snippets
+            CompletionItem('setup()', 'Setup function (runs once)', 'void setup() {\n  $0\n}', 'snippet'),
+            CompletionItem('loop()', 'Loop function (runs repeatedly)', 'void loop() {\n  $0\n}', 'snippet'),
+            CompletionItem('if', 'If statement', 'if ($0) {\n  \n}', 'keyword'),
+            CompletionItem('for', 'For loop', 'for (int i = 0; i < $0; i++) {\n  \n}', 'keyword'),
+            CompletionItem('while', 'While loop', 'while ($0) {\n  \n}', 'keyword'),
+            CompletionItem('switch', 'Switch statement', 'switch ($0) {\n  case value:\n    break;\n  default:\n    break;\n}', 'keyword'),
+        ]
+
+        # Constants
+        self.completions['constants'] = [
+            CompletionItem('HIGH', 'Logic level HIGH (5V)', 'HIGH', 'constant'),
+            CompletionItem('LOW', 'Logic level LOW (0V)', 'LOW', 'constant'),
+            CompletionItem('INPUT', 'Pin mode: input', 'INPUT', 'constant'),
+            CompletionItem('OUTPUT', 'Pin mode: output', 'OUTPUT', 'constant'),
+            CompletionItem('INPUT_PULLUP', 'Pin mode: input with internal pullup', 'INPUT_PULLUP', 'constant'),
+            CompletionItem('LED_BUILTIN', 'Built-in LED pin (usually 13)', 'LED_BUILTIN', 'constant'),
+            CompletionItem('A0', 'Analog input pin 0', 'A0', 'constant'),
+            CompletionItem('A1', 'Analog input pin 1', 'A1', 'constant'),
+            CompletionItem('A2', 'Analog input pin 2', 'A2', 'constant'),
+            CompletionItem('A3', 'Analog input pin 3', 'A3', 'constant'),
+            CompletionItem('A4', 'Analog input pin 4 (I2C SDA)', 'A4', 'constant'),
+            CompletionItem('A5', 'Analog input pin 5 (I2C SCL)', 'A5', 'constant'),
+            CompletionItem('PI', 'Pi constant (3.14159...)', 'PI', 'constant'),
+            CompletionItem('HALF_PI', 'Half Pi constant', 'HALF_PI', 'constant'),
+            CompletionItem('TWO_PI', 'Two Pi constant', 'TWO_PI', 'constant'),
+        ]
+
+    def get_completions(self, context=None):
+        """Get completions for a given context
+
+        Args:
+            context: String like 'Serial', 'Wire', etc. or None for global
+
+        Returns:
+            List of CompletionItem objects
+        """
+        if context and context in self.completions:
+            return self.completions[context]
+        elif context is None:
+            # Return all global completions
+            result = []
+            result.extend(self.completions.get('global', []))
+            result.extend(self.completions.get('constants', []))
+            return result
+        else:
+            return []
+
+
+class CompletionListModel(QAbstractListModel):
+    """Custom model for completion items with descriptions"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.items = []
+
+    def set_items(self, items):
+        """Set completion items"""
+        self.beginResetModel()
+        self.items = items
+        self.endResetModel()
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self.items)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid() or index.row() >= len(self.items):
+            return None
+
+        item = self.items[index.row()]
+
+        if role == Qt.DisplayRole:
+            # Return just the completion text for filtering
+            return item.text
+        elif role == Qt.UserRole:
+            # Store the full item for later use
+            return item
+
+        return None
+
+
+class CompletionDelegate(QStyledItemDelegate):
+    """Custom delegate to render completions with descriptions"""
+
+    def paint(self, painter, option, index):
+        """Custom paint for completion items"""
+        painter.save()
+
+        # Get the completion item
+        item = index.data(Qt.UserRole)
+        if not item:
+            super().paint(painter, option, index)
+            painter.restore()
+            return
+
+        # Set background color
+        if option.state & self.State_Selected:
+            painter.fillRect(option.rect, QColor("#094771"))  # Selected blue
+        elif option.state & self.State_MouseOver:
+            painter.fillRect(option.rect, QColor("#2A2D2E"))  # Hover gray
+        else:
+            painter.fillRect(option.rect, QColor("#1E1E1E"))  # Background
+
+        # Draw icon based on type
+        icon_rect = QRect(option.rect.left() + 5, option.rect.top() + 5, 16, 16)
+        icon_color = {
+            'function': QColor("#DCDCAA"),  # Yellow
+            'keyword': QColor("#569CD6"),   # Blue
+            'type': QColor("#4EC9B0"),      # Teal
+            'constant': QColor("#B5CEA8"),  # Light green
+            'snippet': QColor("#C586C0"),   # Purple
+        }.get(item.type, QColor("#808080"))
+
+        painter.setBrush(icon_color)
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(icon_rect)
+
+        # Draw completion text (bold)
+        text_rect = QRect(option.rect.left() + 28, option.rect.top(),
+                         option.rect.width() // 2 - 28, option.rect.height())
+        painter.setPen(QColor("#FFFFFF"))
+        font = painter.font()
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, item.text)
+
+        # Draw description (normal, gray)
+        if item.description:
+            desc_rect = QRect(option.rect.left() + option.rect.width() // 2,
+                            option.rect.top(),
+                            option.rect.width() // 2 - 5,
+                            option.rect.height())
+            painter.setPen(QColor("#858585"))
+            font.setBold(False)
+            font.setItalic(True)
+            painter.setFont(font)
+
+            # Add arrow separator
+            painter.drawText(desc_rect, Qt.AlignLeft | Qt.AlignVCenter, f"→ {item.description}")
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        """Return size hint for completion item"""
+        return QSize(option.rect.width(), 26)
+
+
 class CodeEditor(QPlainTextEdit):
     """
     Advanced code editor with:
@@ -323,34 +592,117 @@ class CodeEditor(QPlainTextEdit):
         self.update_git_diff()
 
     def setup_autocomplete(self):
-        """Setup code completion"""
-        # Collect all completions
-        completions = []
-        completions.extend(self.highlighter.keywords)
-        completions.extend(self.highlighter.types)
-        completions.extend(self.highlighter.arduino_functions)
-        completions.extend(self.highlighter.constants)
+        """Setup code completion with descriptions"""
+        # Create completion database
+        self.completion_db = CompletionDatabase()
 
-        # Add common Arduino snippets
-        completions.extend([
-            "setup()", "loop()", "Serial.begin(9600)", "pinMode(",
-            "digitalWrite(", "digitalRead(", "analogRead(", "analogWrite(",
-            "delay(", "millis()", "if (", "for (", "while (", "switch ("
-        ])
+        # Create custom model and delegate
+        self.completion_model = CompletionListModel(self)
+        self.completion_delegate = CompletionDelegate(self)
 
-        self.completer = QCompleter(sorted(set(completions)), self)
+        # Setup completer
+        self.completer = QCompleter(self)
+        self.completer.setModel(self.completion_model)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
         self.completer.setWidget(self)
         self.completer.setCompletionMode(QCompleter.PopupCompletion)
+
+        # Set custom delegate for rendering
+        self.completer.popup().setItemDelegate(self.completion_delegate)
+
+        # Style the popup
+        self.completer.popup().setStyleSheet("""
+            QListView {
+                background-color: #1E1E1E;
+                color: #FFFFFF;
+                border: 1px solid #3E3E42;
+                outline: none;
+                selection-background-color: #094771;
+            }
+            QListView::item {
+                padding: 3px;
+                border: none;
+            }
+        """)
+
+        # Connect completion signal
         self.completer.activated.connect(self.insert_completion)
 
-    def insert_completion(self, completion):
+        # Load default global completions
+        self.update_completions(None)
+
+    def update_completions(self, context):
+        """Update completion model with items for given context
+
+        Args:
+            context: String like 'Serial', 'Wire', etc. or None for global
+        """
+        completions = self.completion_db.get_completions(context)
+        self.completion_model.set_items(completions)
+
+    def detect_completion_context(self):
+        """Detect context for auto-completion (e.g., 'Serial', 'Wire')
+
+        Returns:
+            Tuple of (context, prefix) where:
+            - context is the object name (e.g., 'Serial') or None for global
+            - prefix is the text to complete
+        """
+        cursor = self.textCursor()
+        cursor.select(QTextCursor.LineUnderCursor)
+        line = cursor.selectedText()
+
+        # Get position in line
+        pos_in_line = self.textCursor().positionInBlock()
+
+        # Get text before cursor in current line
+        text_before = line[:pos_in_line]
+
+        # Check for object method access (e.g., "Serial.pr")
+        match = re.search(r'(\w+)\.(\w*)$', text_before)
+        if match:
+            object_name = match.group(1)
+            prefix = match.group(2)
+            return (object_name, prefix)
+
+        # Global context - get word under cursor
+        cursor = self.textCursor()
+        cursor.select(QTextCursor.WordUnderCursor)
+        prefix = cursor.selectedText()
+
+        return (None, prefix)
+
+    def insert_completion(self, completion_text):
         """Insert selected completion"""
+        # Get the current model index
+        popup = self.completer.popup()
+        index = popup.currentIndex()
+
+        # Get the completion item
+        item = index.data(Qt.UserRole)
+        if not item:
+            # Fallback to simple text insertion
+            tc = self.textCursor()
+            extra = len(completion_text) - len(self.completer.completionPrefix())
+            tc.movePosition(QTextCursor.Left)
+            tc.movePosition(QTextCursor.EndOfWord)
+            tc.insertText(completion_text[-extra:])
+            self.setTextCursor(tc)
+            return
+
+        # Remove the prefix that's already typed
         tc = self.textCursor()
-        extra = len(completion) - len(self.completer.completionPrefix())
-        tc.movePosition(QTextCursor.Left)
-        tc.movePosition(QTextCursor.EndOfWord)
-        tc.insertText(completion[-extra:])
+        prefix_len = len(self.completer.completionPrefix())
+
+        if prefix_len > 0:
+            tc.movePosition(QTextCursor.Left, QTextCursor.MoveAnchor, prefix_len)
+            tc.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, prefix_len)
+            tc.removeSelectedText()
+
+        # Insert the completion text (without snippet placeholders for now)
+        # Remove $0 placeholders from snippet
+        insert_text = item.text
+        tc.insertText(insert_text)
         self.setTextCursor(tc)
 
     def on_cursor_changed(self):
@@ -602,12 +954,13 @@ class CodeEditor(QPlainTextEdit):
 
     def keyPressEvent(self, event):
         """Handle key press for auto-indentation and autocomplete"""
-        # Handle autocomplete
+        # Handle autocomplete popup navigation
         if self.completer.popup().isVisible():
             if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape, Qt.Key_Tab):
                 event.ignore()
                 return
 
+        # Handle newline with auto-indentation
         if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
             # Get current line indentation
             cursor = self.textCursor()
@@ -628,22 +981,29 @@ class CodeEditor(QPlainTextEdit):
             self.insertPlainText(indent_str + extra_indent)
             return
 
-        # Call parent
+        # Call parent to insert the character
         super().keyPressEvent(event)
 
-        # Trigger autocomplete
-        cursor = self.textCursor()
-        cursor.select(QTextCursor.WordUnderCursor)
-        text_under_cursor = cursor.selectedText()
+        # Detect completion context
+        context, prefix = self.detect_completion_context()
 
-        if len(text_under_cursor) >= 2:  # Show after 2 characters
-            self.completer.setCompletionPrefix(text_under_cursor)
+        # Update completions based on context
+        if context != getattr(self, '_last_completion_context', None):
+            self.update_completions(context)
+            self._last_completion_context = context
+
+        # Trigger autocomplete if we have enough characters or just typed '.'
+        if event.text() == '.' or len(prefix) >= 2:
+            self.completer.setCompletionPrefix(prefix)
             popup = self.completer.popup()
+
+            # Set minimum width for popup to show descriptions
+            popup.setMinimumWidth(600)
+
             popup.setCurrentIndex(self.completer.completionModel().index(0, 0))
 
             cr = self.cursorRect()
-            cr.setWidth(self.completer.popup().sizeHintForColumn(0)
-                       + self.completer.popup().verticalScrollBar().sizeHint().width())
+            cr.setWidth(600)  # Fixed width for better description display
             self.completer.complete(cr)
         else:
             self.completer.popup().hide()
