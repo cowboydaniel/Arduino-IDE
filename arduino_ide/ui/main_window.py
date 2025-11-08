@@ -18,6 +18,9 @@ from arduino_ide.ui.project_explorer import ProjectExplorer
 from arduino_ide.ui.console_panel import ConsolePanel
 from arduino_ide.ui.variable_watch import VariableWatch
 from arduino_ide.ui.status_display import StatusDisplay
+from arduino_ide.ui.plotter_panel import PlotterPanel
+from arduino_ide.ui.problems_panel import ProblemsPanel
+from arduino_ide.ui.output_panel import OutputPanel
 from arduino_ide.services.theme_manager import ThemeManager
 
 
@@ -399,6 +402,27 @@ class MainWindow(QMainWindow):
         self.serial_dock.setWidget(self.serial_monitor)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.serial_dock)
         self.tabifyDockWidget(self.console_dock, self.serial_dock)
+
+        # Plotter (bottom, tabbed)
+        self.plotter_dock = QDockWidget("Plotter", self)
+        self.plotter_panel = PlotterPanel()
+        self.plotter_dock.setWidget(self.plotter_panel)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.plotter_dock)
+        self.tabifyDockWidget(self.serial_dock, self.plotter_dock)
+
+        # Problems (bottom, tabbed)
+        self.problems_dock = QDockWidget("Problems", self)
+        self.problems_panel = ProblemsPanel()
+        self.problems_dock.setWidget(self.problems_panel)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.problems_dock)
+        self.tabifyDockWidget(self.plotter_dock, self.problems_dock)
+
+        # Output (bottom, tabbed)
+        self.output_dock = QDockWidget("Output", self)
+        self.output_panel = OutputPanel()
+        self.output_dock.setWidget(self.output_panel)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.output_dock)
+        self.tabifyDockWidget(self.problems_dock, self.output_dock)
 
         # Show console by default
         self.console_dock.raise_()
