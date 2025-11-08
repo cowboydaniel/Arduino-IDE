@@ -22,6 +22,7 @@ from arduino_ide.ui.plotter_panel import PlotterPanel
 from arduino_ide.ui.problems_panel import ProblemsPanel
 from arduino_ide.ui.output_panel import OutputPanel
 from arduino_ide.ui.status_bar import StatusBar
+from arduino_ide.ui.quick_actions_panel import QuickActionsPanel
 from arduino_ide.services.theme_manager import ThemeManager
 
 
@@ -372,11 +373,21 @@ class MainWindow(QMainWindow):
 
     def create_dock_widgets(self):
         """Create dockable panels"""
-        # Project Explorer (left)
+        # Quick Actions Panel (left)
+        self.quick_actions_dock = QDockWidget("Quick Actions", self)
+        self.quick_actions_panel = QuickActionsPanel()
+        self.quick_actions_dock.setWidget(self.quick_actions_panel)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.quick_actions_dock)
+
+        # Project Explorer (left, tabbed with Quick Actions)
         self.project_dock = QDockWidget("Project Explorer", self)
         self.project_explorer = ProjectExplorer()
         self.project_dock.setWidget(self.project_explorer)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.project_dock)
+        self.tabifyDockWidget(self.quick_actions_dock, self.project_dock)
+
+        # Show Quick Actions by default
+        self.quick_actions_dock.raise_()
 
         # Board Panel (right)
         self.board_dock = QDockWidget("Board Info", self)
@@ -433,6 +444,19 @@ class MainWindow(QMainWindow):
 
         # Show console by default
         self.console_dock.raise_()
+
+        # Connect Quick Actions Panel signals
+        self.quick_actions_panel.upload_clicked.connect(self.upload_sketch)
+        self.quick_actions_panel.verify_clicked.connect(self.verify_sketch)
+        self.quick_actions_panel.find_clicked.connect(self.show_find_dialog)
+        self.quick_actions_panel.libraries_clicked.connect(self.show_libraries)
+        self.quick_actions_panel.examples_clicked.connect(self.show_examples)
+        self.quick_actions_panel.board_clicked.connect(self.on_status_bar_board_clicked)
+        self.quick_actions_panel.new_sketch_clicked.connect(self.new_file)
+        self.quick_actions_panel.open_sketch_clicked.connect(self.open_file)
+        self.quick_actions_panel.save_sketch_clicked.connect(self.save_file)
+        self.quick_actions_panel.serial_monitor_clicked.connect(self.toggle_serial_monitor)
+        self.quick_actions_panel.serial_plotter_clicked.connect(self.toggle_plotter)
 
     def create_new_editor(self, filename="untitled.ino"):
         """Create a new editor tab"""
@@ -533,6 +557,33 @@ void loop() {
         else:
             self.status_dock.show()
             self.status_dock.raise_()
+
+    def toggle_plotter(self):
+        """Show/hide serial plotter"""
+        if self.plotter_dock.isVisible():
+            self.plotter_dock.hide()
+        else:
+            self.plotter_dock.show()
+            self.plotter_dock.raise_()
+
+    def show_find_dialog(self):
+        """Show find/replace dialog"""
+        # Get current editor
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget:
+            editor = current_widget.editor
+            # Show find dialog using Qt's built-in find functionality
+            from PySide6.QtWidgets import QInputDialog, QMessageBox
+            text, ok = QInputDialog.getText(self, "Find", "Find text:")
+            if ok and text:
+                # Search for text in the editor
+                if not editor.find(text):
+                    # If not found, try from the beginning
+                    cursor = editor.textCursor()
+                    cursor.movePosition(cursor.Start)
+                    editor.setTextCursor(cursor)
+                    if not editor.find(text):
+                        QMessageBox.information(self, "Find", f"Text '{text}' not found.")
 
     def show_about(self):
         """Show about dialog"""
