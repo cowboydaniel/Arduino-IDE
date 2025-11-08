@@ -21,6 +21,7 @@ from arduino_ide.ui.status_display import StatusDisplay
 from arduino_ide.ui.plotter_panel import PlotterPanel
 from arduino_ide.ui.problems_panel import ProblemsPanel
 from arduino_ide.ui.output_panel import OutputPanel
+from arduino_ide.ui.status_bar import StatusBar
 from arduino_ide.services.theme_manager import ThemeManager
 
 
@@ -104,6 +105,9 @@ class MainWindow(QMainWindow):
         # Setup port auto-refresh timer
         self.setup_port_refresh()
 
+        # Initialize status bar with current values
+        self.initialize_status_bar()
+
         # Apply theme
         self.theme_manager.apply_theme("dark")
 
@@ -124,10 +128,13 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(self.editor_tabs)
 
-        # Status bar
-        self.status_bar = QStatusBar()
+        # Enhanced status bar
+        self.status_bar = StatusBar()
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("Ready")
+
+        # Connect status bar click signals
+        self.status_bar.board_clicked.connect(self.on_status_bar_board_clicked)
+        self.status_bar.port_clicked.connect(self.on_status_bar_port_clicked)
 
     def create_menus(self):
         """Create menu bar"""
@@ -439,12 +446,17 @@ class MainWindow(QMainWindow):
         editor_container.editor.textChanged.connect(self.update_pin_usage)
         editor_container.editor.textChanged.connect(self.update_status_display)
 
+        # Connect cursor position changes to status bar
+        editor_container.editor.cursorPositionChanged.connect(self.update_cursor_position)
+
         index = self.editor_tabs.addTab(editor_container, filename)
         self.editor_tabs.setCurrentIndex(index)
 
         # Initial updates
         self.update_pin_usage()
         self.update_status_display()
+        self.update_status_bar_for_file(filename)
+        self.update_cursor_position()
 
         return editor_container
 
@@ -479,24 +491,32 @@ void loop() {
     def open_file(self):
         """Open file"""
         # TODO: Implement file dialog
-        self.status_bar.showMessage("Open file (not yet implemented)")
+        self.status_bar.set_status("Open file (not yet implemented)")
+        # Reset to Ready after a moment
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def save_file(self):
         """Save current file"""
         # TODO: Implement save
-        self.status_bar.showMessage("Save file (not yet implemented)")
+        self.status_bar.set_status("Save file (not yet implemented)")
+        # Reset to Ready after a moment
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def verify_sketch(self):
         """Verify/compile sketch"""
         self.console_panel.append_output("Verifying sketch...")
         # TODO: Implement compilation
-        self.status_bar.showMessage("Verifying...")
+        self.status_bar.set_status("Compiling...")
+        # Reset to Ready after a moment (would normally be after compilation)
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def upload_sketch(self):
         """Upload sketch to board"""
         self.console_panel.append_output("Uploading sketch...")
         # TODO: Implement upload
-        self.status_bar.showMessage("Uploading...")
+        self.status_bar.set_status("Uploading...")
+        # Reset to Ready after a moment (would normally be after upload)
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def toggle_serial_monitor(self):
         """Show/hide serial monitor"""
@@ -521,24 +541,37 @@ void loop() {
 
     def on_board_changed(self, board_name):
         """Handle board selection change"""
-        self.status_bar.showMessage(f"Board changed to: {board_name}")
+        self.status_bar.set_status(f"Board changed to: {board_name}")
         self.console_panel.append_output(f"Selected board: {board_name}")
         # Update board panel
         self.board_panel.update_board_info(board_name)
         # Update status display with new board specs
         self.status_display.update_board(board_name)
+        # Update status bar
+        self.status_bar.set_board(board_name)
+        # Reset to Ready after a moment
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def on_port_changed(self, port_name):
         """Handle port selection change"""
         if port_name:
-            self.status_bar.showMessage(f"Port changed to: {port_name}")
+            self.status_bar.set_status(f"Port changed to: {port_name}")
             self.console_panel.append_output(f"Selected port: {port_name}")
+            # Update status bar
+            self.status_bar.set_port(port_name)
+            # Check if port is actually available (not "No ports available")
+            is_connected = port_name != "No ports available" and " - " in port_name
+            self.status_bar.set_connection_status(is_connected)
+            # Reset to Ready after a moment
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def on_config_changed(self, config):
         """Handle build configuration change"""
         self.build_config = config
-        self.status_bar.showMessage(f"Build configuration: {config}")
+        self.status_bar.set_status(f"Build configuration: {config}")
         self.console_panel.append_output(f"Build configuration changed to: {config}")
+        # Reset to Ready after a moment
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def refresh_ports(self):
         """Refresh available serial ports"""
@@ -578,7 +611,9 @@ void loop() {
         if not self.serial_dock.isVisible():
             self.serial_dock.show()
         self.serial_dock.raise_()
-        self.status_bar.showMessage("Upload complete - Serial monitor opened")
+        self.status_bar.set_status("Upload complete - Serial monitor opened")
+        # Reset to Ready after a moment
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def show_examples(self):
         """Show examples menu/dialog"""
@@ -636,7 +671,7 @@ void loop() {
     def load_example(self, example_name):
         """Load an example sketch"""
         self.console_panel.append_output(f"Loading example: {example_name}")
-        self.status_bar.showMessage(f"Loading example: {example_name}")
+        self.status_bar.set_status(f"Loading example: {example_name}")
 
         # Create example templates
         examples = {
@@ -718,18 +753,25 @@ void loop() {
         # Update pin usage for the example
         self.update_pin_usage()
 
+        # Reset to Ready after a moment
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
     def load_library_example(self, library_name, example_name):
         """Load a library example sketch"""
         self.console_panel.append_output(f"Loading library example: {library_name}/{example_name}")
-        self.status_bar.showMessage(f"Loading example: {library_name}/{example_name}")
+        self.status_bar.set_status(f"Loading example: {library_name}/{example_name}")
         # TODO: Implement library example loading
         editor_container = self.create_new_editor(f"{example_name}.ino")
+        # Reset to Ready after a moment
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def open_library_manager(self):
         """Open library manager dialog"""
         self.console_panel.append_output("Opening Library Manager...")
-        self.status_bar.showMessage("Library Manager (not yet implemented)")
+        self.status_bar.set_status("Library Manager (not yet implemented)")
         # TODO: Implement library manager dialog
+        # Reset to Ready after a moment
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def save_state(self):
         """Save window state"""
@@ -770,3 +812,57 @@ void loop() {
         if index >= 0:
             self.update_pin_usage()
             self.update_status_display()
+            # Update status bar for new tab
+            current_widget = self.editor_tabs.currentWidget()
+            if current_widget and hasattr(current_widget, 'filename'):
+                self.update_status_bar_for_file(current_widget.filename)
+            self.update_cursor_position()
+
+    def update_cursor_position(self):
+        """Update cursor position in status bar"""
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget and hasattr(current_widget, 'editor'):
+            cursor = current_widget.editor.textCursor()
+            line = cursor.blockNumber() + 1  # 1-based
+            column = cursor.columnNumber() + 1  # 1-based
+            self.status_bar.set_cursor_position(line, column)
+
+    def update_status_bar_for_file(self, filename):
+        """Update status bar language based on filename"""
+        language = self.status_bar.detect_language_from_filename(filename)
+        self.status_bar.set_language(language)
+
+    def on_status_bar_board_clicked(self):
+        """Handle clicks on the board section in status bar"""
+        # Focus the board selector in the toolbar
+        self.board_selector.setFocus()
+        self.board_selector.showPopup()
+
+    def on_status_bar_port_clicked(self):
+        """Handle clicks on the port section in status bar"""
+        # Refresh ports and focus the port selector
+        self.refresh_ports()
+        self.port_selector.setFocus()
+        self.port_selector.showPopup()
+
+    def initialize_status_bar(self):
+        """Initialize status bar with default values"""
+        # Set initial board
+        self.status_bar.set_board(self.board_selector.currentText())
+
+        # Set initial port
+        current_port = self.port_selector.currentText()
+        self.status_bar.set_port(current_port)
+
+        # Set connection status
+        is_connected = current_port != "No ports available" and " - " in current_port
+        self.status_bar.set_connection_status(is_connected)
+
+        # Set initial encoding
+        self.status_bar.set_encoding("UTF-8")
+
+        # Set initial language (will be updated when file is loaded)
+        self.status_bar.set_language("C++")
+
+        # Set initial status
+        self.status_bar.set_status("Ready")

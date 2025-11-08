@@ -11,6 +11,7 @@ from .status_display import StatusDisplay
 from .plotter_panel import PlotterPanel
 from .problems_panel import ProblemsPanel
 from .output_panel import OutputPanel
+from .status_bar import StatusBar
 
 __all__ = [
     'MainWindow',
@@ -24,4 +25,5 @@ __all__ = [
     'PlotterPanel',
     'ProblemsPanel',
     'OutputPanel',
+    'StatusBar',
 ]
