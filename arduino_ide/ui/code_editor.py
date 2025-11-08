@@ -580,6 +580,9 @@ class CodeEditor(QPlainTextEdit):
     - Minimap
     """
 
+    # Signal emitted when user clicks on a function name
+    function_clicked = Signal(str, str)  # function_name, full_context
+
     def __init__(self, parent=None, file_path=None):
         super().__init__(parent)
 
@@ -1110,6 +1113,88 @@ class CodeEditor(QPlainTextEdit):
             QToolTip.hideText()
 
         super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event):
+        """Detect clicks on function names for context panel"""
+        # Only handle left clicks
+        if event.button() == Qt.LeftButton:
+            cursor = self.cursorForPosition(event.pos())
+            function_name = self.get_function_name_at_cursor(cursor)
+
+            if function_name:
+                # Get the full line context
+                cursor_line = cursor
+                cursor_line.select(QTextCursor.LineUnderCursor)
+                full_context = cursor_line.selectedText().strip()
+
+                # Emit signal for context panel
+                self.function_clicked.emit(function_name, full_context)
+
+        super().mousePressEvent(event)
+
+    def get_function_name_at_cursor(self, cursor):
+        """Get Arduino function name at cursor position, including dot notation
+
+        Returns function name like 'Serial.begin', 'pinMode', 'digitalWrite', etc.
+        Returns None if cursor is not on a recognized function.
+        """
+        # Get the position in the document
+        position = cursor.position()
+        text = self.toPlainText()
+
+        # Find word boundaries
+        # Move backward to find start
+        start = position
+        while start > 0 and (text[start - 1].isalnum() or text[start - 1] in '._'):
+            start -= 1
+
+        # Move forward to find end
+        end = position
+        while end < len(text) and (text[end].isalnum() or text[end] in '._'):
+            end += 1
+
+        # Extract the word
+        word = text[start:end]
+
+        # Check if it looks like a function (followed by '(') or is a known Arduino identifier
+        if end < len(text):
+            # Skip whitespace
+            next_pos = end
+            while next_pos < len(text) and text[next_pos].isspace():
+                next_pos += 1
+
+            # Check if followed by '('
+            if next_pos < len(text) and text[next_pos] == '(':
+                return word
+
+        # Also check common Arduino patterns without requiring '('
+        # This handles cases where user clicks on 'Serial' in 'Serial.begin'
+        if '.' in word:
+            # For things like 'Serial.begin', 'Wire.write', etc.
+            return word
+
+        # Check if it's part of a qualified name (e.g., cursor is on 'Serial' in 'Serial.begin')
+        if end < len(text) and text[end] == '.':
+            # Extend to include the method name
+            method_end = end + 1
+            while method_end < len(text) and (text[method_end].isalnum() or text[method_end] == '_'):
+                method_end += 1
+            return text[start:method_end]
+
+        # Return word if it's a known Arduino function (even without '(')
+        # This allows clicking on function names in various contexts
+        arduino_functions = [
+            'pinMode', 'digitalWrite', 'digitalRead',
+            'analogRead', 'analogWrite', 'analogReference',
+            'delay', 'delayMicroseconds', 'millis', 'micros',
+            'attachInterrupt', 'detachInterrupt',
+            'tone', 'noTone', 'pulseIn', 'shiftOut', 'shiftIn'
+        ]
+
+        if word in arduino_functions:
+            return word
+
+        return None
 
     def contextMenuEvent(self, event):
         """Show context menu with pin-specific actions"""
