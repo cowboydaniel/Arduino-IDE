@@ -46,13 +46,23 @@ class BreadcrumbBar(QWidget):
         self.setMaximumHeight(25)
         self.setStyleSheet("background-color: #2D2D30; border-bottom: 1px solid #3E3E42;")
 
-    def update_breadcrumb(self, file_path, function_name=None, line_number=None):
-        """Update breadcrumb text"""
+    def update_breadcrumb(self, file_path, function_name=None, line_number=None, project_name=None):
+        """Update breadcrumb text with format: 'Project > filename > function > Line X'"""
         parts = []
+
+        # Add project name if provided
+        if project_name:
+            parts.append(project_name)
+
+        # Add file name
         if file_path:
             parts.append(Path(file_path).name)
+
+        # Add function name
         if function_name:
-            parts.append(function_name)
+            parts.append(f"{function_name}()")
+
+        # Add line number
         if line_number is not None:
             parts.append(f"Line {line_number}")
 

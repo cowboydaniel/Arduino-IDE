@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSettings, QTimer
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor
 import serial.tools.list_ports
+from pathlib import Path
 
 from arduino_ide.ui.code_editor import CodeEditor, BreadcrumbBar, CodeMinimap
 from arduino_ide.ui.serial_monitor import SerialMonitor
@@ -28,10 +29,21 @@ from arduino_ide.services.theme_manager import ThemeManager
 class EditorContainer(QWidget):
     """Container widget that combines breadcrumb, editor, and minimap"""
 
-    def __init__(self, filename="untitled.ino", parent=None):
+    def __init__(self, filename="untitled.ino", project_name=None, parent=None):
         super().__init__(parent)
         self.filename = filename
+        self.project_name = project_name or self._derive_project_name(filename)
         self.setup_ui()
+
+    def _derive_project_name(self, filename):
+        """Derive project name from file path"""
+        if filename and filename != "untitled.ino":
+            # Get parent directory name as project name
+            path = Path(filename)
+            if path.is_absolute() and path.parent.name:
+                return path.parent.name
+        # Default to "My Project" for untitled or relative paths
+        return "My Project"
 
     def setup_ui(self):
         """Setup the editor container layout"""
@@ -76,7 +88,12 @@ class EditorContainer(QWidget):
         cursor = self.editor.textCursor()
         line_num = cursor.blockNumber() + 1
         function_name = self.editor.get_current_function()
-        self.breadcrumb.update_breadcrumb(self.filename, function_name, line_num)
+        self.breadcrumb.update_breadcrumb(
+            self.filename,
+            function_name,
+            line_num,
+            self.project_name
+        )
 
     def jump_to_line(self, line_number):
         """Jump to a specific line from minimap click"""
