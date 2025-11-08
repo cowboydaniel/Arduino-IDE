@@ -18,6 +18,13 @@ A modern, professional Arduino development environment built with PySide6 that a
 - **Syntax highlighting** for Arduino C/C++ with hardware-aware coloring
 - **Line numbers** and current line highlighting
 - **Auto-indentation** that understands C/C++ block structure
+- **Inline suggestions** with helpful tips and best practices:
+  - Use `LED_BUILTIN` instead of hardcoded pin 13
+  - Reminder to open Serial Monitor when using Serial
+  - Suggest named constants for pin numbers
+  - Recommend `millis()` instead of long `delay()` calls
+  - Detect missing `pinMode()` declarations
+  - And many more helpful hints!
 - **IntelliSense** support (coming soon with Language Server Protocol integration)
 - **Code snippets library** for common Arduino patterns
 
