@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QGroupBox, QFormLayout
 )
 from PySide6.QtCore import Qt
+from arduino_ide.ui.pin_usage_widget import PinUsageWidget
 
 
 class BoardPanel(QWidget):
@@ -63,15 +64,9 @@ class BoardPanel(QWidget):
         info_group.setLayout(info_layout)
         layout.addWidget(info_group)
 
-        # Pin configuration
-        pins_group = QGroupBox("Pin Configuration")
-        pins_layout = QVBoxLayout()
-
-        pins_btn = QPushButton("View Pinout Diagram")
-        pins_layout.addWidget(pins_btn)
-
-        pins_group.setLayout(pins_layout)
-        layout.addWidget(pins_group)
+        # Pin usage overview
+        self.pin_usage_widget = PinUsageWidget()
+        layout.addWidget(self.pin_usage_widget)
 
         layout.addStretch()
 
@@ -146,3 +141,11 @@ class BoardPanel(QWidget):
     def set_port(self, port):
         """Set connected port"""
         self.port_label.setText(port)
+
+    def update_pin_usage(self, code_text):
+        """Update pin usage overview from code
+
+        Args:
+            code_text: Arduino sketch code as string
+        """
+        self.pin_usage_widget.update_from_code(code_text)
