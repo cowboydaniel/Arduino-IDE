@@ -5,9 +5,9 @@ Main window for Arduino IDE Modern
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget,
-    QComboBox, QLabel, QSizePolicy
+    QComboBox, QLabel, QSizePolicy, QFileDialog, QMessageBox
 )
-from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtCore import Qt, QSettings, QTimer, Signal
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor, QGuiApplication, QCursor
 import serial.tools.list_ports
 from pathlib import Path
@@ -36,11 +36,20 @@ from arduino_ide.services.project_manager import ProjectManager
 class EditorContainer(QWidget):
     """Container widget that combines breadcrumb, editor, and minimap"""
 
-    def __init__(self, filename="untitled.ino", project_name=None, parent=None):
+    dirtyChanged = Signal(bool)
+
+    def __init__(self, filename="untitled.ino", project_name=None, parent=None, file_path=None):
         super().__init__(parent)
-        self.filename = filename
-        self.project_name = project_name or self._derive_project_name(filename)
+        self.suggested_name = filename or "untitled.ino"
+        self.file_path = str(Path(file_path).resolve()) if file_path else None
+        if self.file_path:
+            self.suggested_name = Path(self.file_path).name
+        self.filename = self.file_path or self.suggested_name
+        self.project_name = project_name or self._derive_project_name(self.filename)
+        self.dirty = False
         self.setup_ui()
+        self.editor.document().modificationChanged.connect(self._on_modification_changed)
+        self.set_dirty(self.editor.document().isModified())
 
     def _derive_project_name(self, filename):
         """Derive project name from file path"""
@@ -51,6 +60,45 @@ class EditorContainer(QWidget):
                 return path.parent.name
         # Default to "My Project" for untitled or relative paths
         return "My Project"
+
+    def current_display_name(self):
+        """Return the name that should be shown in tab titles"""
+        if self.file_path:
+            return Path(self.file_path).name
+        return self.suggested_name
+
+    def set_file_path(self, path):
+        """Update the current file path after saving/opening"""
+        self.file_path = str(Path(path).resolve()) if path else None
+        if self.file_path:
+            self.suggested_name = Path(self.file_path).name
+        self.filename = self.file_path or self.suggested_name
+        self.project_name = self._derive_project_name(self.filename)
+        self.editor.file_path = self.file_path
+        self.update_breadcrumb()
+
+    def set_content(self, text, mark_clean=False):
+        """Replace the editor contents"""
+        self.editor.setPlainText(text)
+        if mark_clean:
+            self.editor.document().setModified(False)
+        self.sync_minimap()
+        self.update_breadcrumb()
+
+    def mark_clean(self):
+        """Mark the document as saved"""
+        self.editor.document().setModified(False)
+
+    def set_dirty(self, dirty):
+        """Update dirty flag and emit change signal"""
+        if self.dirty == dirty:
+            return
+        self.dirty = dirty
+        self.dirtyChanged.emit(dirty)
+
+    def _on_modification_changed(self, modified):
+        """Handle modification changes from the document"""
+        self.set_dirty(modified)
 
     def setup_ui(self):
         """Setup the editor container layout"""
@@ -95,8 +143,9 @@ class EditorContainer(QWidget):
         cursor = self.editor.textCursor()
         line_num = cursor.blockNumber() + 1
         function_name = self.editor.get_current_function()
+        current_name = self.file_path or self.suggested_name
         self.breadcrumb.update_breadcrumb(
-            self.filename,
+            current_name,
             function_name,
             line_num,
             self.project_name
@@ -116,6 +165,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = QSettings()
         self.theme_manager = ThemeManager()
+        self.recent_files = self._load_recent_files()
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
@@ -265,6 +315,11 @@ class MainWindow(QMainWindow):
         save_action.setShortcut(QKeySequence.Save)
         save_action.triggered.connect(self.save_file)
         file_menu.addAction(save_action)
+
+        save_as_action = QAction("Save &As...", self)
+        save_as_action.setShortcut(QKeySequence.SaveAs)
+        save_as_action.triggered.connect(self.save_file_as)
+        file_menu.addAction(save_as_action)
 
         file_menu.addSeparator()
 
@@ -543,13 +598,19 @@ class MainWindow(QMainWindow):
         self.quick_actions_panel.serial_monitor_clicked.connect(self.toggle_serial_monitor)
         self.quick_actions_panel.serial_plotter_clicked.connect(self.toggle_plotter)
 
-    def create_new_editor(self, filename="untitled.ino"):
+    def create_new_editor(self, filename="untitled.ino", *, file_path=None, content=None, mark_clean=False):
         """Create a new editor tab"""
-        editor_container = EditorContainer(filename)
+        editor_container = EditorContainer(filename, file_path=file_path)
 
-        # Set default Arduino template
-        if filename.endswith(".ino"):
-            editor_container.editor.setPlainText(self.get_arduino_template())
+        # Set content either from provided text or default template
+        if content is not None:
+            editor_container.set_content(content, mark_clean=mark_clean)
+        elif filename.endswith(".ino"):
+            editor_container.set_content(self.get_arduino_template(), mark_clean=mark_clean)
+
+        # Newly created sketches without saved content should be considered dirty
+        if content is None and not mark_clean:
+            editor_container.editor.document().setModified(True)
 
         # Connect editor changes to pin usage update and status display
         editor_container.editor.textChanged.connect(self.update_pin_usage)
@@ -561,14 +622,21 @@ class MainWindow(QMainWindow):
         # Connect function clicks to context panel
         editor_container.editor.function_clicked.connect(self.context_panel.update_context)
 
-        index = self.editor_tabs.addTab(editor_container, filename)
+        editor_container.dirtyChanged.connect(
+            lambda dirty, container=editor_container: self.on_editor_dirty_changed(container)
+        )
+
+        display_name = editor_container.current_display_name()
+        index = self.editor_tabs.addTab(editor_container, display_name)
+        self.editor_tabs.setTabToolTip(index, editor_container.filename)
         self.editor_tabs.setCurrentIndex(index)
 
         # Initial updates
         self.update_pin_usage()
         self.update_status_display()
-        self.update_status_bar_for_file(filename)
+        self.update_status_bar_for_file(editor_container.filename)
         self.update_cursor_position()
+        self.update_tab_title(index)
 
         return editor_container
 
@@ -593,26 +661,192 @@ void loop() {
 
     def close_tab(self, index):
         """Close editor tab"""
-        # TODO: Check if file is saved
+        widget = self.editor_tabs.widget(index)
+        if not widget:
+            return
+
+        if getattr(widget, "dirty", False):
+            choice = self.prompt_unsaved_changes(widget)
+            if choice == QMessageBox.Cancel:
+                return
+            if choice == QMessageBox.Save:
+                if not self.save_file(index=index):
+                    return
+
         self.editor_tabs.removeTab(index)
 
-    def new_file(self):
+    def prompt_unsaved_changes(self, editor_container):
+        """Ask the user how to handle unsaved changes"""
+        file_name = editor_container.current_display_name()
+        message = QMessageBox(self)
+        message.setIcon(QMessageBox.Warning)
+        message.setWindowTitle("Unsaved Changes")
+        message.setText(f"Do you want to save changes to {file_name}?")
+        message.setInformativeText("Your changes will be lost if you don't save them.")
+        message.setStandardButtons(
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel
+        )
+        message.setDefaultButton(QMessageBox.Save)
+        return message.exec()
+
+    def on_editor_dirty_changed(self, editor_container):
+        """Update tab title when dirty state changes"""
+        index = self.editor_tabs.indexOf(editor_container)
+        if index >= 0:
+            self.update_tab_title(index)
+
+    def update_tab_title(self, index):
+        """Refresh the tab title and tooltip for the given index"""
+        editor_container = self.editor_tabs.widget(index)
+        if not editor_container:
+            return
+        title = editor_container.current_display_name()
+        if getattr(editor_container, "dirty", False):
+            title += "*"
+        self.editor_tabs.setTabText(index, title)
+        tooltip = editor_container.file_path or editor_container.suggested_name
+        self.editor_tabs.setTabToolTip(index, tooltip)
+
+    def find_editor_by_path(self, path):
+        """Return the index and container for a given file path"""
+        if not path:
+            return -1, None
+        normalized = str(Path(path).resolve())
+        for i in range(self.editor_tabs.count()):
+            widget = self.editor_tabs.widget(i)
+            if getattr(widget, "file_path", None) == normalized:
+                return i, widget
+        return -1, None
+
+    def add_recent_file(self, path):
+        """Track a recently opened or saved file"""
+        normalized = str(Path(path).resolve())
+        files = [normalized]
+        files.extend(f for f in getattr(self, "recent_files", []) if f != normalized)
+        self.recent_files = files[:10]
+        self.settings.setValue("recentFiles", self.recent_files)
+
+    def _load_recent_files(self):
+        """Load recent files from persistent settings"""
+        stored = self.settings.value("recentFiles", [])
+        if isinstance(stored, str):
+            return [stored]
+        if isinstance(stored, (list, tuple)):
+            return [str(Path(item).resolve()) for item in stored]
+        return []
+
+    def new_file(self, checked=False):
         """Create new file"""
         self.create_new_editor()
 
-    def open_file(self):
+    def open_file(self, checked=False):
         """Open file"""
-        # TODO: Implement file dialog
-        self.status_bar.set_status("Open file (not yet implemented)")
-        # Reset to Ready after a moment
+        start_dir = self.settings.value("lastOpenDir", str(Path.home()))
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Sketch",
+            start_dir,
+            "Arduino Sketches (*.ino *.pde *.cpp *.c *.h);;All Files (*)"
+        )
+
+        if not file_path:
+            return
+
+        path = Path(file_path)
+        self.settings.setValue("lastOpenDir", str(path.parent))
+
+        try:
+            contents = path.read_text(encoding="utf-8")
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Open Sketch",
+                f"Failed to open {path.name}: {exc}"
+            )
+            self.status_bar.set_status("Ready")
+            return
+
+        existing_index, existing_container = self.find_editor_by_path(path)
+        if existing_container:
+            existing_container.set_file_path(path)
+            existing_container.set_content(contents, mark_clean=True)
+            self.editor_tabs.setCurrentIndex(existing_index)
+            self.update_status_bar_for_file(existing_container.filename)
+            self.update_tab_title(existing_index)
+        else:
+            editor_container = self.create_new_editor(
+                filename=path.name,
+                file_path=str(path),
+                content=contents,
+                mark_clean=True
+            )
+            editor_container.set_file_path(path)
+
+        self.add_recent_file(path)
+        self.status_bar.set_status(f"Opened {path.name}")
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
-    def save_file(self):
+    def save_file(self, checked=False, *, index=None, save_as=False):
         """Save current file"""
-        # TODO: Implement save
-        self.status_bar.set_status("Save file (not yet implemented)")
-        # Reset to Ready after a moment
+        if index is None:
+            index = self.editor_tabs.currentIndex()
+
+        if index < 0:
+            return False
+
+        editor_container = self.editor_tabs.widget(index)
+        if not editor_container:
+            return False
+
+        current_path = editor_container.file_path
+        needs_dialog = save_as or not current_path
+
+        if needs_dialog:
+            suggested_dir = self.settings.value("lastSaveDir", str(Path.home()))
+            if current_path:
+                suggested_dir = str(Path(current_path).parent)
+                default_name = Path(current_path).name
+            else:
+                default_name = editor_container.suggested_name
+            initial_path = str(Path(suggested_dir) / default_name)
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Sketch As" if save_as or not current_path else "Save Sketch",
+                initial_path,
+                "Arduino Sketches (*.ino *.pde *.cpp *.c *.h);;All Files (*)"
+            )
+            if not file_path:
+                return False
+            current_path = file_path
+
+        path = Path(current_path)
+
+        try:
+            path.write_text(editor_container.editor.toPlainText(), encoding="utf-8")
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Save Sketch",
+                f"Failed to save {path.name}: {exc}"
+            )
+            self.status_bar.set_status("Ready")
+            return False
+
+        self.settings.setValue("lastSaveDir", str(path.parent))
+        editor_container.set_file_path(path)
+        editor_container.mark_clean()
+        self.update_tab_title(index)
+        self.add_recent_file(path)
+        self.update_status_bar_for_file(editor_container.filename)
+
+        self.status_bar.set_status(f"Saved {path.name}")
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
+        return True
+
+    def save_file_as(self, checked=False):
+        """Save the current file with a new name"""
+        return self.save_file(index=None, save_as=True)
 
     def verify_sketch(self):
         """Verify/compile sketch"""
@@ -884,7 +1118,7 @@ void loop() {
 
         # Create new editor with example
         editor_container = self.create_new_editor(f"{example_name}.ino")
-        editor_container.editor.setPlainText(example_code)
+        editor_container.set_content(example_code)
 
         # Update pin usage for the example
         self.update_pin_usage()
