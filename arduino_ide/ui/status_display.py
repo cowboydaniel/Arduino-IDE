@@ -105,6 +105,67 @@ class CodeAnalyzer:
     """Analyzes Arduino code to estimate memory usage"""
 
     @staticmethod
+    def strip_comments(code_text):
+        """Remove all comments from code (both // and /* */ style)
+
+        This ensures comments don't affect memory usage estimates,
+        since they are removed during compilation.
+        """
+        if not code_text:
+            return ""
+
+        result = []
+        i = 0
+        while i < len(code_text):
+            # Check for multi-line comment start
+            if i < len(code_text) - 1 and code_text[i:i+2] == '/*':
+                # Find the end of the comment
+                end = code_text.find('*/', i + 2)
+                if end != -1:
+                    # Skip to after the comment, but preserve newlines for line counting
+                    comment_text = code_text[i:end+2]
+                    newlines = comment_text.count('\n')
+                    result.append('\n' * newlines)
+                    i = end + 2
+                else:
+                    # Unclosed comment, skip to end
+                    break
+            # Check for single-line comment
+            elif i < len(code_text) - 1 and code_text[i:i+2] == '//':
+                # Skip to end of line
+                end = code_text.find('\n', i)
+                if end != -1:
+                    result.append('\n')  # Preserve the newline
+                    i = end + 1
+                else:
+                    # Comment goes to end of file
+                    break
+            # Check for string literals (don't strip comments inside strings)
+            elif code_text[i] == '"':
+                # Add the quote
+                result.append(code_text[i])
+                i += 1
+                # Find the end of the string, handling escaped quotes
+                while i < len(code_text):
+                    if code_text[i] == '\\' and i + 1 < len(code_text):
+                        # Escaped character
+                        result.append(code_text[i:i+2])
+                        i += 2
+                    elif code_text[i] == '"':
+                        # End of string
+                        result.append(code_text[i])
+                        i += 1
+                        break
+                    else:
+                        result.append(code_text[i])
+                        i += 1
+            else:
+                result.append(code_text[i])
+                i += 1
+
+        return ''.join(result)
+
+    @staticmethod
     def estimate_flash_usage(code_text):
         """Estimate Flash/Program storage usage from code
 
@@ -116,6 +177,9 @@ class CodeAnalyzer:
         """
         if not code_text.strip():
             return 0
+
+        # Strip comments first - they don't contribute to compiled code
+        code_text = CodeAnalyzer.strip_comments(code_text)
 
         # Base overhead for Arduino runtime
         base_overhead = 1500  # bytes
@@ -132,7 +196,7 @@ class CodeAnalyzer:
 
         # Estimate based on code complexity (LOC)
         lines = [line.strip() for line in code_text.split('\n')
-                 if line.strip() and not line.strip().startswith('//')]
+                 if line.strip()]
         code_lines = len(lines)
         complexity_bytes = code_lines * 15  # Rough estimate: 15 bytes per LOC
 
@@ -165,6 +229,9 @@ class CodeAnalyzer:
         """
         if not code_text.strip():
             return 0
+
+        # Strip comments first - they don't contribute to compiled code
+        code_text = CodeAnalyzer.strip_comments(code_text)
 
         # Base overhead for Arduino runtime and stack
         base_overhead = 200  # bytes
