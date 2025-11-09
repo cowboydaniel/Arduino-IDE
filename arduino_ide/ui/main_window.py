@@ -25,7 +25,12 @@ from arduino_ide.ui.problems_panel import ProblemsPanel
 from arduino_ide.ui.output_panel import OutputPanel
 from arduino_ide.ui.status_bar import StatusBar
 from arduino_ide.ui.quick_actions_panel import QuickActionsPanel
+from arduino_ide.ui.library_manager_dialog import LibraryManagerDialog
+from arduino_ide.ui.board_manager_dialog import BoardManagerDialog
 from arduino_ide.services.theme_manager import ThemeManager
+from arduino_ide.services.library_manager import LibraryManager
+from arduino_ide.services.board_manager import BoardManager
+from arduino_ide.services.project_manager import ProjectManager
 
 
 class EditorContainer(QWidget):
@@ -111,6 +116,14 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = QSettings()
         self.theme_manager = ThemeManager()
+
+        # Initialize package managers
+        self.library_manager = LibraryManager()
+        self.board_manager = BoardManager()
+        self.project_manager = ProjectManager(
+            library_manager=self.library_manager,
+            board_manager=self.board_manager
+        )
 
         # Current build configuration
         self.build_config = "Release"
@@ -230,9 +243,11 @@ class MainWindow(QMainWindow):
         tools_menu.addSeparator()
 
         board_action = QAction("Board Manager...", self)
+        board_action.triggered.connect(self.open_board_manager)
         tools_menu.addAction(board_action)
 
         library_action = QAction("Library Manager...", self)
+        library_action.triggered.connect(self.open_library_manager)
         tools_menu.addAction(library_action)
 
         # View Menu
@@ -850,10 +865,43 @@ void loop() {
     def open_library_manager(self):
         """Open library manager dialog"""
         self.console_panel.append_output("Opening Library Manager...")
-        self.status_bar.set_status("Library Manager (not yet implemented)")
-        # TODO: Implement library manager dialog
-        # Reset to Ready after a moment
-        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+        self.status_bar.set_status("Library Manager")
+
+        dialog = LibraryManagerDialog(self.library_manager, self)
+        dialog.exec_()
+
+        self.status_bar.set_status("Ready")
+
+    def open_board_manager(self):
+        """Open board manager dialog"""
+        self.console_panel.append_output("Opening Board Manager...")
+        self.status_bar.set_status("Board Manager")
+
+        dialog = BoardManagerDialog(self.board_manager, self)
+
+        # Connect board selection signal
+        dialog.board_selected.connect(self.on_board_selected_from_manager)
+
+        dialog.exec_()
+
+        self.status_bar.set_status("Ready")
+
+    def on_board_selected_from_manager(self, fqbn: str):
+        """Handle board selection from board manager"""
+        # Get board object
+        board = self.board_manager.get_board(fqbn)
+        if board:
+            # Update board selector in toolbar
+            # Find the board in the combo box or add it
+            index = self.board_selector.findText(board.name)
+            if index >= 0:
+                self.board_selector.setCurrentIndex(index)
+            else:
+                self.board_selector.addItem(board.name)
+                self.board_selector.setCurrentText(board.name)
+
+            self.console_panel.append_output(f"Selected board: {board.name}")
+            self.status_bar.update_board(board.name)
 
     def save_state(self):
         """Save window state"""

@@ -12,6 +12,8 @@ from .plotter_panel import PlotterPanel
 from .problems_panel import ProblemsPanel
 from .output_panel import OutputPanel
 from .status_bar import StatusBar
+from .library_manager_dialog import LibraryManagerDialog
+from .board_manager_dialog import BoardManagerDialog
 
 __all__ = [
     'MainWindow',
@@ -26,4 +28,6 @@ __all__ = [
     'ProblemsPanel',
     'OutputPanel',
     'StatusBar',
+    'LibraryManagerDialog',
+    'BoardManagerDialog',
 ]
