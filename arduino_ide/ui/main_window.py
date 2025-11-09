@@ -190,6 +190,11 @@ class MainWindow(QMainWindow):
         )
         self.setDockNestingEnabled(True)
 
+        # Assign corners to right dock area so bottom docks (Serial Monitor, Console)
+        # don't extend under the right-side panels
+        self.setCorner(Qt.TopRightCorner, Qt.RightDockWidgetArea)
+        self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
+
         # Central widget with editor tabs
         self.editor_tabs = QTabWidget()
         self.editor_tabs.setTabsClosable(True)
