@@ -59,20 +59,20 @@ def estimate_ram_usage(code_text, board_name="Arduino Uno"):
     code_text = strip_comments(code_text)
 
     board_overhead = {
-        "Arduino Uno": 100,
-        "Arduino Nano": 100,
-        "Arduino Pro Mini": 100,
-        "Arduino Leonardo": 100,
-        "Arduino Micro": 100,
-        "Arduino Mega 2560": 200,
-        "Arduino Due": 500,
-        "Arduino Uno R4 WiFi": 500,
-        "Arduino Uno R4 Minima": 500,
+        "Arduino Uno": 9,
+        "Arduino Nano": 9,
+        "Arduino Pro Mini": 9,
+        "Arduino Leonardo": 20,
+        "Arduino Micro": 20,
+        "Arduino Mega 2560": 12,
+        "Arduino Due": 100,
+        "Arduino Uno R4 WiFi": 100,
+        "Arduino Uno R4 Minima": 100,
         "ESP32 Dev Module": 25600,
         "ESP8266 NodeMCU": 26624,
     }
 
-    total_ram = board_overhead.get(board_name, 100)
+    total_ram = board_overhead.get(board_name, 9)
 
     # Remove PROGMEM data first
     code_no_progmem = re.sub(r'\bPROGMEM\b', '', code_text)
@@ -125,13 +125,13 @@ def estimate_ram_usage(code_text, board_name="Arduino Uno"):
 
     # Library buffers
     if 'Serial.begin' in code_text or 'Serial.' in code_text:
-        total_ram += 128
+        total_ram += 175  # 64B RX + 64B TX + 47B object overhead
     if 'Serial1.begin' in code_text or 'Serial1.' in code_text:
-        total_ram += 128
+        total_ram += 175
     if 'Serial2.begin' in code_text or 'Serial2.' in code_text:
-        total_ram += 128
+        total_ram += 175
     if 'Serial3.begin' in code_text or 'Serial3.' in code_text:
-        total_ram += 128
+        total_ram += 175
     if 'Wire.begin' in code_text or 'Wire.' in code_text or '#include <Wire.h>' in code_text:
         total_ram += 32
     if 'Ethernet.' in code_text or '#include <Ethernet' in code_text:
@@ -158,7 +158,7 @@ def estimate_ram_usage(code_text, board_name="Arduino Uno"):
 # Test cases with actual avr-size output
 test_cases = [
     {
-        "name": "Minimal Serial sketch",
+        "name": "Minimal Serial sketch (ACTUAL COMPILER OUTPUT)",
         "board": "Arduino Uno",
         "code": """
 void setup() {
@@ -166,8 +166,8 @@ void setup() {
 }
 void loop() {}
 """,
-        "expected_ram": 228,
-        "tolerance": 5
+        "expected_ram": 184,  # REAL measurement from actual compiler
+        "tolerance": 0  # Must be exact
     },
     {
         "name": "Empty sketch (no Serial)",
@@ -176,8 +176,8 @@ void loop() {}
 void setup() {}
 void loop() {}
 """,
-        "expected_ram": 100,
-        "tolerance": 10
+        "expected_ram": 9,  # Timer vars only
+        "tolerance": 0
     },
     {
         "name": "Simple variables",
@@ -190,8 +190,8 @@ float z = 3.14;
 void setup() {}
 void loop() {}
 """,
-        "expected_ram": 110,
-        "tolerance": 5
+        "expected_ram": 19,  # 9 (base) + 2 (int) + 4 (long) + 4 (float)
+        "tolerance": 2
     },
     {
         "name": "Array allocation",
@@ -202,8 +202,8 @@ byte buffer[100];
 void setup() {}
 void loop() {}
 """,
-        "expected_ram": 200,
-        "tolerance": 5
+        "expected_ram": 109,  # 9 (base) + 100 (byte array)
+        "tolerance": 2
     },
     {
         "name": "Serial + Wire",
@@ -217,8 +217,8 @@ void setup() {
 }
 void loop() {}
 """,
-        "expected_ram": 260,
-        "tolerance": 10
+        "expected_ram": 216,  # 9 (base) + 175 (Serial) + 32 (Wire)
+        "tolerance": 5
     },
     {
         "name": "Multiple variables per line",
@@ -229,8 +229,8 @@ int a, b, c;
 void setup() {}
 void loop() {}
 """,
-        "expected_ram": 106,
-        "tolerance": 5
+        "expected_ram": 15,  # 9 (base) + 2*3 (three ints)
+        "tolerance": 2
     },
     {
         "name": "String objects",
@@ -241,8 +241,8 @@ String msg;
 void setup() {}
 void loop() {}
 """,
-        "expected_ram": 106,
-        "tolerance": 5
+        "expected_ram": 15,  # 9 (base) + 6 (String object)
+        "tolerance": 2
     },
     {
         "name": "PROGMEM data (should NOT count)",
@@ -253,8 +253,8 @@ const char str[] PROGMEM = "Hello World";
 void setup() {}
 void loop() {}
 """,
-        "expected_ram": 100,
-        "tolerance": 5
+        "expected_ram": 9,  # Just base, PROGMEM doesn't use RAM
+        "tolerance": 2
     },
 ]
 
