@@ -134,6 +134,9 @@ class MainWindow(QMainWindow):
         self.create_dock_widgets()
         self.restore_state()
 
+        # Create initial editor (after dock widgets are created)
+        self.create_new_editor("sketch.ino")
+
         # Setup port auto-refresh timer
         self.setup_port_refresh()
 
@@ -154,9 +157,6 @@ class MainWindow(QMainWindow):
         self.editor_tabs.setMovable(True)
         self.editor_tabs.tabCloseRequested.connect(self.close_tab)
         self.editor_tabs.currentChanged.connect(self.on_tab_changed)
-
-        # Create initial editor
-        self.create_new_editor("sketch.ino")
 
         self.setCentralWidget(self.editor_tabs)
 
