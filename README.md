@@ -204,10 +204,43 @@ The architecture uses a modular approach:
 
 ### Running Tests
 
+The project currently ships a small set of Python scripts that double as our
+smoke/regression tests. They can be executed directly without any additional
+pytest scaffolding.
+
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. **Install Qt runtime libraries** (required for any test that imports
+   PySide6 widgets):
+   - Ubuntu/Debian: `sudo apt-get install -y libgl1`
+   - Fedora: `sudo dnf install mesa-libGL`
+   - macOS: available through the system OpenGL framework (no action usually
+     required)
+3. **(Headless environments)** Set Qt to use the offscreen backend so that CI
+   workers without a display server can instantiate widgets:
+   ```bash
+   export QT_QPA_PLATFORM=offscreen
+   ```
+
+With the prerequisites in place the available checks are:
+
 ```bash
-# TODO: Add test suite
-pytest tests/
+# Static RAM estimation regression suite
+python test_ram_estimation.py
+
+# UI import/attribute smoke test (requires PySide6 + libGL)
+QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-offscreen} python test_features.py
+
+# Optional manual test that opens the plotter UI. Close the window to exit.
+QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-offscreen} python test_plotter.py
 ```
+
+`test_plotter.py` spins up a Qt event loop to exercise the live serial plotter.
+Because it requires human interaction to close the window it is not run in CI
+by default, but the command above allows contributors to reproduce the behavior
+locally when debugging GUI issues.
 
 ### Building for Distribution
 
