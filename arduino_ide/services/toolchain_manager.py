@@ -135,7 +135,9 @@ class ToolchainManager:
                         last_percent[0] = percent
                         mb_downloaded = downloaded / (1024 * 1024)
                         mb_total = total_size / (1024 * 1024)
-                        print(f"Downloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)", end='\r', flush=True)
+                        # Use sys.stdout.write for better control over line updates
+                        sys.stdout.write(f"\rDownloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)")
+                        sys.stdout.flush()
                 if progress_callback:
                     progress_callback(downloaded, total_size)
 
