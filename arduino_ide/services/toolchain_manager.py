@@ -126,6 +126,7 @@ class ToolchainManager:
 
             # Download with progress
             last_percent = [-1]  # Use list to allow modification in nested function
+
             def reporthook(block_num, block_size, total_size):
                 downloaded = block_num * block_size
                 if total_size > 0:
@@ -135,8 +136,10 @@ class ToolchainManager:
                         last_percent[0] = percent
                         mb_downloaded = downloaded / (1024 * 1024)
                         mb_total = total_size / (1024 * 1024)
-                        # Use sys.stdout.write for better control over line updates
-                        sys.stdout.write(f"\rDownloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)")
+                        # Use carriage return to overwrite same line (every 1%)
+                        progress_text = f"Downloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)"
+                        # Pad with spaces to overwrite any previous longer text
+                        sys.stdout.write(f"\r{progress_text:<80}")
                         sys.stdout.flush()
                 if progress_callback:
                     progress_callback(downloaded, total_size)
