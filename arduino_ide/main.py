@@ -21,9 +21,9 @@ def main():
     app.setOrganizationName("Arduino IDE Modern")
     app.setApplicationVersion("0.1.0")
 
-    # Create and show main window
+    # Create and show main window maximized
     window = MainWindow()
-    window.show()
+    window.showMaximized()
 
     sys.exit(app.exec())
 

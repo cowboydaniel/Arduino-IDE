@@ -139,9 +139,6 @@ class MainWindow(QMainWindow):
         if state:
             self.restoreState(state)
 
-        # Set window state to maximized
-        self.setWindowState(Qt.WindowMaximized)
-
         # Create initial editor (after dock widgets are created)
         self.create_new_editor("sketch.ino")
 
@@ -157,14 +154,6 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """Initialize the main UI"""
         self.setWindowTitle("Arduino IDE Modern")
-
-        # Explicitly set window flags to ensure maximize button is visible on Linux
-        self.setWindowFlags(
-            Qt.Window |
-            Qt.WindowMinimizeButtonHint |
-            Qt.WindowMaximizeButtonHint |
-            Qt.WindowCloseButtonHint
-        )
 
         # Central widget with editor tabs
         self.editor_tabs = QTabWidget()
