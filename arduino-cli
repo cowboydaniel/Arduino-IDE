@@ -377,13 +377,20 @@ class ArduinoCLI:
             return 1
 
         # Compile with avr-gcc
-        obj_file = build_dir / f"{sketch_file.stem}.o"
+        sketch_obj_file = build_dir / f"{sketch_file.stem}.o"
+        core_obj_file = build_dir / "Arduino.o"
         elf_file = build_dir / f"{sketch_file.stem}.elf"
         hex_file = build_dir / f"{sketch_file.stem}.hex"
 
         # Get MCU type from board
         mcu = 'atmega328p' if 'uno' in board.fqbn.lower() else 'atmega2560'
         f_cpu = '16000000L'
+
+        # Get specs directory for AVR toolchain
+        specs_dir = toolchain.avr_dir / 'bin' / 'gcc' / 'avr' / '7.3.0' / 'device-specs'
+        if not specs_dir.exists():
+            # Try usr/lib location
+            specs_dir = toolchain.avr_dir / 'usr' / 'lib' / 'gcc' / 'avr' / '7.3.0' / 'device-specs'
 
         # Compilation flags for Arduino Uno
         compile_flags = [
@@ -393,17 +400,51 @@ class ArduinoCLI:
             '-Os',  # Optimize for size
             '-w',  # Suppress warnings
             f'-mmcu={mcu}',
+        ]
+
+        # Add specs directory and bin directory for finding binutils
+        if specs_dir.exists():
+            compile_flags.extend(['-B', str(specs_dir.parent.parent.parent)])
+
+        # Add AVR binutils directory so gcc can find avr-as, avr-ld, etc.
+        avr_binutils = toolchain.avr_dir / 'bin' / 'avr' / 'bin'
+        if not avr_binutils.exists():
+            avr_binutils = toolchain.avr_dir / 'usr' / 'lib' / 'avr' / 'bin'
+
+        if avr_binutils.exists():
+            compile_flags.extend(['-B', str(avr_binutils)])
+
+        # Also keep the main bin directory for PATH
+        bin_dir = toolchain.avr_dir / 'bin'
+
+        # Add AVR libc include paths
+        avr_include = toolchain.avr_dir / 'bin' / 'avr' / 'include'
+        if not avr_include.exists():
+            avr_include = toolchain.avr_dir / 'usr' / 'lib' / 'avr' / 'include'
+
+        compile_flags.extend([
             f'-DF_CPU={f_cpu}',
             '-DARDUINO=10819',
             '-DARDUINO_AVR_UNO',
             '-DARDUINO_ARCH_AVR',
+        ])
+
+        # Add include paths
+        if avr_include.exists():
+            compile_flags.extend(['-isystem', str(avr_include)])
+
+        compile_flags.extend([
             '-I' + str(Path(__file__).parent / 'arduino_ide' / 'cores' / 'arduino'),
             str(cpp_file),
-            '-o', str(obj_file)
-        ]
+            '-o', str(sketch_obj_file)
+        ])
 
         try:
-            result = subprocess.run(compile_flags, capture_output=True, text=True, timeout=30)
+            # Set PATH to include AVR toolchain bin directory first
+            env = os.environ.copy()
+            env['PATH'] = str(bin_dir) + os.pathsep + env.get('PATH', '')
+
+            result = subprocess.run(compile_flags, capture_output=True, text=True, timeout=30, env=env)
             if result.returncode != 0:
                 print(f"✗ Compilation failed:\n{result.stderr}", file=sys.stderr)
                 return result.returncode
@@ -414,18 +455,81 @@ class ArduinoCLI:
             print(f"✗ Compilation error: {exc}", file=sys.stderr)
             return 1
 
+        # Compile Arduino core
+        core_cpp_file = Path(__file__).parent / 'arduino_ide' / 'cores' / 'arduino' / 'Arduino.cpp'
+        core_compile_flags = [
+            str(toolchain.get_avr_gcc_path()),
+            '-c',
+            '-g',
+            '-Os',
+            '-w',
+            f'-mmcu={mcu}',
+        ]
+
+        # Add same -B flags
+        if specs_dir.exists():
+            core_compile_flags.extend(['-B', str(specs_dir.parent.parent.parent)])
+        if avr_binutils.exists():
+            core_compile_flags.extend(['-B', str(avr_binutils)])
+
+        core_compile_flags.extend([
+            f'-DF_CPU={f_cpu}',
+            '-DARDUINO=10819',
+            '-DARDUINO_AVR_UNO',
+            '-DARDUINO_ARCH_AVR',
+        ])
+
+        if avr_include.exists():
+            core_compile_flags.extend(['-isystem', str(avr_include)])
+
+        core_compile_flags.extend([
+            '-I' + str(Path(__file__).parent / 'arduino_ide' / 'cores' / 'arduino'),
+            str(core_cpp_file),
+            '-o', str(core_obj_file)
+        ])
+
+        try:
+            result = subprocess.run(core_compile_flags, capture_output=True, text=True, timeout=30, env=env)
+            if result.returncode != 0:
+                print(f"✗ Core compilation failed:\n{result.stderr}", file=sys.stderr)
+                return result.returncode
+        except Exception as exc:
+            print(f"✗ Core compilation error: {exc}", file=sys.stderr)
+            return 1
+
         # Link
         link_flags = [
             str(toolchain.get_avr_gcc_path()),
             '-Os',
             f'-mmcu={mcu}',
-            '-o', str(elf_file),
-            str(obj_file),
-            '-lm'  # Math library
         ]
 
+        # Add same -B flags for linking
+        if specs_dir.exists():
+            link_flags.extend(['-B', str(specs_dir.parent.parent.parent)])
+        if avr_binutils.exists():
+            link_flags.extend(['-B', str(avr_binutils)])
+
+        # Add library search paths for AVR libc
+        avr_lib_dir = toolchain.avr_dir / 'bin' / 'avr' / 'lib' / 'avr5'
+        if not avr_lib_dir.exists():
+            avr_lib_dir = toolchain.avr_dir / 'usr' / 'lib' / 'avr' / 'lib' / 'avr5'
+
+        if avr_lib_dir.exists():
+            # Add -B flag for the lib directory (for startup files)
+            link_flags.extend(['-B', str(avr_lib_dir.parent)])
+            # Add -L flag for library search
+            link_flags.extend(['-L', str(avr_lib_dir)])
+
+        link_flags.extend([
+            '-o', str(elf_file),
+            str(sketch_obj_file),
+            str(core_obj_file),
+            '-lm'  # Math library
+        ])
+
         try:
-            result = subprocess.run(link_flags, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(link_flags, capture_output=True, text=True, timeout=30, env=env)
             if result.returncode != 0:
                 print(f"✗ Linking failed:\n{result.stderr}", file=sys.stderr)
                 return result.returncode
