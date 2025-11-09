@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QComboBox, QLabel, QSizePolicy
 )
 from PySide6.QtCore import Qt, QSettings, QTimer
-from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor, QGuiApplication
+from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor, QGuiApplication, QCursor
 import serial.tools.list_ports
 from pathlib import Path
 
@@ -812,7 +812,7 @@ void loop() {
         comm_menu.addAction("SerialPassthrough").triggered.connect(lambda: self.load_example("SerialPassthrough"))
 
         # Show menu at cursor position
-        examples_menu.exec_(self.mapToGlobal(self.rect().center()))
+        examples_menu.exec_(QCursor.pos())
 
     def show_libraries(self):
         """Show libraries menu/dialog"""
@@ -835,7 +835,7 @@ void loop() {
         wifi_menu.addAction("WiFiWebServer").triggered.connect(lambda: self.load_library_example("WiFi", "WiFiWebServer"))
 
         # Show menu at cursor position
-        libraries_menu.exec_(self.mapToGlobal(self.rect().center()))
+        libraries_menu.exec_(QCursor.pos())
 
     def load_example(self, example_name):
         """Load an example sketch"""
