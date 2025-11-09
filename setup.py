@@ -15,6 +15,7 @@ setup(
         "GitPython>=3.1.0",
         "requests>=2.32.0",
         "jedi>=0.19.0",
+        "packaging>=24.0",
     ],
     python_requires=">=3.9",
     entry_points={

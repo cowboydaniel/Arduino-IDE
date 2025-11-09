@@ -3,9 +3,11 @@ Data models for Arduino libraries
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
 from datetime import datetime
 from enum import Enum
+from typing import List, Optional, Dict
+
+from packaging.version import Version, InvalidVersion
 
 
 class LibraryStatus(Enum):
@@ -215,6 +217,27 @@ class Library:
         if self.installed_version:
             return self.get_version(self.installed_version)
         return None
+
+    @property
+    def available_versions(self) -> List[str]:
+        """Return all available version strings sorted by semantic version"""
+        valid_versions: List[tuple[Version, str]] = []
+        invalid_versions: List[str] = []
+
+        for version in self.versions:
+            version_str = version.version
+            try:
+                parsed = Version(version_str)
+            except InvalidVersion:
+                invalid_versions.append(version_str)
+            else:
+                valid_versions.append((parsed, version_str))
+
+        valid_versions.sort(key=lambda item: item[0], reverse=True)
+
+        sorted_versions = [version_str for _, version_str in valid_versions]
+        sorted_versions.extend(invalid_versions)
+        return sorted_versions
 
     def is_compatible_with_board(self, board_architecture: str) -> bool:
         """Check if library is compatible with board architecture"""

@@ -6,7 +6,10 @@ Handles arduino-project.json configuration and project-level dependency manageme
 
 from pathlib import Path
 from typing import Optional, List
+
 from PySide6.QtCore import QObject, Signal
+from packaging.specifiers import SpecifierSet, InvalidSpecifier
+from packaging.version import Version, InvalidVersion
 
 from ..models import ProjectConfig, InstallPlan, ProjectDependency
 
@@ -113,6 +116,10 @@ class ProjectManager(QObject):
 
     def install_dependencies(self, include_dev: bool = False) -> InstallPlan:
         """Install all project dependencies"""
+        return self.create_install_plan(include_dev=include_dev)
+
+    def create_install_plan(self, include_dev: bool = False) -> InstallPlan:
+        """Create an installation plan for project dependencies"""
         if not self.current_project:
             plan = InstallPlan()
             plan.conflicts.append("No project loaded")
@@ -135,12 +142,13 @@ class ProjectManager(QObject):
                 plan.conflicts.append(f"Library '{dep_name}' not found")
                 continue
 
-            # Determine version to install
-            version_to_install = dep.version
-            if version_to_install == "*" or version_to_install.startswith("^") or version_to_install.startswith(">="):
-                # Use latest version for now
-                # TODO: Implement semantic versioning resolution
-                version_to_install = library.latest_version
+            version_to_install = self._resolve_dependency_version(library, dep)
+
+            if not version_to_install:
+                plan.conflicts.append(
+                    f"No available versions of '{dep_name}' satisfy constraint '{dep.version}'"
+                )
+                continue
 
             if library.installed_version:
                 if library.installed_version == version_to_install:
@@ -151,6 +159,66 @@ class ProjectManager(QObject):
                 plan.to_install.append((dep_name, version_to_install))
 
         return plan
+
+    def _resolve_dependency_version(self, library, dependency: ProjectDependency) -> Optional[str]:
+        """Resolve the best matching version for a dependency"""
+        available_versions = getattr(library, "available_versions", None)
+        if not available_versions:
+            # Fall back to latest_version if available
+            return library.latest_version
+
+        constraint = (dependency.version or "*").strip()
+
+        # Wildcard or default constraint selects the highest available version
+        if constraint in ("", "*"):
+            return available_versions[0]
+        normalized_constraint = self._normalize_constraint(constraint)
+
+        try:
+            spec = SpecifierSet(normalized_constraint)
+        except InvalidSpecifier:
+            try:
+                target_version = Version(normalized_constraint)
+            except InvalidVersion:
+                return normalized_constraint if normalized_constraint in available_versions else None
+
+            for version_str in available_versions:
+                try:
+                    if Version(version_str) == target_version:
+                        return version_str
+                except InvalidVersion:
+                    continue
+            return None
+
+        for version_str in available_versions:
+            if spec.contains(version_str, prereleases=True):
+                return version_str
+
+        return None
+
+    def _normalize_constraint(self, constraint: str) -> str:
+        """Normalize constraint strings (handle caret and spacing)."""
+        if constraint.startswith("^"):
+            caret_target = constraint[1:]
+            try:
+                version = Version(caret_target)
+            except InvalidVersion:
+                return constraint
+
+            if version.major > 0:
+                upper = Version(f"{version.major + 1}.0.0")
+            elif version.minor > 0:
+                upper = Version(f"0.{version.minor + 1}.0")
+            else:
+                upper = Version(f"0.0.{version.micro + 1}")
+
+            return f">={version},<{upper}"
+
+        parts = [part.strip() for part in constraint.replace(",", " ").split() if part.strip()]
+        if len(parts) > 1:
+            return ",".join(parts)
+
+        return parts[0] if parts else constraint
 
     def execute_install_plan(self, plan: InstallPlan) -> bool:
         """Execute an installation plan"""
