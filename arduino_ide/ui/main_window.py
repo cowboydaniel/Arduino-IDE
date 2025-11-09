@@ -134,6 +134,9 @@ class MainWindow(QMainWindow):
         self.create_dock_widgets()
         self.restore_state()
 
+        # Start window maximized
+        self.showMaximized()
+
         # Create initial editor (after dock widgets are created)
         self.create_new_editor("sketch.ino")
 
