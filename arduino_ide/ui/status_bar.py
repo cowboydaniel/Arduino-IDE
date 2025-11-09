@@ -3,7 +3,7 @@ Enhanced status bar for Arduino IDE Modern
 Displays comprehensive IDE status information
 """
 
-from PySide6.QtWidgets import QWidget, QLabel, QHBoxLayout
+from PySide6.QtWidgets import QWidget, QLabel, QHBoxLayout, QStatusBar
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor
 
@@ -39,7 +39,7 @@ class StatusBarSection(QLabel):
         super().mousePressEvent(event)
 
 
-class StatusBar(QWidget):
+class StatusBar(QStatusBar):
     """
     Enhanced status bar showing:
     - Status indicator (Ready/Compiling/Uploading/Error)
@@ -63,7 +63,9 @@ class StatusBar(QWidget):
 
     def setup_ui(self):
         """Initialize the status bar UI"""
-        layout = QHBoxLayout(self)
+        # Create a container widget for all status sections
+        container = QWidget()
+        layout = QHBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
@@ -102,13 +104,19 @@ class StatusBar(QWidget):
         self.connection_label = StatusBarSection("🔌 Disconnected")
         layout.addWidget(self.connection_label)
 
+        # Add the container to the status bar
+        self.addWidget(container, 1)
+
         # Overall styling
         self.setStyleSheet("""
-            QWidget {
+            QStatusBar {
                 background-color: #007ACC;
                 border-top: 1px solid #0098FF;
                 min-height: 24px;
                 max-height: 24px;
+            }
+            QStatusBar::item {
+                border: none;
             }
         """)
 
