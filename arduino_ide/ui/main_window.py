@@ -906,8 +906,75 @@ void loop() {
 
     def show_about(self):
         """Show about dialog"""
-        # TODO: Implement about dialog
-        pass
+        from PySide6.QtCore import Qt, QUrl
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtWidgets import QLabel, QMessageBox
+
+        from arduino_ide.config import (
+            ABOUT_CREDITS,
+            APP_AUTHORS,
+            APP_DESCRIPTION,
+            APP_NAME,
+            APP_SOURCE_REPO,
+            APP_VERSION,
+            APP_WEBSITE,
+        )
+
+        about_dialog = QMessageBox(self)
+        about_dialog.setIcon(QMessageBox.Information)
+        about_dialog.setWindowTitle(f"About {APP_NAME}")
+        about_dialog.setStandardButtons(QMessageBox.Close)
+        about_dialog.setDefaultButton(QMessageBox.Close)
+        about_dialog.setTextFormat(Qt.RichText)
+
+        credits_html = "".join(f"<li>{credit}</li>" for credit in ABOUT_CREDITS)
+        authors = ", ".join(APP_AUTHORS)
+        about_dialog.setText(
+            """
+            <div style="min-width: 320px;">
+                <h2 style="margin-bottom: 4px;">{name}</h2>
+                <p style="margin: 0 0 8px 0;"><strong>Version:</strong> {version}</p>
+                <p style="margin: 0 0 12px 0;">{description}</p>
+                <p style="margin: 0 0 8px 0;"><strong>Credits</strong></p>
+                <ul style="margin-top: 0; padding-left: 18px;">{credits}</ul>
+                <p style="margin: 12px 0 4px 0;">
+                    <strong>Project Links</strong><br>
+                    <a href="{website}">Official website</a><br>
+                    <a href="{repository}">Source repository</a>
+                </p>
+                <p style="margin: 12px 0 0 0;">Maintained by {authors}</p>
+            </div>
+            """.format(
+                name=APP_NAME,
+                version=APP_VERSION,
+                description=APP_DESCRIPTION,
+                credits=credits_html or "<li>No credits listed.</li>",
+                website=APP_WEBSITE,
+                repository=APP_SOURCE_REPO,
+                authors=authors,
+            )
+        )
+
+        about_dialog.setTextInteractionFlags(
+            Qt.TextBrowserInteraction
+            | Qt.LinksAccessibleByMouse
+            | Qt.TextSelectableByMouse
+        )
+
+        label = about_dialog.findChild(QLabel, "qt_msgbox_label")
+        if label is not None:
+            label.setOpenExternalLinks(True)
+            label.setTextInteractionFlags(
+                Qt.TextBrowserInteraction
+                | Qt.LinksAccessibleByMouse
+                | Qt.TextSelectableByMouse
+            )
+
+        def open_link(url: str) -> None:
+            QDesktopServices.openUrl(QUrl(url))
+
+        about_dialog.linkActivated.connect(open_link)
+        about_dialog.exec()
 
     def on_board_changed(self, board_name):
         """Handle board selection change"""
