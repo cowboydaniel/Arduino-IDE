@@ -314,8 +314,9 @@ class ArduinoCLI:
     def compile_sketch(self, fqbn: str, sketch: str, build_path: Optional[str] = None,
                        config: Optional[str] = None) -> int:
         """Compile a sketch for the requested board using avr-gcc."""
-        # Import toolchain manager
+        # Import managers
         from arduino_ide.services.toolchain_manager import ToolchainManager
+        from arduino_ide.services.core_manager import CoreManager
         import subprocess
         import re
 
@@ -355,6 +356,12 @@ class ArduinoCLI:
             print("✗ Failed to install AVR toolchain", file=sys.stderr)
             return 1
 
+        # Ensure Arduino core is installed
+        core_manager = CoreManager()
+        if not core_manager.ensure_installed():
+            print("✗ Failed to install Arduino core", file=sys.stderr)
+            return 1
+
         print("Generating function prototypes...", flush=True)
         print("Performing static analysis...", flush=True)
 
@@ -378,7 +385,7 @@ class ArduinoCLI:
 
         # Compile with avr-gcc
         sketch_obj_file = build_dir / f"{sketch_file.stem}.o"
-        core_obj_file = build_dir / "Arduino.o"
+        core_obj_files = []  # Will hold all core object files
         elf_file = build_dir / f"{sketch_file.stem}.elf"
         hex_file = build_dir / f"{sketch_file.stem}.hex"
 
@@ -433,8 +440,13 @@ class ArduinoCLI:
         if avr_include.exists():
             compile_flags.extend(['-isystem', str(avr_include)])
 
+        # Add Arduino core include paths
+        core_path = core_manager.get_core_path()
+        variant_path = core_manager.get_variant_path('standard')  # Standard variant for Uno
+
         compile_flags.extend([
-            '-I' + str(Path(__file__).parent / 'arduino_ide' / 'cores' / 'arduino'),
+            '-I' + str(core_path),
+            '-I' + str(variant_path),
             str(cpp_file),
             '-o', str(sketch_obj_file)
         ])
@@ -455,47 +467,54 @@ class ArduinoCLI:
             print(f"✗ Compilation error: {exc}", file=sys.stderr)
             return 1
 
-        # Compile Arduino core
-        core_cpp_file = Path(__file__).parent / 'arduino_ide' / 'cores' / 'arduino' / 'Arduino.cpp'
-        core_compile_flags = [
-            str(toolchain.get_avr_gcc_path()),
-            '-c',
-            '-g',
-            '-Os',
-            '-w',
-            f'-mmcu={mcu}',
-        ]
+        # Compile all Arduino core source files
+        core_sources = core_manager.get_core_sources()
+        print(f"Compiling {len(core_sources)} core source files...", flush=True)
 
-        # Add same -B flags
-        if specs_dir.exists():
-            core_compile_flags.extend(['-B', str(specs_dir.parent.parent.parent)])
-        if avr_binutils.exists():
-            core_compile_flags.extend(['-B', str(avr_binutils)])
+        for core_source in core_sources:
+            core_obj_file = build_dir / f"{core_source.stem}.o"
+            core_obj_files.append(core_obj_file)
 
-        core_compile_flags.extend([
-            f'-DF_CPU={f_cpu}',
-            '-DARDUINO=10819',
-            '-DARDUINO_AVR_UNO',
-            '-DARDUINO_ARCH_AVR',
-        ])
+            core_compile_flags = [
+                str(toolchain.get_avr_gcc_path()),
+                '-c',
+                '-g',
+                '-Os',
+                '-w',
+                f'-mmcu={mcu}',
+            ]
 
-        if avr_include.exists():
-            core_compile_flags.extend(['-isystem', str(avr_include)])
+            # Add same -B flags
+            if specs_dir.exists():
+                core_compile_flags.extend(['-B', str(specs_dir.parent.parent.parent)])
+            if avr_binutils.exists():
+                core_compile_flags.extend(['-B', str(avr_binutils)])
 
-        core_compile_flags.extend([
-            '-I' + str(Path(__file__).parent / 'arduino_ide' / 'cores' / 'arduino'),
-            str(core_cpp_file),
-            '-o', str(core_obj_file)
-        ])
+            core_compile_flags.extend([
+                f'-DF_CPU={f_cpu}',
+                '-DARDUINO=10819',
+                '-DARDUINO_AVR_UNO',
+                '-DARDUINO_ARCH_AVR',
+            ])
 
-        try:
-            result = subprocess.run(core_compile_flags, capture_output=True, text=True, timeout=30, env=env)
-            if result.returncode != 0:
-                print(f"✗ Core compilation failed:\n{result.stderr}", file=sys.stderr)
-                return result.returncode
-        except Exception as exc:
-            print(f"✗ Core compilation error: {exc}", file=sys.stderr)
-            return 1
+            if avr_include.exists():
+                core_compile_flags.extend(['-isystem', str(avr_include)])
+
+            core_compile_flags.extend([
+                '-I' + str(core_path),
+                '-I' + str(variant_path),
+                str(core_source),
+                '-o', str(core_obj_file)
+            ])
+
+            try:
+                result = subprocess.run(core_compile_flags, capture_output=True, text=True, timeout=30, env=env)
+                if result.returncode != 0:
+                    print(f"✗ Core compilation failed for {core_source.name}:\n{result.stderr}", file=sys.stderr)
+                    return result.returncode
+            except Exception as exc:
+                print(f"✗ Core compilation error for {core_source.name}: {exc}", file=sys.stderr)
+                return 1
 
         # Link
         link_flags = [
@@ -524,9 +543,13 @@ class ArduinoCLI:
         link_flags.extend([
             '-o', str(elf_file),
             str(sketch_obj_file),
-            str(core_obj_file),
-            '-lm'  # Math library
         ])
+
+        # Add all core object files
+        link_flags.extend([str(obj) for obj in core_obj_files])
+
+        # Add math library
+        link_flags.append('-lm')
 
         try:
             result = subprocess.run(link_flags, capture_output=True, text=True, timeout=30, env=env)
