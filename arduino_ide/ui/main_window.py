@@ -182,6 +182,14 @@ class MainWindow(QMainWindow):
         """Initialize the main UI"""
         self.setWindowTitle("Arduino IDE Modern")
 
+        # Configure dock widget behavior to force vertical stacking
+        self.setDockOptions(
+            QMainWindow.AnimatedDocks |
+            QMainWindow.AllowNestedDocks |
+            QMainWindow.AllowTabbedDocks
+        )
+        self.setDockNestingEnabled(True)
+
         # Central widget with editor tabs
         self.editor_tabs = QTabWidget()
         self.editor_tabs.setTabsClosable(True)
@@ -469,28 +477,45 @@ class MainWindow(QMainWindow):
         self.board_dock.setWidget(self.board_panel)
         self.addDockWidget(Qt.RightDockWidgetArea, self.board_dock)
 
-        # Variable Watch (right)
+        # Variable Watch (right, stacked vertically below board panel)
         self.watch_dock = QDockWidget("Variables", self)
         self.watch_dock.setObjectName("VariablesDock")
         self.variable_watch = VariableWatch()
         self.watch_dock.setWidget(self.variable_watch)
         self.addDockWidget(Qt.RightDockWidgetArea, self.watch_dock)
+        self.splitDockWidget(self.board_dock, self.watch_dock, Qt.Vertical)
 
-        # Status Display (right, tabbed with board panel)
+        # Status Display (right, stacked vertically below variables panel)
         self.status_dock = QDockWidget("Real-time Status", self)
         self.status_dock.setObjectName("RealTimeStatusDock")
         self.status_display = StatusDisplay()
         self.status_dock.setWidget(self.status_display)
         self.addDockWidget(Qt.RightDockWidgetArea, self.status_dock)
-        self.tabifyDockWidget(self.board_dock, self.status_dock)
+        self.splitDockWidget(self.watch_dock, self.status_dock, Qt.Vertical)
 
-        # Context Panel (right, tabbed with other panels)
+        # Context Panel (right, stacked vertically below status panel)
         self.context_dock = QDockWidget("Context Help", self)
         self.context_dock.setObjectName("ContextHelpDock")
         self.context_panel = ContextPanel()
         self.context_dock.setWidget(self.context_panel)
         self.addDockWidget(Qt.RightDockWidgetArea, self.context_dock)
-        self.tabifyDockWidget(self.status_dock, self.context_dock)
+        self.splitDockWidget(self.status_dock, self.context_dock, Qt.Vertical)
+
+        # Set fixed width for right-side panels to ensure proper column layout
+        # This prevents the Serial Monitor from extending under the right panels
+        right_panel_width = 320
+        right_docks = [
+            self.board_dock,
+            self.watch_dock,
+            self.status_dock,
+            self.context_dock
+        ]
+        for dock in right_docks:
+            dock.setMinimumWidth(right_panel_width)
+            dock.setMaximumWidth(right_panel_width)
+
+        # Resize the right-side panel column to the specified width
+        self.resizeDocks([self.board_dock], [right_panel_width], Qt.Horizontal)
 
         # Console Panel (bottom)
         self.console_dock = QDockWidget("Console", self)
