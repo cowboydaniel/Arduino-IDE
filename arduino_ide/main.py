@@ -5,7 +5,7 @@ Main entry point for Arduino IDE Modern
 
 import sys
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from arduino_ide.ui.main_window import MainWindow
 
 
@@ -23,7 +23,9 @@ def main():
 
     # Create and show main window maximized
     window = MainWindow()
+    window.setWindowState(window.windowState() | Qt.WindowMaximized)
     window.showMaximized()
+    QTimer.singleShot(0, window.showMaximized)
 
     sys.exit(app.exec())
 
