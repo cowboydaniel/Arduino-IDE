@@ -24,6 +24,7 @@ import sys
 from pathlib import Path as PathLib
 sys.path.insert(0, str(PathLib(__file__).parent.parent / "services"))
 from suggestion_analyzer import SuggestionAnalyzer
+from git_diff_utils import calculate_git_changes
 
 
 class BreadcrumbBar(QWidget):
@@ -821,16 +822,17 @@ class CodeEditor(QPlainTextEdit):
             return
 
         try:
-            repo = Repo(Path(self.file_path).parent, search_parent_directories=True)
-            if repo.bare:
-                return
-
-            # Get diff for current file
-            self.git_changes.clear()
-            # This is a simplified version - real implementation would parse git diff
-            # For now, just mark it as a placeholder
+            changes = calculate_git_changes(self.file_path, self.toPlainText())
         except Exception:
-            pass
+            return
+
+        if changes is None:
+            changes = {}
+
+        self.git_changes = changes
+        if hasattr(self, 'line_number_area'):
+            self.line_number_area.update()
+        self.viewport().update()
 
     def get_current_function(self):
         """Get the name of the function at cursor position"""
