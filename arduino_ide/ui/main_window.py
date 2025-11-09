@@ -31,6 +31,7 @@ from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
 from arduino_ide.services.project_manager import ProjectManager
+from arduino_ide.services import ArduinoCliService
 
 
 class EditorContainer(QWidget):
@@ -197,6 +198,14 @@ class MainWindow(QMainWindow):
             library_manager=self.library_manager,
             board_manager=self.board_manager
         )
+
+        self.cli_service = ArduinoCliService(self)
+        self.cli_service.output_received.connect(self._handle_cli_output)
+        self.cli_service.error_received.connect(self._handle_cli_error)
+        self.cli_service.finished.connect(self._handle_cli_finished)
+        self._cli_current_operation = None
+        self._last_cli_error = ""
+        self._open_monitor_after_upload = False
 
         # Current build configuration
         self.build_config = "Release"
@@ -848,21 +857,210 @@ void loop() {
         """Save the current file with a new name"""
         return self.save_file(index=None, save_as=True)
 
+    def _append_console_stream(self, chunk, *, color=None):
+        """Stream CLI output to the console panel line-by-line."""
+        if not chunk:
+            return
+        lines = chunk.splitlines()
+        if chunk.endswith("
+") or chunk.endswith(""):
+            lines.append("")
+        for line in lines:
+            self.console_panel.append_output(line, color=color)
+
+    def _handle_cli_output(self, text):
+        self._append_console_stream(text)
+
+    def _handle_cli_error(self, text):
+        if not text:
+            return
+        self._last_cli_error += text
+        self._append_console_stream(text, color="#F48771")
+
+    def _handle_cli_finished(self, exit_code):
+        operation = self._cli_current_operation
+        self._cli_current_operation = None
+
+        if exit_code == 0:
+            if operation == "compile":
+                self.console_panel.append_output("✔ Compilation completed successfully.", color="#6A9955")
+                self.status_bar.set_status("Compilation Succeeded")
+            elif operation == "upload":
+                self.console_panel.append_output("✔ Upload completed successfully.", color="#6A9955")
+                self.status_bar.set_status("Upload Succeeded")
+                if self._open_monitor_after_upload:
+                    self.toggle_serial_monitor()
+            else:
+                self.status_bar.set_status("Ready")
+            self._open_monitor_after_upload = False
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+        else:
+            detail = self._last_cli_error.strip() or "Check the console for details."
+            if operation == "compile":
+                self.console_panel.append_output("✗ Compilation failed.", color="#F48771")
+                self.status_bar.set_status("Compilation Failed")
+                QMessageBox.critical(self, "Compilation Failed", detail)
+            elif operation == "upload":
+                self.console_panel.append_output("✗ Upload failed.", color="#F48771")
+                self.status_bar.set_status("Upload Failed")
+                QMessageBox.critical(self, "Upload Failed", detail)
+            else:
+                self.status_bar.set_status("Error")
+                QMessageBox.critical(self, "Command Failed", detail)
+            self._open_monitor_after_upload = False
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
+        self._last_cli_error = ""
+
+    def _get_selected_board(self):
+        board_name = self.board_selector.currentText().strip() if hasattr(self, "board_selector") else ""
+        if not board_name:
+            return None
+        boards = self.board_manager.search_boards(query=board_name)
+        for board in boards:
+            if board.name == board_name or board.fqbn == board_name:
+                return board
+        return self.board_manager.get_board(board_name)
+
+    def _get_selected_port(self):
+        if not hasattr(self, "port_selector"):
+            return None
+        port_text = self.port_selector.currentText().strip()
+        if not port_text or port_text == "No ports available":
+            return None
+        if " - " in port_text:
+            return port_text.split(" - ", 1)[0].strip()
+        return port_text
+
     def verify_sketch(self):
         """Verify/compile sketch"""
-        self.console_panel.append_output("Verifying sketch...")
-        # TODO: Implement compilation
+        current_widget = self.editor_tabs.currentWidget()
+        if not current_widget or not hasattr(current_widget, "editor"):
+            QMessageBox.warning(self, "Verify Sketch", "No sketch is currently open.")
+            return
+
+        if self.cli_service.is_running():
+            QMessageBox.information(self, "Arduino CLI Busy", "Another command is currently running. Please wait for it to finish.")
+            return
+
+        index = self.editor_tabs.currentIndex()
+        if current_widget.editor.document().isModified():
+            choice = QMessageBox.question(
+                self,
+                "Save Sketch",
+                "The sketch has unsaved changes. Save before verifying?",
+                QMessageBox.Save | QMessageBox.Cancel,
+                QMessageBox.Save
+            )
+            if choice == QMessageBox.Save:
+                if not self.save_file(index=index):
+                    return
+            else:
+                return
+
+        if not getattr(current_widget, "file_path", None):
+            if not self.save_file(index=index, save_as=True):
+                return
+
+        sketch_path = Path(current_widget.file_path)
+        if not sketch_path.exists():
+            QMessageBox.critical(self, "Verify Sketch", f"Sketch file not found: {sketch_path}")
+            return
+
+        board = self._get_selected_board()
+        if not board:
+            QMessageBox.warning(self, "Verify Sketch", "Please select a board before compiling.")
+            return
+
+        build_config = self.config_selector.currentText() if hasattr(self, "config_selector") else None
+
+        self.console_panel.append_output(
+            f"Compiling {sketch_path.name} for {board.name} ({board.fqbn})..."
+        )
+        if build_config:
+            self.console_panel.append_output(f"Using configuration: {build_config}")
         self.status_bar.set_status("Compiling...")
-        # Reset to Ready after a moment (would normally be after compilation)
-        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+        self._cli_current_operation = "compile"
+        self._last_cli_error = ""
+
+        try:
+            self.cli_service.run_compile(str(sketch_path), board.fqbn, config=build_config)
+        except (RuntimeError, FileNotFoundError) as exc:
+            self._cli_current_operation = None
+            self.console_panel.append_output(f"✗ {exc}", color="#F48771")
+            self.status_bar.set_status("Compilation Failed")
+            QMessageBox.critical(self, "Verify Sketch", str(exc))
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def upload_sketch(self):
         """Upload sketch to board"""
-        self.console_panel.append_output("Uploading sketch...")
-        # TODO: Implement upload
+        current_widget = self.editor_tabs.currentWidget()
+        if not current_widget or not hasattr(current_widget, "editor"):
+            QMessageBox.warning(self, "Upload Sketch", "No sketch is currently open.")
+            self._open_monitor_after_upload = False
+            return
+
+        if self.cli_service.is_running():
+            QMessageBox.information(self, "Arduino CLI Busy", "Another command is currently running. Please wait for it to finish.")
+            self._open_monitor_after_upload = False
+            return
+
+        index = self.editor_tabs.currentIndex()
+        if current_widget.editor.document().isModified():
+            choice = QMessageBox.question(
+                self,
+                "Save Sketch",
+                "The sketch has unsaved changes. Save before uploading?",
+                QMessageBox.Save | QMessageBox.Cancel,
+                QMessageBox.Save
+            )
+            if choice == QMessageBox.Save:
+                if not self.save_file(index=index):
+                    self._open_monitor_after_upload = False
+                    return
+            else:
+                self._open_monitor_after_upload = False
+                return
+
+        if not getattr(current_widget, "file_path", None):
+            if not self.save_file(index=index, save_as=True):
+                self._open_monitor_after_upload = False
+                return
+
+        sketch_path = Path(current_widget.file_path)
+        if not sketch_path.exists():
+            QMessageBox.critical(self, "Upload Sketch", f"Sketch file not found: {sketch_path}")
+            self._open_monitor_after_upload = False
+            return
+
+        board = self._get_selected_board()
+        if not board:
+            QMessageBox.warning(self, "Upload Sketch", "Please select a board before uploading.")
+            self._open_monitor_after_upload = False
+            return
+
+        port = self._get_selected_port()
+        if not port:
+            QMessageBox.warning(self, "Upload Sketch", "Please select a serial port before uploading.")
+            self._open_monitor_after_upload = False
+            return
+
+        self.console_panel.append_output(
+            f"Uploading {sketch_path.name} to {board.name} via {port}..."
+        )
         self.status_bar.set_status("Uploading...")
-        # Reset to Ready after a moment (would normally be after upload)
-        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+        self._cli_current_operation = "upload"
+        self._last_cli_error = ""
+
+        try:
+            self.cli_service.run_upload(str(sketch_path), board.fqbn, port)
+        except (RuntimeError, FileNotFoundError) as exc:
+            self._cli_current_operation = None
+            self.console_panel.append_output(f"✗ {exc}", color="#F48771")
+            self.status_bar.set_status("Upload Failed")
+            QMessageBox.critical(self, "Upload Sketch", str(exc))
+            self._open_monitor_after_upload = False
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def toggle_serial_monitor(self):
         """Show/hide serial monitor"""
@@ -1043,8 +1241,9 @@ void loop() {
     def upload_and_monitor(self):
         """Upload sketch and open serial monitor"""
         self.console_panel.append_output("Uploading sketch and opening serial monitor...")
+        self._open_monitor_after_upload = True
         self.upload_sketch()
-        # Switch to Serial Monitor tab after upload
+        # Serial monitor will be shown after a successful upload
         serial_index = self.bottom_tabs.indexOf(self.serial_monitor)
         if serial_index >= 0:
             self.bottom_tabs.setCurrentIndex(serial_index)
