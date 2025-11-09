@@ -37,6 +37,25 @@ class LibraryDependency:
 
 
 @dataclass
+class KnownIssue:
+    """Represents a known issue in a library version"""
+    severity: str  # "critical", "high", "medium", "low"
+    description: str
+    workaround: str = ""
+    affected_versions: List[str] = field(default_factory=list)
+    fixed_in: Optional[str] = None
+    issue_url: Optional[str] = None
+
+
+@dataclass
+class DownloadMirror:
+    """Represents a download mirror for a library"""
+    url: str
+    type: str  # "primary", "mirror", "cdn"
+    priority: int = 0  # Higher priority = tried first
+
+
+@dataclass
 class LibraryVersion:
     """Represents a specific version of a library"""
     version: str
@@ -46,9 +65,10 @@ class LibraryVersion:
     release_date: datetime
     changelog: str = ""
     breaking_changes: bool = False
-    known_issues: List[str] = field(default_factory=list)
+    known_issues: List[KnownIssue] = field(default_factory=list)
     dependencies: List[LibraryDependency] = field(default_factory=list)
     architectures: List[str] = field(default_factory=list)  # ["avr", "esp32", "*"]
+    mirrors: List[DownloadMirror] = field(default_factory=list)  # Download mirrors
 
     def size_human_readable(self) -> str:
         """Get human-readable size"""
@@ -59,6 +79,13 @@ class LibraryVersion:
         else:
             return f"{self.size / (1024 * 1024):.1f}MB"
 
+    def get_download_urls(self) -> List[str]:
+        """Get all download URLs sorted by priority"""
+        urls = [(self.url, 1000)]  # Primary URL has highest priority
+        for mirror in sorted(self.mirrors, key=lambda m: m.priority, reverse=True):
+            urls.append((mirror.url, mirror.priority))
+        return [url for url, _ in sorted(urls, key=lambda x: x[1], reverse=True)]
+
 
 @dataclass
 class LibraryExample:
@@ -66,6 +93,27 @@ class LibraryExample:
     name: str
     path: str
     description: str = ""
+    difficulty: str = "beginner"  # "beginner", "intermediate", "advanced"
+
+
+@dataclass
+class CommunityRating:
+    """Community rating information"""
+    average: float = 0.0
+    count: int = 0
+    five_star: int = 0
+    four_star: int = 0
+    three_star: int = 0
+    two_star: int = 0
+    one_star: int = 0
+
+
+@dataclass
+class BoardCompatibility:
+    """Board compatibility information"""
+    board_fqbn: str
+    status: str  # "tested", "partial", "untested", "incompatible"
+    notes: str = ""
 
 
 @dataclass
@@ -78,6 +126,17 @@ class LibraryStats:
     closed_issues: int = 0
     last_commit: Optional[datetime] = None
     actively_maintained: bool = True
+
+    # Enhanced metadata
+    downloads_last_month: int = 0
+    forks: int = 0
+    watchers: int = 0
+    contributors: int = 0
+    verified: bool = False  # Official Arduino verification
+    compatibility_score: float = 0.98  # 0.0 to 1.0
+
+    # Community ratings
+    community_rating: Optional[CommunityRating] = None
 
 
 @dataclass
@@ -110,12 +169,13 @@ class Library:
     architectures: List[str] = field(default_factory=list)
     compatible_boards: List[str] = field(default_factory=list)
     incompatible_boards: List[str] = field(default_factory=list)
+    board_compatibility: List[BoardCompatibility] = field(default_factory=list)
 
     # Stats
     stats: Optional[LibraryStats] = None
 
     # Issues and warnings
-    known_issues: List[str] = field(default_factory=list)
+    known_issues: List[KnownIssue] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
     # Installation info

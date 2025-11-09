@@ -52,7 +52,19 @@ A modern, professional Arduino development environment built with PySide6 that a
 - **Memory profiler** (coming soon)
 - **Logic analyzer integration** (planned)
 
-### 5. Build & Upload System
+### 5. Enhanced Package Manager 🆕
+- **Smart caching**: Incremental index updates save 90%+ bandwidth
+- **Multi-mirror downloads**: Automatic fallback to ensure reliability
+- **Resume capability**: Interrupted downloads continue automatically
+- **Dependency resolution**: Automatic installation of required libraries
+- **Offline mode**: Full functionality with cached packages
+- **Background updates**: Non-blocking update checking with notifications
+- **CLI tools**: Full arduino-cli compatible command-line interface
+- **Rich metadata**: Community ratings, download stats, compatibility info
+
+[📖 Read the Package Manager Documentation](docs/PACKAGE_MANAGER_REDESIGN.md)
+
+### 6. Build & Upload System
 - **One-click verify/compile**
 - **Direct upload to board**
 - **Console output** with error highlighting
