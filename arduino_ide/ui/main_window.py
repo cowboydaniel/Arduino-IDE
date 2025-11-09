@@ -207,6 +207,7 @@ class MainWindow(QMainWindow):
         self._cli_current_operation = None
         self._last_cli_error = ""
         self._open_monitor_after_upload = False
+        self._last_selected_port = None
 
         # Current build configuration
         self.build_config = "Release"
@@ -1198,8 +1199,11 @@ void loop() {
     def on_port_changed(self, port_name):
         """Handle port selection change"""
         if port_name:
-            self.status_bar.set_status(f"Port changed to: {port_name}")
-            self.console_panel.append_output(f"Selected port: {port_name}")
+            # Only log to console if port actually changed
+            if port_name != self._last_selected_port:
+                self.status_bar.set_status(f"Port changed to: {port_name}")
+                self.console_panel.append_output(f"Selected port: {port_name}")
+                self._last_selected_port = port_name
             # Update status bar
             self.status_bar.set_port(port_name)
             # Check if port is actually available (not "No ports available")
