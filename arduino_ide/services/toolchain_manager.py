@@ -125,13 +125,17 @@ class ToolchainManager:
             temp_file = self.tools_dir / archive_name
 
             # Download with progress
+            last_percent = [-1]  # Use list to allow modification in nested function
             def reporthook(block_num, block_size, total_size):
                 downloaded = block_num * block_size
                 if total_size > 0:
                     percent = min(100, int(downloaded * 100 / total_size))
-                    mb_downloaded = downloaded / (1024 * 1024)
-                    mb_total = total_size / (1024 * 1024)
-                    print(f"\rDownloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)", end='', flush=True)
+                    # Only update display when percent changes to reduce output spam
+                    if percent != last_percent[0]:
+                        last_percent[0] = percent
+                        mb_downloaded = downloaded / (1024 * 1024)
+                        mb_total = total_size / (1024 * 1024)
+                        print(f"\rDownloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)", end='', flush=True)
                 if progress_callback:
                     progress_callback(downloaded, total_size)
 
