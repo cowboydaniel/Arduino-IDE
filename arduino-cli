@@ -35,16 +35,29 @@ from typing import Optional, List
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from arduino_ide.services.library_manager import LibraryManager
-from arduino_ide.services.board_manager import BoardManager
-
 
 class ArduinoCLI:
     """Arduino CLI implementation"""
 
     def __init__(self):
-        self.lib_manager = LibraryManager()
-        self.board_manager = BoardManager()
+        self._lib_manager = None
+        self._board_manager = None
+
+    @property
+    def lib_manager(self):
+        """Lazy load library manager"""
+        if self._lib_manager is None:
+            from arduino_ide.services.library_manager import LibraryManager
+            self._lib_manager = LibraryManager()
+        return self._lib_manager
+
+    @property
+    def board_manager(self):
+        """Lazy load board manager"""
+        if self._board_manager is None:
+            from arduino_ide.services.board_manager import BoardManager
+            self._board_manager = BoardManager()
+        return self._board_manager
 
     def lib_install(self, library: str, version: Optional[str] = None, with_deps: bool = True):
         """Install a library"""
@@ -269,6 +282,35 @@ class ArduinoCLI:
             sketch_path = candidates[0]
         return sketch_path
 
+    def _parse_memory_size(self, size_str: str, is_flash: bool = False) -> int:
+        """Parse memory size string like '32 KB' or '2 KB' to bytes."""
+        size_str = size_str.strip().upper()
+
+        # Handle common formats
+        if 'KB' in size_str or 'K' in size_str:
+            # Extract number
+            num_str = size_str.replace('KB', '').replace('K', '').strip()
+            try:
+                kb = int(num_str)
+                # Arduino flash is reported in KiB (1024 bytes) but some bootloader space is reserved
+                # For Uno: 32KB = 32768 bytes, but usable is 32256 (bootloader uses 512 bytes)
+                if is_flash and kb == 32:
+                    return 32256  # Reserve 512 bytes for bootloader (32768 - 512)
+                else:
+                    return kb * 1024
+            except ValueError:
+                pass
+        elif 'MB' in size_str or 'M' in size_str:
+            num_str = size_str.replace('MB', '').replace('M', '').strip()
+            try:
+                mb = int(num_str)
+                return mb * 1024 * 1024
+            except ValueError:
+                pass
+
+        # Default fallback
+        return 32256 if is_flash else 2048
+
     def compile_sketch(self, fqbn: str, sketch: str, build_path: Optional[str] = None,
                        config: Optional[str] = None) -> int:
         """Simulate compilation of a sketch for the requested board."""
@@ -316,12 +358,52 @@ class ArduinoCLI:
             print(f"✗ Failed to write build artifact: {exc}", file=sys.stderr)
             return 1
 
-        sketch_size = len(source.encode("utf-8"))
-        ram_usage = max(32, min(8192, int(len(source) * 0.25)))
-        prog_percent = min(100, sketch_size // 512 if sketch_size else 0)
+        # Get board memory specifications
+        flash_max = self._parse_memory_size(board.specs.flash, is_flash=True)
+        ram_max = self._parse_memory_size(board.specs.ram, is_flash=False)
 
-        print(f"Sketch uses {sketch_size} bytes ({prog_percent}% of program storage space).", flush=True)
-        print(f"Global variables use {ram_usage} bytes of dynamic memory.", flush=True)
+        # Calculate realistic compiled sizes
+        # Base overhead for Arduino core (including runtime, initialization, etc.)
+        base_flash = 666  # Arduino core base overhead
+        base_ram = 9  # Global variables base overhead
+
+        # Estimate based on source code complexity
+        source_len = len(source)
+        lines = source.count('\n') + 1
+
+        # Flash calculation: realistic estimate based on actual Arduino compilation
+        # Arduino code typically compiles to ~15-25 bytes per line of actual code
+        sketch_size = base_flash + (lines * 15) + (source_len // 4)
+
+        # RAM calculation: estimate global variables and buffers
+        # Look for common patterns that use RAM
+        ram_usage = base_ram
+
+        # Serial buffer is allocated once if Serial is used at all
+        if 'Serial' in source:
+            ram_usage += 188  # Serial RX/TX buffers (~188 bytes total)
+
+        # Count other RAM usage
+        ram_usage += source.count('String') * 16  # String objects
+        ram_usage += source.count('int ') * 2  # int variables
+        ram_usage += source.count('long') * 4  # long variables
+        ram_usage += source.count('float') * 4  # float variables
+        ram_usage += source.count('char ') * 1  # char variables
+        ram_usage += source.count('[') * 10  # Arrays (estimate)
+
+        # Ensure minimum realistic values
+        if sketch_size < 1000:
+            sketch_size = max(1000, sketch_size)
+        if ram_usage < 100:
+            ram_usage = max(100, ram_usage)
+
+        # Calculate percentages
+        prog_percent = int((sketch_size / flash_max) * 100) if flash_max > 0 else 0
+        ram_percent = int((ram_usage / ram_max) * 100) if ram_max > 0 else 0
+        ram_remaining = ram_max - ram_usage
+
+        print(f"Sketch uses {sketch_size} bytes ({prog_percent}%) of program storage space. Maximum is {flash_max} bytes.", flush=True)
+        print(f"Global variables use {ram_usage} bytes ({ram_percent}%) of dynamic memory, leaving {ram_remaining} bytes for local variables. Maximum is {ram_max} bytes.", flush=True)
         print("✔ Compilation successful.", flush=True)
         return 0
 
