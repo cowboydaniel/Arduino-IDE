@@ -119,11 +119,15 @@ class MainWindow(QMainWindow):
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
-        # GNOME on Wayland) will omit the maximize button unless the system
-        # menu hint is explicitly enabled.
-        self.setWindowFlag(Qt.WindowMinimizeButtonHint, True)
-        self.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
-        self.setWindowFlag(Qt.WindowSystemMenuHint, True)
+        # GNOME on Wayland) will omit the maximize button unless the window
+        # advertises both the system menu and maximize hints together.
+        window_flags = (
+            self.windowFlags()
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowMaximizeButtonHint
+            | Qt.WindowSystemMenuHint
+        )
+        self.setWindowFlags(window_flags)
 
         # Guarantee the window advertises a resizable geometry so window
         # managers keep the maximize control visible.
