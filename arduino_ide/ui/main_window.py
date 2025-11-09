@@ -1405,11 +1405,48 @@ void loop() {
 
     def load_library_example(self, library_name, example_name):
         """Load a library example sketch"""
-        self.console_panel.append_output(f"Loading library example: {library_name}/{example_name}")
+        message = f"Loading library example: {library_name}/{example_name}"
+        self.console_panel.append_output(message)
         self.status_bar.set_status(f"Loading example: {library_name}/{example_name}")
-        # TODO: Implement library example loading
-        editor_container = self.create_new_editor(f"{example_name}.ino")
-        # Reset to Ready after a moment
+
+        example_path = self.library_manager.get_example_sketch_path(library_name, example_name)
+        if not example_path:
+            error_msg = (
+                f"Example '{example_name}' not found in library '{library_name}'."
+            )
+            self.console_panel.append_output(error_msg, color="#F48771")
+            self.status_bar.set_status(
+                f"Error loading {library_name}/{example_name}"
+            )
+            QMessageBox.warning(self, "Example Not Found", error_msg)
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+            return
+
+        try:
+            with open(example_path, "r", encoding="utf-8") as sketch_file:
+                example_code = sketch_file.read()
+        except OSError as exc:
+            error_msg = (
+                f"Failed to read example '{library_name}/{example_name}': {exc}"
+            )
+            self.console_panel.append_output(error_msg, color="#F48771")
+            self.status_bar.set_status(
+                f"Error loading {library_name}/{example_name}"
+            )
+            QMessageBox.critical(self, "Error Loading Example", error_msg)
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+            return
+
+        self.create_new_editor(
+            example_path.name,
+            file_path=str(example_path),
+            content=example_code,
+            mark_clean=True,
+        )
+
+        success_message = f"Loaded library example from {example_path}"
+        self.console_panel.append_output(success_message)
+        self.status_bar.set_status(f"Loaded: {library_name}/{example_name}")
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def open_library_manager(self):
