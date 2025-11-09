@@ -5,10 +5,11 @@ Displays real-time plots of serial data
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QComboBox, QCheckBox, QSpinBox, QFileDialog
+    QLabel, QComboBox, QCheckBox, QSpinBox, QFileDialog,
+    QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QPainter, QPen, QColor, QFont
+from PySide6.QtGui import QPainter, QPen, QColor, QFont, QGuiApplication
 import re
 import csv
 from datetime import datetime
@@ -30,7 +31,17 @@ class PlotWidget(QWidget):
             QColor(155, 89, 182),   # Purple
             QColor(230, 126, 34),   # Orange
         ]
-        self.setMinimumHeight(300)
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            available_height = screen.availableGeometry().height()
+            min_height = max(150, min(300, available_height // 3))
+        else:
+            min_height = 200
+
+        size_policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        size_policy.setVerticalStretch(1)
+        self.setSizePolicy(size_policy)
+        self.setMinimumHeight(min_height)
 
     def add_data_point(self, values, labels=None):
         """Add a data point (can be multiple series)"""

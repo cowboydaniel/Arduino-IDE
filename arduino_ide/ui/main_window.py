@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QComboBox, QLabel
 )
 from PySide6.QtCore import Qt, QSettings, QTimer
-from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor
+from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor, QGuiApplication
 import serial.tools.list_ports
 from pathlib import Path
 
@@ -510,6 +510,29 @@ class MainWindow(QMainWindow):
 
         # Show console by default
         self.console_dock.raise_()
+
+        bottom_docks = [
+            self.console_dock,
+            self.serial_dock,
+            self.plotter_dock,
+            self.problems_dock,
+            self.output_dock,
+        ]
+
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            available_height = screen.availableGeometry().height()
+            max_bottom_height = max(int(available_height * 0.4), 240)
+            dock_min_height = max(100, int(max_bottom_height / len(bottom_docks)))
+        else:
+            max_bottom_height = 300
+            dock_min_height = 120
+
+        for dock in bottom_docks:
+            dock.setMinimumHeight(dock_min_height)
+
+        if screen:
+            self.resizeDocks([self.console_dock], [max_bottom_height], Qt.Vertical)
 
         # Connect Quick Actions Panel signals
         self.quick_actions_panel.upload_clicked.connect(self.upload_sketch)
