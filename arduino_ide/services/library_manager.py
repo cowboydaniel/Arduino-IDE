@@ -19,6 +19,8 @@ from ..models import (
     Library, LibraryIndex, LibraryVersion, LibraryDependency,
     LibraryType, LibraryStatus, ProjectConfig, InstallPlan, DependencyTree
 )
+from .download_manager import DownloadManager
+from .index_updater import IndexUpdater
 
 
 class LibraryManager(QObject):
@@ -53,6 +55,17 @@ class LibraryManager(QObject):
         # Library index
         self.library_index = LibraryIndex()
         self.installed_libraries: Dict[str, str] = {}  # name -> version
+
+        # Enhanced services
+        self.download_manager = DownloadManager(self.cache_dir, parent=self)
+        self.index_updater = IndexUpdater(self.cache_dir, parent=self)
+
+        # Connect signals
+        self.download_manager.progress_changed.connect(
+            lambda p: self.progress_changed.emit(p.percentage)
+        )
+        self.download_manager.status_message.connect(self.status_message.emit)
+        self.index_updater.status_message.connect(self.status_message.emit)
 
         # Load data
         self._load_installed_libraries()
@@ -138,42 +151,20 @@ class LibraryManager(QObject):
         """Update library index from Arduino servers"""
         self.status_message.emit("Updating library index...")
 
-        # Check if update is needed
-        if not force and self.index_file.exists():
-            age = datetime.now() - datetime.fromtimestamp(self.index_file.stat().st_mtime)
-            if age.total_seconds() < 3600:  # Less than 1 hour old
-                self.status_message.emit("Library index is up to date")
-                return True
+        # Use the enhanced index updater
+        success = self.index_updater.update_index(
+            index_url=self.LIBRARY_INDEX_URL,
+            index_file=self.index_file,
+            force=force,
+            cache_duration_hours=1
+        )
 
-        try:
-            # Try main URL first
-            response = requests.get(self.LIBRARY_INDEX_URL, timeout=30)
+        if success:
+            # Reload index
+            self._load_library_index()
+            self.index_updated.emit()
 
-            if response.status_code != 200:
-                # Try mirror
-                response = requests.get(self.LIBRARY_INDEX_MIRROR, timeout=30)
-
-            if response.status_code == 200:
-                data = response.json()
-
-                # Save to cache
-                data["last_updated"] = datetime.now().isoformat()
-                with open(self.index_file, 'w', encoding='utf-8') as f:
-                    json.dump(data, f)
-
-                # Reload index
-                self._load_library_index()
-
-                self.status_message.emit("Library index updated successfully")
-                self.index_updated.emit()
-                return True
-            else:
-                self.status_message.emit(f"Failed to update index: HTTP {response.status_code}")
-                return False
-
-        except Exception as e:
-            self.status_message.emit(f"Error updating index: {str(e)}")
-            return False
+        return success
 
     def search_libraries(self, query: str = "", category: Optional[str] = None,
                         architecture: Optional[str] = None,
@@ -232,28 +223,27 @@ class LibraryManager(QObject):
         self.status_message.emit(f"Installing {name} v{version}...")
 
         try:
-            # Download library
+            # Use enhanced download manager with mirror fallback
             self.status_message.emit(f"Downloading {name}...")
-            response = requests.get(lib_version.url, timeout=60, stream=True)
 
-            if response.status_code != 200:
-                self.status_message.emit(f"Failed to download: HTTP {response.status_code}")
+            # Get all download URLs (primary + mirrors)
+            download_urls = lib_version.get_download_urls() if hasattr(lib_version, 'get_download_urls') else [lib_version.url]
+
+            # Download with enhanced manager
+            filename = f"{name}-{version}.zip"
+            result = self.download_manager.download(
+                urls=download_urls,
+                filename=filename,
+                expected_checksum=lib_version.checksum if lib_version.checksum else None,
+                expected_size=lib_version.size if lib_version.size > 0 else None,
+                resume=True
+            )
+
+            if not result.success:
+                self.status_message.emit(f"Failed to download: {result.error_message}")
                 return False
 
-            # Save to temp file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
-                total_size = int(response.headers.get('content-length', 0))
-                downloaded = 0
-
-                for chunk in response.iter_content(chunk_size=8192):
-                    tmp_file.write(chunk)
-                    downloaded += len(chunk)
-
-                    if total_size > 0:
-                        progress = int((downloaded / total_size) * 100)
-                        self.progress_changed.emit(progress)
-
-                tmp_path = tmp_file.name
+            tmp_path = str(result.file_path)
 
             # Extract library
             self.status_message.emit(f"Extracting {name}...")
@@ -284,8 +274,8 @@ class LibraryManager(QObject):
                     if temp_extract.exists():
                         shutil.rmtree(temp_extract)
 
-            # Clean up temp file
-            os.unlink(tmp_path)
+            # Keep downloaded file in cache for potential reinstall
+            # (download_manager handles caching)
 
             # Update installed libraries
             self.installed_libraries[name] = version

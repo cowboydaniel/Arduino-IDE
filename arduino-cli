@@ -1,0 +1,388 @@
+#!/usr/bin/env python3
+"""
+Arduino CLI - Command Line Interface for Arduino IDE
+
+Compatible with arduino-cli commands for CI/CD integration
+
+Usage:
+    arduino-cli lib install <library>[@version]
+    arduino-cli lib uninstall <library>
+    arduino-cli lib list [--format json]
+    arduino-cli lib search <query>
+    arduino-cli lib upgrade [library]
+    arduino-cli lib export > requirements.txt
+    arduino-cli lib install -r requirements.txt
+
+    arduino-cli core install <platform>
+    arduino-cli core uninstall <platform>
+    arduino-cli core list
+    arduino-cli core upgrade
+
+    arduino-cli board list
+    arduino-cli board search <query>
+
+    arduino-cli compile -b <fqbn> <sketch>
+    arduino-cli upload -b <fqbn> -p <port> <sketch>
+"""
+
+import sys
+import os
+import json
+import argparse
+from pathlib import Path
+from typing import Optional, List
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
+
+from arduino_ide.services.library_manager import LibraryManager
+from arduino_ide.services.board_manager import BoardManager
+
+
+class ArduinoCLI:
+    """Arduino CLI implementation"""
+
+    def __init__(self):
+        self.lib_manager = LibraryManager()
+        self.board_manager = BoardManager()
+
+    def lib_install(self, library: str, version: Optional[str] = None, with_deps: bool = True):
+        """Install a library"""
+        print(f"Installing {library}...")
+
+        success = self.lib_manager.install_library(library, version, resolve_dependencies=with_deps)
+
+        if success:
+            print(f"✓ Successfully installed {library}")
+            return 0
+        else:
+            print(f"✗ Failed to install {library}", file=sys.stderr)
+            return 1
+
+    def lib_uninstall(self, library: str):
+        """Uninstall a library"""
+        print(f"Uninstalling {library}...")
+
+        success = self.lib_manager.uninstall_library(library)
+
+        if success:
+            print(f"✓ Successfully uninstalled {library}")
+            return 0
+        else:
+            print(f"✗ Failed to uninstall {library}", file=sys.stderr)
+            return 1
+
+    def lib_list(self, format: str = "text", installed_only: bool = True):
+        """List libraries"""
+        libraries = self.lib_manager.search_libraries(installed_only=installed_only)
+
+        if format == "json":
+            data = [
+                {
+                    "name": lib.name,
+                    "version": lib.installed_version,
+                    "author": lib.author,
+                    "description": lib.description,
+                }
+                for lib in libraries
+            ]
+            print(json.dumps(data, indent=2))
+        else:
+            if not libraries:
+                print("No libraries installed")
+            else:
+                print(f"{'Name':<30} {'Version':<15} {'Author':<20}")
+                print("-" * 70)
+                for lib in libraries:
+                    print(f"{lib.name:<30} {lib.installed_version:<15} {lib.author:<20}")
+
+        return 0
+
+    def lib_search(self, query: str):
+        """Search for libraries"""
+        print(f"Searching for '{query}'...")
+
+        # Update index first
+        self.lib_manager.update_index()
+
+        libraries = self.lib_manager.search_libraries(query=query)
+
+        if not libraries:
+            print(f"No libraries found matching '{query}'")
+            return 0
+
+        print(f"\nFound {len(libraries)} libraries:\n")
+        print(f"{'Name':<30} {'Version':<15} {'Category':<20}")
+        print("-" * 70)
+
+        for lib in libraries[:20]:  # Show top 20
+            print(f"{lib.name:<30} {lib.latest_version:<15} {lib.category:<20}")
+
+        if len(libraries) > 20:
+            print(f"\n... and {len(libraries) - 20} more")
+
+        return 0
+
+    def lib_upgrade(self, library: Optional[str] = None):
+        """Upgrade library or all libraries"""
+        if library:
+            print(f"Upgrading {library}...")
+            success = self.lib_manager.update_library(library)
+            if success:
+                print(f"✓ Successfully upgraded {library}")
+                return 0
+            else:
+                print(f"✗ No update available for {library}")
+                return 1
+        else:
+            print("Upgrading all libraries...")
+            count = self.lib_manager.update_all_libraries()
+            print(f"✓ Upgraded {count} libraries")
+            return 0
+
+    def lib_export(self, output_file: Optional[str] = None):
+        """Export installed libraries to requirements file"""
+        installed = self.lib_manager.installed_libraries
+
+        if output_file:
+            with open(output_file, 'w') as f:
+                for name, version in installed.items():
+                    f.write(f"{name}=={version}\n")
+            print(f"✓ Exported to {output_file}")
+        else:
+            # Print to stdout
+            for name, version in installed.items():
+                print(f"{name}=={version}")
+
+        return 0
+
+    def lib_import(self, requirements_file: str):
+        """Install libraries from requirements file"""
+        print(f"Installing from {requirements_file}...")
+
+        if not Path(requirements_file).exists():
+            print(f"✗ File not found: {requirements_file}", file=sys.stderr)
+            return 1
+
+        with open(requirements_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+
+                # Parse library==version
+                if '==' in line:
+                    name, version = line.split('==', 1)
+                else:
+                    name = line
+                    version = None
+
+                self.lib_install(name, version)
+
+        return 0
+
+    def core_install(self, platform: str, version: Optional[str] = None):
+        """Install a board platform"""
+        print(f"Installing {platform}...")
+
+        success = self.board_manager.install_package(platform, version)
+
+        if success:
+            print(f"✓ Successfully installed {platform}")
+            return 0
+        else:
+            print(f"✗ Failed to install {platform}", file=sys.stderr)
+            return 1
+
+    def core_uninstall(self, platform: str):
+        """Uninstall a board platform"""
+        print(f"Uninstalling {platform}...")
+
+        success = self.board_manager.uninstall_package(platform)
+
+        if success:
+            print(f"✓ Successfully uninstalled {platform}")
+            return 0
+        else:
+            print(f"✗ Failed to uninstall {platform}", file=sys.stderr)
+            return 1
+
+    def core_list(self):
+        """List installed board platforms"""
+        packages = self.board_manager.search_packages(installed_only=True)
+
+        if not packages:
+            print("No platforms installed")
+        else:
+            print(f"{'Name':<40} {'Version':<15}")
+            print("-" * 60)
+            for pkg in packages:
+                print(f"{pkg.name:<40} {pkg.installed_version:<15}")
+
+        return 0
+
+    def board_list(self):
+        """List available boards"""
+        boards = self.board_manager.get_all_boards()
+
+        if not boards:
+            print("No boards found")
+        else:
+            print(f"{'Name':<30} {'FQBN':<40}")
+            print("-" * 75)
+            for board in boards[:30]:  # Show top 30
+                print(f"{board.name:<30} {board.fqbn:<40}")
+
+        return 0
+
+    def board_search(self, query: str):
+        """Search for boards"""
+        boards = self.board_manager.search_boards(query=query)
+
+        if not boards:
+            print(f"No boards found matching '{query}'")
+        else:
+            print(f"\nFound {len(boards)} boards:\n")
+            print(f"{'Name':<30} {'Architecture':<15} {'FQBN':<40}")
+            print("-" * 90)
+            for board in boards[:20]:
+                print(f"{board.name:<30} {board.architecture:<15} {board.fqbn:<40}")
+
+        return 0
+
+
+def main():
+    """Main CLI entry point"""
+    parser = argparse.ArgumentParser(
+        description="Arduino CLI - Package management for Arduino IDE",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__
+    )
+
+    subparsers = parser.add_subparsers(dest='command', help='Command')
+
+    # Library commands
+    lib_parser = subparsers.add_parser('lib', help='Library management')
+    lib_subparsers = lib_parser.add_subparsers(dest='lib_command')
+
+    # lib install
+    install_parser = lib_subparsers.add_parser('install', help='Install library')
+    install_parser.add_argument('library', help='Library name[@version]')
+    install_parser.add_argument('--with-deps', action='store_true', default=True, help='Install with dependencies')
+    install_parser.add_argument('-r', '--requirements', help='Install from requirements file')
+
+    # lib uninstall
+    uninstall_parser = lib_subparsers.add_parser('uninstall', help='Uninstall library')
+    uninstall_parser.add_argument('library', help='Library name')
+
+    # lib list
+    list_parser = lib_subparsers.add_parser('list', help='List libraries')
+    list_parser.add_argument('--format', choices=['text', 'json'], default='text', help='Output format')
+    list_parser.add_argument('--all', action='store_true', help='Show all libraries (not just installed)')
+
+    # lib search
+    search_parser = lib_subparsers.add_parser('search', help='Search libraries')
+    search_parser.add_argument('query', help='Search query')
+
+    # lib upgrade
+    upgrade_parser = lib_subparsers.add_parser('upgrade', help='Upgrade library')
+    upgrade_parser.add_argument('library', nargs='?', help='Library name (omit to upgrade all)')
+
+    # lib export
+    export_parser = lib_subparsers.add_parser('export', help='Export installed libraries')
+    export_parser.add_argument('-o', '--output', help='Output file (default: stdout)')
+
+    # Core commands
+    core_parser = subparsers.add_parser('core', help='Platform management')
+    core_subparsers = core_parser.add_subparsers(dest='core_command')
+
+    # core install
+    core_install_parser = core_subparsers.add_parser('install', help='Install platform')
+    core_install_parser.add_argument('platform', help='Platform name')
+
+    # core uninstall
+    core_uninstall_parser = core_subparsers.add_parser('uninstall', help='Uninstall platform')
+    core_uninstall_parser.add_argument('platform', help='Platform name')
+
+    # core list
+    core_list_parser = core_subparsers.add_parser('list', help='List platforms')
+
+    # Board commands
+    board_parser = subparsers.add_parser('board', help='Board management')
+    board_subparsers = board_parser.add_subparsers(dest='board_command')
+
+    # board list
+    board_list_parser = board_subparsers.add_parser('list', help='List boards')
+
+    # board search
+    board_search_parser = board_subparsers.add_parser('search', help='Search boards')
+    board_search_parser.add_argument('query', help='Search query')
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Execute command
+    cli = ArduinoCLI()
+
+    try:
+        if args.command == 'lib':
+            if args.lib_command == 'install':
+                if args.requirements:
+                    return cli.lib_import(args.requirements)
+                else:
+                    # Parse library[@version]
+                    if '@' in args.library:
+                        name, version = args.library.split('@', 1)
+                        return cli.lib_install(name, version, args.with_deps)
+                    else:
+                        return cli.lib_install(args.library, with_deps=args.with_deps)
+
+            elif args.lib_command == 'uninstall':
+                return cli.lib_uninstall(args.library)
+
+            elif args.lib_command == 'list':
+                return cli.lib_list(format=args.format, installed_only=not args.all)
+
+            elif args.lib_command == 'search':
+                return cli.lib_search(args.query)
+
+            elif args.lib_command == 'upgrade':
+                return cli.lib_upgrade(args.library)
+
+            elif args.lib_command == 'export':
+                return cli.lib_export(args.output)
+
+        elif args.command == 'core':
+            if args.core_command == 'install':
+                return cli.core_install(args.platform)
+
+            elif args.core_command == 'uninstall':
+                return cli.core_uninstall(args.platform)
+
+            elif args.core_command == 'list':
+                return cli.core_list()
+
+        elif args.command == 'board':
+            if args.board_command == 'list':
+                return cli.board_list()
+
+            elif args.board_command == 'search':
+                return cli.board_search(args.query)
+
+        else:
+            parser.print_help()
+            return 1
+
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user")
+        return 130
+
+    except Exception as e:
+        print(f"✗ Error: {str(e)}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

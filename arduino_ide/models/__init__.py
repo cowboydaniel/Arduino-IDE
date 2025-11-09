@@ -11,6 +11,10 @@ from .library import (
     LibraryStatus,
     LibraryType,
     LibraryIndex,
+    KnownIssue,
+    DownloadMirror,
+    CommunityRating,
+    BoardCompatibility,
 )
 
 from .board import (
@@ -43,6 +47,10 @@ __all__ = [
     "LibraryStatus",
     "LibraryType",
     "LibraryIndex",
+    "KnownIssue",
+    "DownloadMirror",
+    "CommunityRating",
+    "BoardCompatibility",
     # Board models
     "Board",
     "BoardSpecs",
