@@ -128,8 +128,7 @@ class MainWindow(QMainWindow):
         # Guarantee the window advertises a resizable geometry so window
         # managers keep the maximize control visible.
         self.setMinimumSize(640, 480)
-        self.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.resize(1280, 800)
 
         # Track initial maximize attempts so we can retry until the window is
         # actually maximized when first shown.
