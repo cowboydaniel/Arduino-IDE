@@ -12,9 +12,11 @@ Handles package downloads with:
 import os
 import hashlib
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Optional, Callable
 from dataclasses import dataclass
+import threading
 import requests
 from PySide6.QtCore import QObject, Signal
 
@@ -329,6 +331,7 @@ class ParallelDownloadManager:
         self.cache_dir = cache_dir
         self.max_concurrent = max_concurrent
         self.active_downloads: List[DownloadManager] = []
+        self._active_lock = threading.Lock()
 
     def download_multiple(self, download_specs: List[dict]) -> List[DownloadResult]:
         """
@@ -341,18 +344,40 @@ class ParallelDownloadManager:
         Returns:
             List of DownloadResults
         """
-        results = []
+        results: List[Optional[DownloadResult]] = [None] * len(download_specs)
 
-        # TODO: Implement parallel download queue
-        # For now, download sequentially
-        for spec in download_specs:
-            manager = DownloadManager(self.cache_dir)
-            result = manager.download(
-                urls=spec.get('urls', []),
-                filename=spec.get('filename', ''),
-                expected_checksum=spec.get('checksum'),
-                expected_size=spec.get('size')
-            )
-            results.append(result)
+        def _run_download(manager: DownloadManager, spec: dict) -> DownloadResult:
+            with self._active_lock:
+                self.active_downloads.append(manager)
+            try:
+                return manager.download(
+                    urls=spec.get('urls', []),
+                    filename=spec.get('filename', ''),
+                    expected_checksum=spec.get('checksum'),
+                    expected_size=spec.get('size')
+                )
+            finally:
+                with self._active_lock:
+                    if manager in self.active_downloads:
+                        self.active_downloads.remove(manager)
 
-        return results
+        futures = {}
+
+        with ThreadPoolExecutor(max_workers=self.max_concurrent) as executor:
+            for index, spec in enumerate(download_specs):
+                manager = DownloadManager(self.cache_dir)
+                future = executor.submit(_run_download, manager, spec)
+                futures[future] = index
+
+            for future in as_completed(futures):
+                index = futures[future]
+                try:
+                    results[index] = future.result()
+                except Exception as exc:  # Propagate error information
+                    results[index] = DownloadResult(
+                        success=False,
+                        error_message=str(exc)
+                    )
+
+        # All downloads should produce a result, but guard against any missing entries
+        return [result if result is not None else DownloadResult(success=False) for result in results]
