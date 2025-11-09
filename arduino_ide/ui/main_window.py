@@ -474,33 +474,47 @@ class MainWindow(QMainWindow):
         # Show Quick Actions by default
         self.quick_actions_dock.raise_()
 
-        # Create right-side panel widgets
-        self.board_panel = BoardPanel()
-        self.variable_watch = VariableWatch()
-        self.status_display = StatusDisplay()
-        self.context_panel = ContextPanel()
-
-        # Create a dedicated splitter for right docks
-        self.right_splitter = QSplitter(Qt.Vertical)
-        self.right_splitter.setObjectName("RightDockColumn")
-
-        # Add right panel widgets to the splitter
-        self.right_splitter.addWidget(self.board_panel)
-        self.right_splitter.addWidget(self.variable_watch)
-        self.right_splitter.addWidget(self.status_display)
-        self.right_splitter.addWidget(self.context_panel)
-
-        # Fix width of the whole splitter column
+        # --- RIGHT COLUMN FIX ---
+        # Create individual dock widgets for right-side panels
         right_panel_width = 320
-        self.right_splitter.setMinimumWidth(right_panel_width)
-        self.right_splitter.setMaximumWidth(right_panel_width)
 
-        # Wrap splitter in a dock widget and add to right area
-        self.right_dock = QDockWidget("Info Panels", self)
-        self.right_dock.setObjectName("RightDockColumn")
-        self.right_dock.setWidget(self.right_splitter)
-        self.right_dock.setFeatures(QDockWidget.NoDockWidgetFeatures)  # Prevent closing/floating
-        self.addDockWidget(Qt.RightDockWidgetArea, self.right_dock)
+        # Board Info dock
+        self.board_dock = QDockWidget("Board Info", self)
+        self.board_dock.setObjectName("BoardInfoDock")
+        self.board_panel = BoardPanel()
+        self.board_dock.setWidget(self.board_panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.board_dock)
+
+        # Variables dock
+        self.watch_dock = QDockWidget("Variables", self)
+        self.watch_dock.setObjectName("VariablesDock")
+        self.variable_watch = VariableWatch()
+        self.watch_dock.setWidget(self.variable_watch)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.watch_dock)
+
+        # Real-time Status dock
+        self.status_dock = QDockWidget("Real-time Status", self)
+        self.status_dock.setObjectName("RealTimeStatusDock")
+        self.status_display = StatusDisplay()
+        self.status_dock.setWidget(self.status_display)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.status_dock)
+
+        # Context Help dock
+        self.context_dock = QDockWidget("Context Help", self)
+        self.context_dock.setObjectName("ContextHelpDock")
+        self.context_panel = ContextPanel()
+        self.context_dock.setWidget(self.context_panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.context_dock)
+
+        # Force vertical stacking of right docks
+        self.splitDockWidget(self.board_dock, self.watch_dock, Qt.Vertical)
+        self.splitDockWidget(self.watch_dock, self.status_dock, Qt.Vertical)
+        self.splitDockWidget(self.status_dock, self.context_dock, Qt.Vertical)
+
+        # Set fixed width for the entire right column
+        for dock in (self.board_dock, self.watch_dock, self.status_dock, self.context_dock):
+            dock.setMinimumWidth(right_panel_width)
+            dock.setMaximumWidth(right_panel_width)
 
         # Console Panel (bottom)
         self.console_dock = QDockWidget("Console", self)
@@ -680,10 +694,11 @@ void loop() {
 
     def toggle_status_display(self):
         """Show/hide real-time status display"""
-        if self.status_display.isVisible():
-            self.status_display.hide()
+        if self.status_dock.isVisible():
+            self.status_dock.hide()
         else:
-            self.status_display.show()
+            self.status_dock.show()
+            self.status_dock.raise_()
 
     def toggle_plotter(self):
         """Show/hide serial plotter"""
