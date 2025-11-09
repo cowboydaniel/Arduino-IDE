@@ -29,6 +29,14 @@ extern "C"{
 // Pin Definitions for Arduino Uno
 #define LED_BUILTIN 13
 
+// Analog pin definitions (A0-A5 for Arduino Uno)
+#define A0 14
+#define A1 15
+#define A2 16
+#define A3 17
+#define A4 18
+#define A5 19
+
 // Boolean
 #define true 0x1
 #define false 0x0
@@ -74,6 +82,18 @@ uint8_t shiftIn(uint8_t dataPin, uint8_t clockPin, uint8_t bitOrder);
 
 void attachInterrupt(uint8_t interruptNum, void (*userFunc)(void), int mode);
 void detachInterrupt(uint8_t interruptNum);
+
+// Random number functions
+void randomSeed(unsigned long seed);
+long random(long howbig);
+long random(long howsmall, long howbig);
+
+// Math utility functions
+long map(long x, long in_min, long in_max, long out_min, long out_max);
+#define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
+#define min(a,b) ((a)<(b)?(a):(b))
+#define max(a,b) ((a)>(b)?(a):(b))
+#define abs(x) ((x)>0?(x):-(x))
 
 void setup(void);
 void loop(void);
