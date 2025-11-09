@@ -475,14 +475,27 @@ class ArduinoCLI:
             core_obj_file = build_dir / f"{core_source.stem}.o"
             core_obj_files.append(core_obj_file)
 
+            # Determine if this is an assembly file
+            is_assembly = core_source.suffix == '.S'
+
             core_compile_flags = [
                 str(toolchain.get_avr_gcc_path()),
                 '-c',
                 '-g',
-                '-Os',
-                '-w',
-                f'-mmcu={mcu}',
             ]
+
+            # Assembly files need different flags
+            if is_assembly:
+                core_compile_flags.extend([
+                    '-x', 'assembler-with-cpp',  # Treat as assembly with C preprocessor
+                ])
+            else:
+                core_compile_flags.extend([
+                    '-Os',  # Optimize for size (not for assembly)
+                ])
+
+            core_compile_flags.append('-w')  # Suppress warnings
+            core_compile_flags.append(f'-mmcu={mcu}')
 
             # Add same -B flags
             if specs_dir.exists():
