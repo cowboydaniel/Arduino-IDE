@@ -189,44 +189,50 @@ class MainWindow(QMainWindow):
         self.editor_tabs.tabCloseRequested.connect(self.close_tab)
         self.editor_tabs.currentChanged.connect(self.on_tab_changed)
 
-        # Main layout: vertical (top block + bottom block)
-        central = QWidget()
-        central_layout = QVBoxLayout(central)
-        central_layout.setContentsMargins(0, 0, 0, 0)
-        central_layout.setSpacing(0)
+        # Main horizontal splitter: [left area (with bottom tabs)] | [right column (full height)]
+        central = QSplitter(Qt.Horizontal)
+        central.setHandleWidth(4)
 
-        # Horizontal splitter: left column | editor | right column
-        self.top_splitter = QSplitter(Qt.Horizontal)
-        self.top_splitter.setHandleWidth(4)
+        # Left area: vertical layout for top row and bottom tabs
+        left_area = QWidget()
+        left_area_layout = QVBoxLayout(left_area)
+        left_area_layout.setContentsMargins(0, 0, 0, 0)
+        left_area_layout.setSpacing(0)
+
+        # Top row: horizontal splitter with left column | editor
+        top_splitter = QSplitter(Qt.Horizontal)
+        top_splitter.setHandleWidth(4)
 
         # Left column (Quick Actions + Project Explorer)
         self.left_column = QWidget()
         self.left_column_layout = QVBoxLayout(self.left_column)
         self.left_column_layout.setContentsMargins(0, 0, 0, 0)
         self.left_column_layout.setSpacing(0)
+        self.left_column.setFixedWidth(260)
 
-        self.top_splitter.addWidget(self.left_column)
+        top_splitter.addWidget(self.left_column)
+        top_splitter.addWidget(self.editor_tabs)
 
-        # Editor (already exists)
-        self.top_splitter.addWidget(self.editor_tabs)
+        # Add top splitter to left area
+        left_area_layout.addWidget(top_splitter)
 
-        # Right column (Board/Watch/Status/Context)
+        # Bottom tab widget (only under left area, NOT under right column)
+        self.bottom_tabs = QTabWidget()
+        self.bottom_tabs.setMinimumHeight(150)
+        left_area_layout.addWidget(self.bottom_tabs)
+
+        # Add left area to main splitter
+        central.addWidget(left_area)
+
+        # Right column (Board/Watch/Status/Context) - full height
         self.right_column = QWidget()
         self.right_column_layout = QVBoxLayout(self.right_column)
         self.right_column_layout.setContentsMargins(0, 0, 0, 0)
         self.right_column_layout.setSpacing(0)
-
-        self.top_splitter.addWidget(self.right_column)
-
-        # Fixed widths for left and right
-        self.left_column.setFixedWidth(260)
         self.right_column.setFixedWidth(300)
 
-        central_layout.addWidget(self.top_splitter)
-
-        # Bottom tab widget (serial monitor, plotter, etc.)
-        self.bottom_tabs = QTabWidget()
-        central_layout.addWidget(self.bottom_tabs)
+        # Add right column to main splitter
+        central.addWidget(self.right_column)
 
         self.setCentralWidget(central)
 
@@ -523,9 +529,6 @@ class MainWindow(QMainWindow):
         self.bottom_tabs.addTab(self.plotter_panel, "Plotter")
         self.bottom_tabs.addTab(self.problems_panel, "Problems")
         self.bottom_tabs.addTab(self.output_panel, "Output")
-
-        # Set minimum height for bottom tabs
-        self.bottom_tabs.setMinimumHeight(150)
 
         # Connect Quick Actions Panel signals
         self.quick_actions_panel.upload_clicked.connect(self.upload_sketch)
