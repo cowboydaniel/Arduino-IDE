@@ -126,6 +126,8 @@ class ToolchainManager:
 
             # Download with progress
             last_percent = [-1]  # Use list to allow modification in nested function
+            is_tty = sys.stdout.isatty()
+
             def reporthook(block_num, block_size, total_size):
                 downloaded = block_num * block_size
                 if total_size > 0:
@@ -135,9 +137,17 @@ class ToolchainManager:
                         last_percent[0] = percent
                         mb_downloaded = downloaded / (1024 * 1024)
                         mb_total = total_size / (1024 * 1024)
-                        # Use sys.stdout.write for better control over line updates
-                        sys.stdout.write(f"\rDownloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)")
-                        sys.stdout.flush()
+
+                        if is_tty:
+                            # Use carriage return for terminals (overwrite same line)
+                            progress_text = f"Downloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)"
+                            # Pad with spaces to overwrite any previous longer text
+                            sys.stdout.write(f"\r{progress_text:<80}")
+                            sys.stdout.flush()
+                        else:
+                            # For non-TTY (redirected output), only show every 10% to avoid spam
+                            if percent % 10 == 0 or percent == 100:
+                                print(f"Downloading: {mb_downloaded:.1f}/{mb_total:.1f} MB ({percent}%)")
                 if progress_callback:
                     progress_callback(downloaded, total_size)
 
