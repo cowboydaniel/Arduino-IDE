@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""
-Main entry point for Arduino IDE Modern
-"""
+"""Main entry point for Arduino IDE Modern"""
 
 import sys
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt, QTimer
+
+from arduino_ide.config import APP_NAME, APP_ORGANIZATION, APP_VERSION
 from arduino_ide.ui.main_window import MainWindow
 
 
@@ -17,9 +17,9 @@ def main():
     )
 
     app = QApplication(sys.argv)
-    app.setApplicationName("Arduino IDE Modern")
-    app.setOrganizationName("Arduino IDE Modern")
-    app.setApplicationVersion("0.1.0")
+    app.setApplicationName(APP_NAME)
+    app.setOrganizationName(APP_ORGANIZATION)
+    app.setApplicationVersion(APP_VERSION)
 
     # Create and show main window maximized
     window = MainWindow()
