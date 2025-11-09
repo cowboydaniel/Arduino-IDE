@@ -213,7 +213,7 @@ class CoreManager:
         return self.download_core()
 
     def get_core_sources(self) -> list[Path]:
-        """Get list of all core source files (.c, .cpp) that need to be compiled
+        """Get list of all core source files (.c, .cpp, .S) that need to be compiled
 
         Returns:
             List of source file paths
@@ -224,12 +224,10 @@ class CoreManager:
         core_path = self.get_core_path()
         sources = []
 
-        # Add all .c and .cpp files except main.cpp
-        for ext in ['*.c', '*.cpp']:
+        # Add all .c, .cpp, and .S (assembly) files INCLUDING main.cpp
+        for ext in ['*.c', '*.cpp', '*.S']:
             for source in core_path.glob(ext):
-                # Skip main.cpp as it conflicts with the sketch's main
-                if source.name != 'main.cpp':
-                    sources.append(source)
+                sources.append(source)
 
         return sources
 
