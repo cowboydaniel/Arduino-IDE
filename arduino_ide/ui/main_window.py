@@ -151,6 +151,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Arduino IDE Modern")
         self.setGeometry(100, 100, 1600, 900)
 
+        # Explicitly set window flags to ensure maximize button is visible on Linux
+        self.setWindowFlags(
+            Qt.Window |
+            Qt.WindowMinimizeButtonHint |
+            Qt.WindowMaximizeButtonHint |
+            Qt.WindowCloseButtonHint
+        )
+
         # Central widget with editor tabs
         self.editor_tabs = QTabWidget()
         self.editor_tabs.setTabsClosable(True)
