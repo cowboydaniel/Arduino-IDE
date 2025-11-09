@@ -117,6 +117,13 @@ class MainWindow(QMainWindow):
         self.settings = QSettings()
         self.theme_manager = ThemeManager()
 
+        # Ensure minimize and maximize buttons are available on the title bar
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowMaximizeButtonHint
+            | Qt.WindowMinimizeButtonHint
+        )
+
         # Initialize package managers
         self.library_manager = LibraryManager()
         self.board_manager = BoardManager()
