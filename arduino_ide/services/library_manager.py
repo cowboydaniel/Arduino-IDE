@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Set
 from datetime import datetime
 import requests
+from packaging.version import Version, InvalidVersion
 
 # Optional PySide6 support
 try:
@@ -232,6 +233,19 @@ class LibraryManager(QObject):
         if not lib_version:
             self.status_message.emit(f"Version '{version}' not found for '{name}'")
             return False
+
+        # Check for existing duplicates before installation
+        duplicates = self.detect_duplicate_installations()
+        if name in duplicates:
+            self.status_message.emit(
+                f"Warning: {name} has {len(duplicates[name])} existing installation(s). "
+                f"Installing will create another copy."
+            )
+            # Log the existing installations
+            for install in duplicates[name]:
+                self.status_message.emit(
+                    f"  Existing: v{install['version']} at {install['path']} ({install['source']})"
+                )
 
         self.status_message.emit(f"Installing {name} v{version}...")
 
@@ -674,6 +688,270 @@ class LibraryManager(QObject):
             )
 
         return conflicts
+
+    def detect_duplicate_installations(self) -> Dict[str, List[Dict[str, str]]]:
+        """Detect duplicate library installations.
+
+        Scans the libraries directory for duplicate installations of the same library,
+        which can occur when:
+        - The same library is installed multiple times in different subdirectories
+        - Multiple versions of the same library are installed
+        - Manual installations conflict with package manager installations
+
+        Returns:
+            Dictionary mapping library name to list of installation details:
+            {
+                "LibraryName": [
+                    {"version": "1.0.0", "path": "/path/to/lib1", "source": "manual"},
+                    {"version": "1.0.0", "path": "/path/to/lib2", "source": "managed"}
+                ]
+            }
+        """
+        duplicates: Dict[str, List[Dict[str, str]]] = {}
+
+        if not self.libraries_dir.exists():
+            return duplicates
+
+        # Track all library installations by normalized name
+        library_installations: Dict[str, List[Dict[str, str]]] = {}
+
+        # Scan the main libraries directory
+        for lib_dir in self.libraries_dir.iterdir():
+            if not lib_dir.is_dir():
+                continue
+
+            # Try to read library.properties
+            props_file = lib_dir / "library.properties"
+            if props_file.exists():
+                try:
+                    props = self._parse_library_properties(props_file)
+                    lib_name = props.get("name", lib_dir.name)
+                    lib_version = props.get("version", "unknown")
+
+                    # Normalize library name for comparison (case-insensitive)
+                    normalized_name = lib_name.lower()
+
+                    # Determine installation source
+                    # A library is "managed" only if it's tracked AND the version matches AND it's in the standard location
+                    is_managed = (
+                        lib_name in self.installed_libraries and
+                        self.installed_libraries[lib_name] == lib_version and
+                        lib_dir.name == lib_name  # Standard naming convention
+                    )
+                    source = "managed" if is_managed else "manual"
+
+                    installation_info = {
+                        "name": lib_name,  # Original name
+                        "version": lib_version,
+                        "path": str(lib_dir),
+                        "source": source
+                    }
+
+                    if normalized_name not in library_installations:
+                        library_installations[normalized_name] = []
+                    library_installations[normalized_name].append(installation_info)
+
+                except Exception as e:
+                    print(f"Error reading {props_file}: {e}")
+
+        # Find duplicates (libraries with more than one installation)
+        for normalized_name, installations in library_installations.items():
+            if len(installations) > 1:
+                # Use the original name from the first installation
+                original_name = installations[0]["name"]
+                duplicates[original_name] = installations
+
+        return duplicates
+
+    def find_multiple_versions(self) -> Dict[str, List[str]]:
+        """Find libraries with multiple versions installed.
+
+        Returns:
+            Dictionary mapping library name to list of installed versions:
+            {"LibraryName": ["1.0.0", "1.2.0", "2.0.0"]}
+        """
+        multiple_versions: Dict[str, List[str]] = {}
+
+        duplicates = self.detect_duplicate_installations()
+
+        for lib_name, installations in duplicates.items():
+            # Extract unique versions
+            versions = list(set(install["version"] for install in installations))
+
+            # Only include if there are actually multiple different versions
+            if len(versions) > 1:
+                # Sort versions (attempt semantic versioning)
+                try:
+                    sorted_versions = sorted(versions, key=lambda v: Version(v) if v != "unknown" else Version("0.0.0"))
+                except InvalidVersion:
+                    # Fallback to string sorting
+                    sorted_versions = sorted(versions)
+
+                multiple_versions[lib_name] = sorted_versions
+
+        return multiple_versions
+
+    def get_duplicate_summary(self) -> str:
+        """Get a human-readable summary of duplicate library installations.
+
+        Returns:
+            Formatted string describing all duplicate installations found.
+        """
+        duplicates = self.detect_duplicate_installations()
+
+        if not duplicates:
+            return "No duplicate library installations found."
+
+        lines = ["Duplicate library installations detected:", ""]
+
+        for lib_name, installations in sorted(duplicates.items()):
+            lines.append(f"Library: {lib_name}")
+
+            # Group by version
+            version_groups: Dict[str, List[Dict[str, str]]] = {}
+            for install in installations:
+                version = install["version"]
+                if version not in version_groups:
+                    version_groups[version] = []
+                version_groups[version].append(install)
+
+            if len(version_groups) > 1:
+                lines.append(f"  ⚠ Multiple versions installed:")
+                for version, installs in sorted(version_groups.items()):
+                    lines.append(f"    Version {version}:")
+                    for install in installs:
+                        lines.append(f"      - {install['path']} ({install['source']})")
+            else:
+                # Same version, different locations
+                version = list(version_groups.keys())[0]
+                lines.append(f"  ⚠ Version {version} installed in multiple locations:")
+                for install in installations:
+                    lines.append(f"    - {install['path']} ({install['source']})")
+
+            lines.append("")
+
+        # Add recommendations
+        lines.append("Recommendations:")
+        lines.append("  - Remove duplicate installations to avoid conflicts")
+        lines.append("  - Keep only one version of each library")
+        lines.append("  - Use the library manager for installations to avoid manual duplicates")
+
+        return "\n".join(lines)
+
+    def resolve_duplicates(self, library_name: str, keep_version: Optional[str] = None,
+                          keep_path: Optional[str] = None, dry_run: bool = True) -> Dict[str, any]:
+        """Resolve duplicate library installations by removing unwanted copies.
+
+        Args:
+            library_name: Name of the library to resolve duplicates for
+            keep_version: Version to keep (if None, keeps the latest)
+            keep_path: Specific path to keep (takes precedence over keep_version)
+            dry_run: If True, only report what would be done without making changes
+
+        Returns:
+            Dictionary with resolution results:
+            {
+                "kept": {"version": "1.0.0", "path": "/path"},
+                "removed": [{"version": "0.9.0", "path": "/path1"}, ...],
+                "errors": ["error1", "error2"]
+            }
+        """
+        result = {
+            "kept": None,
+            "removed": [],
+            "errors": []
+        }
+
+        duplicates = self.detect_duplicate_installations()
+
+        if library_name not in duplicates:
+            result["errors"].append(f"No duplicates found for '{library_name}'")
+            return result
+
+        installations = duplicates[library_name]
+
+        # Determine which installation to keep
+        installation_to_keep = None
+
+        if keep_path:
+            # Keep specific path
+            for install in installations:
+                if install["path"] == keep_path:
+                    installation_to_keep = install
+                    break
+
+            if not installation_to_keep:
+                result["errors"].append(f"Specified path '{keep_path}' not found")
+                return result
+
+        elif keep_version:
+            # Keep specific version (prefer managed installations)
+            candidates = [i for i in installations if i["version"] == keep_version]
+            if candidates:
+                # Prefer managed over manual
+                managed = [c for c in candidates if c["source"] == "managed"]
+                installation_to_keep = managed[0] if managed else candidates[0]
+            else:
+                result["errors"].append(f"Version '{keep_version}' not found")
+                return result
+
+        else:
+            # Keep the latest version (prefer managed installations)
+            try:
+                # Sort by version
+                sorted_installs = sorted(
+                    installations,
+                    key=lambda i: (
+                        Version(i["version"]) if i["version"] != "unknown" else Version("0.0.0"),
+                        i["source"] == "managed"  # Prefer managed
+                    ),
+                    reverse=True
+                )
+                installation_to_keep = sorted_installs[0]
+            except InvalidVersion:
+                # Fallback: prefer managed, then first
+                managed = [i for i in installations if i["source"] == "managed"]
+                installation_to_keep = managed[0] if managed else installations[0]
+
+        result["kept"] = installation_to_keep
+
+        # Remove other installations
+        for install in installations:
+            if install["path"] == installation_to_keep["path"]:
+                continue
+
+            if dry_run:
+                result["removed"].append(install)
+            else:
+                try:
+                    install_path = Path(install["path"])
+                    if install_path.exists():
+                        shutil.rmtree(install_path)
+                        result["removed"].append(install)
+
+                        # Update installed libraries tracking
+                        if install["name"] in self.installed_libraries:
+                            # Only remove if this was the tracked version
+                            if self.installed_libraries[install["name"]] == install["version"]:
+                                if installation_to_keep["source"] == "managed":
+                                    # Update to kept version
+                                    self.installed_libraries[install["name"]] = installation_to_keep["version"]
+                                else:
+                                    # Remove from tracking
+                                    del self.installed_libraries[install["name"]]
+
+                        self.status_message.emit(
+                            f"Removed duplicate: {install['name']} v{install['version']} from {install['path']}"
+                        )
+                except Exception as e:
+                    error_msg = f"Failed to remove {install['path']}: {str(e)}"
+                    result["errors"].append(error_msg)
+                    self.status_message.emit(error_msg)
+
+        if not dry_run and not result["errors"]:
+            self._save_installed_libraries()
+
+        return result
 
     def get_library_size(self, name: str, version: Optional[str] = None) -> int:
         """Get library size in bytes"""
