@@ -240,22 +240,24 @@ class CodeAnalyzer:
         code_text = CodeAnalyzer.strip_comments(code_text)
 
         # Board-specific base overhead (Arduino core runtime variables)
-        # These values are from actual avr-size measurements of minimal sketches
+        # Empirically calibrated from actual compiler output (avr-size)
+        # Uno: 9 bytes = 3 timer variables in wiring.c (timer0_overflow_count,
+        #                timer0_millis, timer0_fract)
         board_overhead = {
-            "Arduino Uno": 100,           # ATmega328P
-            "Arduino Nano": 100,          # ATmega328P
-            "Arduino Pro Mini": 100,      # ATmega328P
-            "Arduino Leonardo": 100,      # ATmega32U4
-            "Arduino Micro": 100,         # ATmega32U4
-            "Arduino Mega 2560": 200,     # ATmega2560 (more peripherals)
-            "Arduino Due": 500,           # ARM Cortex-M3
-            "Arduino Uno R4 WiFi": 500,   # ARM Cortex-M4
-            "Arduino Uno R4 Minima": 500, # ARM Cortex-M4
-            "ESP32 Dev Module": 25600,    # ESP32 has large runtime overhead
-            "ESP8266 NodeMCU": 26624,     # ESP8266 has large runtime overhead
+            "Arduino Uno": 9,             # ATmega328P: timer vars only
+            "Arduino Nano": 9,            # ATmega328P: timer vars only
+            "Arduino Pro Mini": 9,        # ATmega328P: timer vars only
+            "Arduino Leonardo": 20,       # ATmega32U4: timer + USB overhead
+            "Arduino Micro": 20,          # ATmega32U4: timer + USB overhead
+            "Arduino Mega 2560": 12,      # ATmega2560: timer vars (slightly more)
+            "Arduino Due": 100,           # ARM Cortex-M3: larger runtime
+            "Arduino Uno R4 WiFi": 100,   # ARM Cortex-M4: larger runtime
+            "Arduino Uno R4 Minima": 100, # ARM Cortex-M4: larger runtime
+            "ESP32 Dev Module": 25600,    # ESP32: large WiFi/BT runtime
+            "ESP8266 NodeMCU": 26624,     # ESP8266: large WiFi runtime
         }
 
-        total_ram = board_overhead.get(board_name, 100)
+        total_ram = board_overhead.get(board_name, 9)
 
         # === GLOBAL & STATIC VARIABLES ===
         # Remove PROGMEM data first (it goes to flash, not RAM)
@@ -326,18 +328,20 @@ class CodeAnalyzer:
             total_ram += len(var_names) * 6  # String object overhead
 
         # === LIBRARY BUFFERS ===
-        # These are the static buffers libraries allocate
+        # These values are empirically calibrated from actual compiler output
 
-        # Serial/UART buffers (HardwareSerial)
-        # Default: 64 bytes RX + 64 bytes TX = 128 bytes per Serial port
+        # Serial/UART (HardwareSerial object + buffers)
+        # Empirically measured: 175 bytes total per Serial port
+        # Breakdown: 64B RX buffer + 64B TX buffer + 47B object overhead
+        #   (object overhead includes: 6 pointers, indices, bool, alignment padding)
         if 'Serial.begin' in code_text or 'Serial.' in code_text:
-            total_ram += 128  # Serial (USB/UART0)
+            total_ram += 175  # Serial (USB/UART0)
         if 'Serial1.begin' in code_text or 'Serial1.' in code_text:
-            total_ram += 128  # Serial1 (UART1) - Mega, Leonardo
+            total_ram += 175  # Serial1 (UART1) - Mega, Leonardo
         if 'Serial2.begin' in code_text or 'Serial2.' in code_text:
-            total_ram += 128  # Serial2 (UART2) - Mega
+            total_ram += 175  # Serial2 (UART2) - Mega
         if 'Serial3.begin' in code_text or 'Serial3.' in code_text:
-            total_ram += 128  # Serial3 (UART3) - Mega
+            total_ram += 175  # Serial3 (UART3) - Mega
 
         # Wire (I2C) buffer
         if 'Wire.begin' in code_text or 'Wire.' in code_text or '#include <Wire.h>' in code_text:
