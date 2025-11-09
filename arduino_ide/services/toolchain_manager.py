@@ -9,8 +9,14 @@ import platform
 import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
-import urllib.request
 import shutil
+
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    import urllib.request
+    HAS_REQUESTS = False
 
 
 class ToolchainManager:
@@ -118,7 +124,58 @@ class ToolchainManager:
                 if progress_callback:
                     progress_callback(downloaded, total_size)
 
-            urllib.request.urlretrieve(url, temp_file, reporthook)
+            # Download using requests library if available (more reliable)
+            try:
+                if HAS_REQUESTS:
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Accept': '*/*',
+                        'Accept-Encoding': 'gzip, deflate',
+                        'Connection': 'keep-alive'
+                    }
+                    response = requests.get(url, headers=headers, stream=True, timeout=30)
+                    response.raise_for_status()
+
+                    total_size = int(response.headers.get('content-length', 0))
+                    downloaded = 0
+                    block_size = 8192
+                    block_num = 0
+
+                    with open(temp_file, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=block_size):
+                            if chunk:
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                block_num += 1
+                                reporthook(block_num, block_size, total_size)
+                else:
+                    # Fallback to urllib
+                    req = urllib.request.Request(
+                        url,
+                        headers={'User-Agent': 'Mozilla/5.0 (compatible; Arduino-IDE/1.0)'}
+                    )
+
+                    with urllib.request.urlopen(req) as response:
+                        total_size = int(response.headers.get('Content-Length', 0))
+                        downloaded = 0
+                        block_size = 8192
+                        block_num = 0
+
+                        with open(temp_file, 'wb') as f:
+                            while True:
+                                chunk = response.read(block_size)
+                                if not chunk:
+                                    break
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                block_num += 1
+                                reporthook(block_num, block_size, total_size)
+
+            except Exception as e:
+                # If download fails, try fallback to system package
+                print(f"\n✗ Download failed: {e}", file=sys.stderr)
+                print("Attempting to use system AVR toolchain...", file=sys.stderr)
+                return self._try_system_toolchain()
             print()  # New line after progress
 
             # Extract archive
@@ -155,6 +212,51 @@ class ToolchainManager:
             print(f"✗ Failed to download toolchain: {e}", file=sys.stderr)
             return False
 
+    def _try_system_toolchain(self) -> bool:
+        """Try to use system-installed AVR toolchain as fallback
+
+        Returns:
+            True if system toolchain is available, False otherwise
+        """
+        try:
+            # Check if avr-gcc is in PATH
+            result = subprocess.run(
+                ['which', 'avr-gcc'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode == 0:
+                system_avr_gcc = Path(result.stdout.strip())
+                system_bin_dir = system_avr_gcc.parent
+
+                # Create avr-gcc directory structure
+                self.avr_dir.mkdir(parents=True, exist_ok=True)
+                local_bin_dir = self.avr_dir / 'bin'
+                local_bin_dir.mkdir(parents=True, exist_ok=True)
+
+                # Create symlinks to system tools
+                tools = ['avr-gcc', 'avr-g++', 'avr-size', 'avr-objcopy', 'avr-objdump', 'avr-ar']
+                for tool in tools:
+                    system_tool = system_bin_dir / tool
+                    local_tool = local_bin_dir / tool
+                    if system_tool.exists() and not local_tool.exists():
+                        try:
+                            local_tool.symlink_to(system_tool)
+                        except Exception:
+                            # If symlink fails, copy the file
+                            shutil.copy2(system_tool, local_tool)
+
+                if self.is_installed():
+                    print("✓ Using system AVR toolchain")
+                    return True
+
+        except Exception as e:
+            print(f"✗ Failed to use system toolchain: {e}", file=sys.stderr)
+
+        return False
+
     def ensure_installed(self) -> bool:
         """Ensure toolchain is installed, download if necessary
 
@@ -165,6 +267,12 @@ class ToolchainManager:
             return True
 
         print("AVR toolchain not found. Installing automatically...")
+
+        # First try system toolchain
+        if self._try_system_toolchain():
+            return True
+
+        # If system toolchain not available, try downloading
         return self.download_toolchain()
 
     def get_version(self) -> Optional[str]:
