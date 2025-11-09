@@ -117,12 +117,24 @@ class MainWindow(QMainWindow):
         self.settings = QSettings()
         self.theme_manager = ThemeManager()
 
-        # Ensure minimize and maximize buttons are available on the title bar
-        self.setWindowFlags(
-            self.windowFlags()
-            | Qt.WindowMaximizeButtonHint
-            | Qt.WindowMinimizeButtonHint
-        )
+        # Ensure standard window chrome is available so desktop environments
+        # show the minimize/maximize controls.  Some window managers (notably
+        # GNOME on Wayland) will omit the maximize button unless the system
+        # menu hint is explicitly enabled.
+        self.setWindowFlag(Qt.WindowMinimizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowSystemMenuHint, True)
+
+        # Guarantee the window advertises a resizable geometry so window
+        # managers keep the maximize control visible.
+        self.setMinimumSize(640, 480)
+        self.resize(1280, 800)
+
+        # Track initial maximize attempts so we can retry until the window is
+        # actually maximized when first shown.
+        self._initial_maximize_done = False
+        self._initial_maximize_attempts = 0
+        self._max_initial_maximize_attempts = 5
 
         # Initialize package managers
         self.library_manager = LibraryManager()
@@ -145,6 +157,10 @@ class MainWindow(QMainWindow):
         state = self.settings.value("windowState")
         if state:
             self.restoreState(state)
+
+        # Always open maximized regardless of any previous geometry by kicking
+        # off the maximize retry loop.
+        self._enforce_initial_maximize()
 
         # Create initial editor (after dock widgets are created)
         self.create_new_editor("sketch.ino")
@@ -299,6 +315,12 @@ class MainWindow(QMainWindow):
         about_action = QAction("About", self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
+
+    def showEvent(self, event):
+        """Ensure the window is maximized the first time it is shown"""
+        super().showEvent(event)
+        if not self._initial_maximize_done:
+            self._enforce_initial_maximize()
 
     def create_toolbars(self):
         """Create toolbars"""
@@ -963,6 +985,25 @@ void loop() {
         state = self.settings.value("windowState")
         if state:
             self.restoreState(state)
+
+    def _enforce_initial_maximize(self):
+        """Force the main window to launch maximized on all platforms"""
+        if self._initial_maximize_done:
+            return
+
+        if self._initial_maximize_attempts >= self._max_initial_maximize_attempts:
+            self._initial_maximize_done = True
+            return
+
+        self._initial_maximize_attempts += 1
+        self.showMaximized()
+
+        if self.isMaximized():
+            self._initial_maximize_done = True
+        else:
+            # Keep retrying briefly - some window managers ignore the request
+            # the first few times while the window is still being constructed.
+            QTimer.singleShot(100, self._enforce_initial_maximize)
 
     def closeEvent(self, event):
         """Handle window close"""
