@@ -17,6 +17,9 @@ from threading import Thread, Event
 import requests
 from PySide6.QtCore import QObject, Signal
 
+from .library_manager import LibraryManager
+from .board_manager import BoardManager
+
 
 class OfflineDetector:
     """
@@ -114,6 +117,10 @@ class BackgroundUpdater(QObject):
 
         # Update callbacks
         self._update_callbacks: List[callable] = []
+
+        # Lazy loaded managers
+        self._library_manager: Optional[LibraryManager] = None
+        self._board_manager: Optional[BoardManager] = None
 
     def start(self):
         """Start background update checker"""
@@ -240,10 +247,81 @@ class BackgroundUpdater(QObject):
         Returns:
             List of update info dicts
         """
-        # This would integrate with LibraryManager and BoardManager
-        # For now, return empty list
-        # TODO: Integrate with actual managers
-        return []
+        updates: List[Dict] = []
+
+        if self.is_offline:
+            self.status_message.emit("Skipping update check while offline")
+            return updates
+
+        # Get library updates
+        library_manager = self._library_manager
+        if library_manager is None:
+            try:
+                library_manager = LibraryManager()
+                self._library_manager = library_manager
+            except Exception as exc:
+                self.status_message.emit(f"Unable to initialize LibraryManager: {exc}")
+                library_manager = None
+
+        if library_manager is not None:
+            try:
+                libraries_with_updates = []
+                if hasattr(library_manager, "library_index"):
+                    libraries_with_updates = library_manager.library_index.get_libraries_with_updates()
+
+                for library in libraries_with_updates:
+                    updates.append({
+                        "type": "library",
+                        "name": getattr(library, "name", ""),
+                        "current": getattr(library, "installed_version", "") or "",
+                        "latest": getattr(library, "latest_version", "") or "",
+                        "description": getattr(library, "description", "") or getattr(library, "sentence", ""),
+                        "metadata": {
+                            "author": getattr(library, "author", ""),
+                            "category": getattr(library, "category", ""),
+                        },
+                    })
+            except Exception as exc:
+                self.status_message.emit(f"Failed to check library updates: {exc}")
+
+        # Get board package updates
+        board_manager = self._board_manager
+        if board_manager is None:
+            try:
+                board_manager = BoardManager()
+                self._board_manager = board_manager
+            except Exception as exc:
+                self.status_message.emit(f"Unable to initialize BoardManager: {exc}")
+                board_manager = None
+
+        if board_manager is not None:
+            try:
+                packages_with_updates = []
+                if hasattr(board_manager, "board_index"):
+                    packages_with_updates = board_manager.board_index.get_packages_with_updates()
+
+                for package in packages_with_updates:
+                    category = getattr(package, "category", "")
+                    if hasattr(category, "value"):
+                        category_value = category.value
+                    else:
+                        category_value = str(category)
+
+                    updates.append({
+                        "type": "board",
+                        "name": getattr(package, "name", ""),
+                        "current": getattr(package, "installed_version", "") or "",
+                        "latest": getattr(package, "latest_version", "") or "",
+                        "description": getattr(package, "description", ""),
+                        "metadata": {
+                            "maintainer": getattr(package, "maintainer", ""),
+                            "category": category_value,
+                        },
+                    })
+            except Exception as exc:
+                self.status_message.emit(f"Failed to check board package updates: {exc}")
+
+        return updates
 
     def set_check_interval(self, hours: int):
         """
