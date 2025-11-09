@@ -8,6 +8,7 @@ Handles:
 - Scheduled updates
 """
 
+import json
 import time
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -354,9 +355,33 @@ class OfflineMode:
         Returns:
             Number of cached packages
         """
-        # Count cached index entries
-        # TODO: Implement actual counting
-        return 0
+        cached_count = 0
+
+        index_files = [
+            (self.cache_dir / "library_index.json", "libraries"),
+            (self.cache_dir / "package_index.json", "packages"),
+        ]
+
+        for path, key in index_files:
+            if not path.exists():
+                continue
+
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+
+                items = data.get(key, [])
+
+                if isinstance(items, list):
+                    cached_count += len(items)
+                elif isinstance(items, dict):
+                    cached_count += len(items)
+            except Exception:
+                # If a cache file is corrupt or unreadable, skip it without
+                # breaking offline mode functionality.
+                continue
+
+        return cached_count
 
     def get_offline_status_message(self) -> str:
         """
