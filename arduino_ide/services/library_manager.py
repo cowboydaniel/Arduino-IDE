@@ -13,7 +13,16 @@ from pathlib import Path
 from typing import List, Optional, Dict, Tuple, Set
 from datetime import datetime
 import requests
-from PySide6.QtCore import QObject, Signal
+
+# Optional PySide6 support
+try:
+    from PySide6.QtCore import QObject, Signal
+    HAS_QT = True
+except ImportError:
+    # Provide stub for non-Qt usage
+    QObject = object
+    Signal = lambda *args, **kwargs: None
+    HAS_QT = False
 
 from ..models import (
     Library, LibraryIndex, LibraryVersion, LibraryDependency,
@@ -26,20 +35,24 @@ from .index_updater import IndexUpdater
 class LibraryManager(QObject):
     """Manages Arduino libraries"""
 
-    # Signals
-    library_installed = Signal(str, str)  # (name, version)
-    library_uninstalled = Signal(str)  # (name)
-    library_updated = Signal(str, str, str)  # (name, old_version, new_version)
-    index_updated = Signal()
-    progress_changed = Signal(int)  # Progress percentage
-    status_message = Signal(str)  # Status message
+    # Signals (only functional with Qt)
+    if HAS_QT:
+        library_installed = Signal(str, str)  # (name, version)
+        library_uninstalled = Signal(str)  # (name)
+        library_updated = Signal(str, str, str)  # (name, old_version, new_version)
+        index_updated = Signal()
+        progress_changed = Signal(int)  # Progress percentage
+        status_message = Signal(str)  # Status message
 
     # Arduino Library Index URL
     LIBRARY_INDEX_URL = "https://downloads.arduino.cc/libraries/library_index.json"
     LIBRARY_INDEX_MIRROR = "https://raw.githubusercontent.com/arduino/library-registry/main/public/library_index.json"
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        if HAS_QT:
+            super().__init__(parent)
+        else:
+            super().__init__()
 
         # Initialize paths
         self.base_dir = Path.home() / ".arduino-ide-modern"
