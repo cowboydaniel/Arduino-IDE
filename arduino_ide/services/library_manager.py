@@ -367,6 +367,110 @@ class LibraryManager(QObject):
 
         return updated_count
 
+    def get_example_sketch_path(self, library_name: str, example_name: str) -> Optional[Path]:
+        """Return the path to an example sketch for an installed library.
+
+        The Arduino ecosystem organises library examples under the library's
+        ``examples`` directory.  Each example usually lives in its own folder
+        that contains an ``.ino`` file with the same name as the folder.  This
+        helper searches the installed library tree for the requested example,
+        supporting nested folders such as ``01.Basics/Blink`` and direct ``.ino``
+        references like ``Blink/Blink.ino``.
+
+        Args:
+            library_name: Name of the installed library.
+            example_name: Example identifier (folder path or ``.ino`` name).
+
+        Returns:
+            Path to the example sketch if found, otherwise ``None``.
+        """
+
+        if not example_name:
+            return None
+
+        # Attempt to locate the library's installation directory.
+        library = self.get_library(library_name)
+        install_root: Optional[Path] = None
+        if library and library.install_path:
+            install_root = Path(library.install_path)
+
+        if not install_root:
+            install_root = self.libraries_dir / library_name
+
+        if not install_root.exists():
+            return None
+
+        examples_dir = install_root / "examples"
+        if not examples_dir.exists():
+            return None
+
+        # Normalise the requested example so we can support nested folders and
+        # both POSIX and Windows separators.
+        normalised_request = example_name.replace("\\", "/").strip("/\\")
+        if not normalised_request:
+            return None
+
+        request_path = Path(normalised_request)
+
+        # When the caller already specifies a file (e.g. "Blink/Blink.ino"),
+        # try to resolve it directly and fall back to a case-insensitive search.
+        if request_path.suffix:
+            direct_file = examples_dir / request_path
+            if direct_file.exists():
+                return direct_file
+
+            target_name = request_path.name.lower()
+            for candidate in examples_dir.rglob("*.ino"):
+                if candidate.name.lower() == target_name:
+                    return candidate
+
+            return None
+
+        search_directories: List[Path] = []
+
+        direct_directory = examples_dir / request_path
+        if direct_directory.is_dir():
+            search_directories.append(direct_directory)
+        else:
+            target_name = request_path.name.lower()
+            for candidate_dir in examples_dir.rglob("*"):
+                if candidate_dir.is_dir() and candidate_dir.name.lower() == target_name:
+                    search_directories.append(candidate_dir)
+
+        if not search_directories:
+            return None
+
+        target_stem = request_path.name.lower()
+
+        for directory in search_directories:
+            # Common Arduino convention: the example .ino matches the folder name.
+            preferred_files = [
+                directory / f"{directory.name}.ino",
+                directory / f"{request_path.name}.ino",
+            ]
+
+            for preferred in preferred_files:
+                if preferred.exists():
+                    return preferred
+
+            # Otherwise, look for the best matching .ino within the directory.
+            ino_files = sorted(directory.glob("*.ino"))
+            if not ino_files:
+                ino_files = sorted(directory.rglob("*.ino"))
+
+            if not ino_files:
+                continue
+
+            # Prefer files whose stem matches the requested example name.
+            for ino_file in ino_files:
+                if ino_file.stem.lower() == target_stem:
+                    return ino_file
+
+            # Fall back to the first discovered .ino file.
+            return ino_files[0]
+
+        return None
+
     def resolve_dependencies(self, library_name: str, version: Optional[str] = None) -> InstallPlan:
         """Resolve dependencies for a library"""
         plan = InstallPlan()
