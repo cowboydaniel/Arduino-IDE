@@ -562,6 +562,7 @@ class MainWindow(QMainWindow):
         # Add widgets to left column layout (NOT as dock widgets)
         self.left_column_layout.addWidget(self.quick_actions_panel)
         self.left_column_layout.addWidget(self.project_explorer)
+        self.project_explorer.file_open_requested.connect(self.open_file_from_project_explorer)
 
         # --- RIGHT COLUMN (Normal widgets, NOT docks) ---
         # Create right-side panel widgets
@@ -765,36 +766,7 @@ void loop() {
         path = Path(file_path)
         self.settings.setValue("lastOpenDir", str(path.parent))
 
-        try:
-            contents = path.read_text(encoding="utf-8")
-        except Exception as exc:
-            QMessageBox.critical(
-                self,
-                "Open Sketch",
-                f"Failed to open {path.name}: {exc}"
-            )
-            self.status_bar.set_status("Ready")
-            return
-
-        existing_index, existing_container = self.find_editor_by_path(path)
-        if existing_container:
-            existing_container.set_file_path(path)
-            existing_container.set_content(contents, mark_clean=True)
-            self.editor_tabs.setCurrentIndex(existing_index)
-            self.update_status_bar_for_file(existing_container.filename)
-            self.update_tab_title(existing_index)
-        else:
-            editor_container = self.create_new_editor(
-                filename=path.name,
-                file_path=str(path),
-                content=contents,
-                mark_clean=True
-            )
-            editor_container.set_file_path(path)
-
-        self.add_recent_file(path)
-        self.status_bar.set_status(f"Opened {path.name}")
-        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+        self._open_file_path(path)
 
     def save_file(self, checked=False, *, index=None, save_as=False):
         """Save current file"""
@@ -848,6 +820,42 @@ void loop() {
         self.update_tab_title(index)
         self.add_recent_file(path)
         self.update_status_bar_for_file(editor_container.filename)
+
+    def open_file_from_project_explorer(self, file_path: str):
+        """Open a file from the project explorer tree."""
+        self._open_file_path(Path(file_path))
+
+    def _open_file_path(self, path: Path):
+        try:
+            contents = path.read_text(encoding="utf-8")
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Open Sketch",
+                f"Failed to open {path.name}: {exc}"
+            )
+            self.status_bar.set_status("Ready")
+            return
+
+        existing_index, existing_container = self.find_editor_by_path(path)
+        if existing_container:
+            existing_container.set_file_path(path)
+            existing_container.set_content(contents, mark_clean=True)
+            self.editor_tabs.setCurrentIndex(existing_index)
+            self.update_status_bar_for_file(existing_container.filename)
+            self.update_tab_title(existing_index)
+        else:
+            editor_container = self.create_new_editor(
+                filename=path.name,
+                file_path=str(path),
+                content=contents,
+                mark_clean=True
+            )
+            editor_container.set_file_path(path)
+
+        self.add_recent_file(path)
+        self.status_bar.set_status(f"Opened {path.name}")
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
         self.status_bar.set_status(f"Saved {path.name}")
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
