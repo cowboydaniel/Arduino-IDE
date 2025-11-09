@@ -871,9 +871,7 @@ void loop() {
         if not chunk:
             return
         lines = chunk.splitlines()
-        if chunk.endswith("
-") or chunk.endswith("
-"):
+        if chunk.endswith(("\n", "\r")):
             lines.append("")
         for line in lines:
             self.console_panel.append_output(line, color=color)
