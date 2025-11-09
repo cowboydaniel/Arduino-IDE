@@ -301,6 +301,7 @@ class MainWindow(QMainWindow):
         """Create toolbars"""
         # Main toolbar
         main_toolbar = QToolBar("Main")
+        main_toolbar.setObjectName("MainToolBar")
         main_toolbar.setMovable(False)
         self.addToolBar(main_toolbar)
 
@@ -416,12 +417,14 @@ class MainWindow(QMainWindow):
         """Create dockable panels"""
         # Quick Actions Panel (left)
         self.quick_actions_dock = QDockWidget("Quick Actions", self)
+        self.quick_actions_dock.setObjectName("QuickActionsDock")
         self.quick_actions_panel = QuickActionsPanel()
         self.quick_actions_dock.setWidget(self.quick_actions_panel)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.quick_actions_dock)
 
         # Project Explorer (left, tabbed with Quick Actions)
         self.project_dock = QDockWidget("Project Explorer", self)
+        self.project_dock.setObjectName("ProjectExplorerDock")
         self.project_explorer = ProjectExplorer()
         self.project_dock.setWidget(self.project_explorer)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.project_dock)
@@ -432,18 +435,21 @@ class MainWindow(QMainWindow):
 
         # Board Panel (right)
         self.board_dock = QDockWidget("Board Info", self)
+        self.board_dock.setObjectName("BoardInfoDock")
         self.board_panel = BoardPanel()
         self.board_dock.setWidget(self.board_panel)
         self.addDockWidget(Qt.RightDockWidgetArea, self.board_dock)
 
         # Variable Watch (right)
         self.watch_dock = QDockWidget("Variables", self)
+        self.watch_dock.setObjectName("VariablesDock")
         self.variable_watch = VariableWatch()
         self.watch_dock.setWidget(self.variable_watch)
         self.addDockWidget(Qt.RightDockWidgetArea, self.watch_dock)
 
         # Status Display (right, tabbed with board panel)
         self.status_dock = QDockWidget("Real-time Status", self)
+        self.status_dock.setObjectName("RealTimeStatusDock")
         self.status_display = StatusDisplay()
         self.status_dock.setWidget(self.status_display)
         self.addDockWidget(Qt.RightDockWidgetArea, self.status_dock)
@@ -451,6 +457,7 @@ class MainWindow(QMainWindow):
 
         # Context Panel (right, tabbed with other panels)
         self.context_dock = QDockWidget("Context Help", self)
+        self.context_dock.setObjectName("ContextHelpDock")
         self.context_panel = ContextPanel()
         self.context_dock.setWidget(self.context_panel)
         self.addDockWidget(Qt.RightDockWidgetArea, self.context_dock)
@@ -458,12 +465,14 @@ class MainWindow(QMainWindow):
 
         # Console Panel (bottom)
         self.console_dock = QDockWidget("Console", self)
+        self.console_dock.setObjectName("ConsoleDock")
         self.console_panel = ConsolePanel()
         self.console_dock.setWidget(self.console_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.console_dock)
 
         # Serial Monitor (bottom, tabbed with console)
         self.serial_dock = QDockWidget("Serial Monitor", self)
+        self.serial_dock.setObjectName("SerialMonitorDock")
         self.serial_monitor = SerialMonitor()
         self.serial_dock.setWidget(self.serial_monitor)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.serial_dock)
@@ -471,6 +480,7 @@ class MainWindow(QMainWindow):
 
         # Plotter (bottom, tabbed)
         self.plotter_dock = QDockWidget("Plotter", self)
+        self.plotter_dock.setObjectName("PlotterDock")
         self.plotter_panel = PlotterPanel()
         self.plotter_dock.setWidget(self.plotter_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.plotter_dock)
@@ -481,6 +491,7 @@ class MainWindow(QMainWindow):
 
         # Problems (bottom, tabbed)
         self.problems_dock = QDockWidget("Problems", self)
+        self.problems_dock.setObjectName("ProblemsDock")
         self.problems_panel = ProblemsPanel()
         self.problems_dock.setWidget(self.problems_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.problems_dock)
@@ -488,6 +499,7 @@ class MainWindow(QMainWindow):
 
         # Output (bottom, tabbed)
         self.output_dock = QDockWidget("Output", self)
+        self.output_dock.setObjectName("OutputDock")
         self.output_panel = OutputPanel()
         self.output_dock.setWidget(self.output_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.output_dock)
