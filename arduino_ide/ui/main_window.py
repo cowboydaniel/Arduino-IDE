@@ -182,17 +182,12 @@ class MainWindow(QMainWindow):
         """Initialize the main UI"""
         self.setWindowTitle("Arduino IDE Modern")
 
-        # Configure dock widget behavior to force vertical stacking
+        # Configure dock widget behavior (only for left docks now)
         self.setDockOptions(
             QMainWindow.AnimatedDocks |
             QMainWindow.AllowNestedDocks |
             QMainWindow.AllowTabbedDocks
         )
-        self.setDockNestingEnabled(True)
-
-        # Ensure bottom docks ONLY attach to the left side
-        self.setCorner(Qt.BottomLeftCorner, Qt.BottomDockWidgetArea)
-        self.setCorner(Qt.BottomRightCorner, Qt.RightDockWidgetArea)
 
         # Central widget with editor tabs
         self.editor_tabs = QTabWidget()
@@ -201,26 +196,39 @@ class MainWindow(QMainWindow):
         self.editor_tabs.tabCloseRequested.connect(self.close_tab)
         self.editor_tabs.currentChanged.connect(self.on_tab_changed)
 
-        # Horizontal splitter: editor (left) + right sidebar (right)
-        self.main_splitter = QSplitter(Qt.Horizontal)
-        self.main_splitter.setContentsMargins(0, 0, 0, 0)
-        self.main_splitter.setHandleWidth(4)
+        # Main layout: vertical (top block + bottom block)
+        central = QWidget()
+        central_layout = QVBoxLayout(central)
+        central_layout.setContentsMargins(0, 0, 0, 0)
+        central_layout.setSpacing(0)
 
-        # Editor container goes on the left
-        self.main_splitter.addWidget(self.editor_tabs)
+        # Top block: horizontal splitter
+        self.top_splitter = QSplitter(Qt.Horizontal)
+        self.top_splitter.setHandleWidth(4)
+        self.top_splitter.addWidget(self.editor_tabs)
 
-        # Create right sidebar container (not docks)
-        self.right_sidebar = QWidget()
-        self.right_sidebar_layout = QVBoxLayout(self.right_sidebar)
-        self.right_sidebar_layout.setContentsMargins(0, 0, 0, 0)
-        self.right_sidebar_layout.setSpacing(0)
-        self.main_splitter.addWidget(self.right_sidebar)
+        # Right side: column of widgets
+        self.right_column = QWidget()
+        self.right_layout = QVBoxLayout(self.right_column)
+        self.right_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_layout.setSpacing(0)
 
-        # Make right column fixed width
-        self.right_sidebar.setMinimumWidth(320)
-        self.right_sidebar.setMaximumWidth(320)
+        right_panel_width = 320
+        self.right_column.setMinimumWidth(right_panel_width)
+        self.right_column.setMaximumWidth(right_panel_width)
 
-        self.setCentralWidget(self.main_splitter)
+        self.top_splitter.addWidget(self.right_column)
+
+        central_layout.addWidget(self.top_splitter)
+
+        # Bottom block: serial monitor and other panels
+        self.bottom_panel = QWidget()
+        self.bottom_layout = QVBoxLayout(self.bottom_panel)
+        self.bottom_layout.setContentsMargins(0, 0, 0, 0)
+        self.bottom_layout.setSpacing(0)
+        central_layout.addWidget(self.bottom_panel)
+
+        self.setCentralWidget(central)
 
         # Enhanced status bar
         self.status_bar = StatusBar()
@@ -494,85 +502,51 @@ class MainWindow(QMainWindow):
         self.quick_actions_dock.raise_()
 
         # --- RIGHT COLUMN (Normal widgets, NOT docks) ---
-        # Create right-side panel widgets and add to right sidebar layout
+        # Create right-side panel widgets and add to right layout
         self.board_panel = BoardPanel()
         self.variable_watch = VariableWatch()
         self.status_display = StatusDisplay()
         self.context_panel = ContextPanel()
 
-        # Add widgets to right sidebar layout (NOT as dock widgets)
-        self.right_sidebar_layout.addWidget(self.board_panel)
-        self.right_sidebar_layout.addWidget(self.variable_watch)
-        self.right_sidebar_layout.addWidget(self.status_display)
-        self.right_sidebar_layout.addWidget(self.context_panel)
+        # Add widgets to right layout (NOT as dock widgets)
+        self.right_layout.addWidget(self.board_panel)
+        self.right_layout.addWidget(self.variable_watch)
+        self.right_layout.addWidget(self.status_display)
+        self.right_layout.addWidget(self.context_panel)
+        self.right_layout.addStretch()
 
-        # Console Panel (bottom)
-        self.console_dock = QDockWidget("Console", self)
-        self.console_dock.setObjectName("ConsoleDock")
+        # --- BOTTOM PANEL (Normal widgets in tabs, NOT docks) ---
+        # Create bottom panels
         self.console_panel = ConsolePanel()
-        self.console_dock.setWidget(self.console_panel)
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.console_dock)
-
-        # Serial Monitor (bottom, tabbed with console)
-        self.serial_dock = QDockWidget("Serial Monitor", self)
-        self.serial_dock.setObjectName("SerialMonitorDock")
         self.serial_monitor = SerialMonitor()
-        self.serial_dock.setWidget(self.serial_monitor)
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.serial_dock)
-        self.tabifyDockWidget(self.console_dock, self.serial_dock)
-
-        # Plotter (bottom, tabbed)
-        self.plotter_dock = QDockWidget("Plotter", self)
-        self.plotter_dock.setObjectName("PlotterDock")
         self.plotter_panel = PlotterPanel()
-        self.plotter_dock.setWidget(self.plotter_panel)
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.plotter_dock)
-        self.tabifyDockWidget(self.serial_dock, self.plotter_dock)
+        self.problems_panel = ProblemsPanel()
+        self.output_panel = OutputPanel()
 
         # Connect serial monitor data to plotter
         self.serial_monitor.data_received.connect(self.plotter_panel.append_output)
 
-        # Problems (bottom, tabbed)
-        self.problems_dock = QDockWidget("Problems", self)
-        self.problems_dock.setObjectName("ProblemsDock")
-        self.problems_panel = ProblemsPanel()
-        self.problems_dock.setWidget(self.problems_panel)
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.problems_dock)
-        self.tabifyDockWidget(self.plotter_dock, self.problems_dock)
+        # Create tab widget for bottom panels
+        self.bottom_tabs = QTabWidget()
+        self.bottom_tabs.addTab(self.console_panel, "Console")
+        self.bottom_tabs.addTab(self.serial_monitor, "Serial Monitor")
+        self.bottom_tabs.addTab(self.plotter_panel, "Plotter")
+        self.bottom_tabs.addTab(self.problems_panel, "Problems")
+        self.bottom_tabs.addTab(self.output_panel, "Output")
 
-        # Output (bottom, tabbed)
-        self.output_dock = QDockWidget("Output", self)
-        self.output_dock.setObjectName("OutputDock")
-        self.output_panel = OutputPanel()
-        self.output_dock.setWidget(self.output_panel)
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.output_dock)
-        self.tabifyDockWidget(self.problems_dock, self.output_dock)
-
-        # Show console by default
-        self.console_dock.raise_()
-
-        bottom_docks = [
-            self.console_dock,
-            self.serial_dock,
-            self.plotter_dock,
-            self.problems_dock,
-            self.output_dock,
-        ]
-
+        # Set minimum height for bottom panel
         screen = QGuiApplication.primaryScreen()
         if screen:
             available_height = screen.availableGeometry().height()
             max_bottom_height = max(int(available_height * 0.4), 240)
-            dock_min_height = max(100, int(max_bottom_height / len(bottom_docks)))
         else:
-            max_bottom_height = 300
-            dock_min_height = 120
+            max_bottom_height = 240
 
-        for dock in bottom_docks:
-            dock.setMinimumHeight(dock_min_height)
+        self.bottom_tabs.setMinimumHeight(150)
+        self.bottom_panel.setMinimumHeight(150)
 
-        if screen:
-            self.resizeDocks([self.console_dock], [max_bottom_height], Qt.Vertical)
+        # Add bottom tabs to bottom layout
+        self.bottom_layout.addWidget(self.bottom_tabs)
 
         # Connect Quick Actions Panel signals
         self.quick_actions_panel.upload_clicked.connect(self.upload_sketch)
@@ -676,11 +650,10 @@ void loop() {
 
     def toggle_serial_monitor(self):
         """Show/hide serial monitor"""
-        if self.serial_dock.isVisible():
-            self.serial_dock.hide()
-        else:
-            self.serial_dock.show()
-            self.serial_dock.raise_()
+        # Switch to Serial Monitor tab
+        serial_index = self.bottom_tabs.indexOf(self.serial_monitor)
+        if serial_index >= 0:
+            self.bottom_tabs.setCurrentIndex(serial_index)
 
     def toggle_status_display(self):
         """Show/hide real-time status display"""
@@ -691,11 +664,10 @@ void loop() {
 
     def toggle_plotter(self):
         """Show/hide serial plotter"""
-        if self.plotter_dock.isVisible():
-            self.plotter_dock.hide()
-        else:
-            self.plotter_dock.show()
-            self.plotter_dock.raise_()
+        # Switch to Plotter tab
+        plotter_index = self.bottom_tabs.indexOf(self.plotter_panel)
+        if plotter_index >= 0:
+            self.bottom_tabs.setCurrentIndex(plotter_index)
 
     def show_find_dialog(self):
         """Show find/replace dialog"""
@@ -789,10 +761,10 @@ void loop() {
         """Upload sketch and open serial monitor"""
         self.console_panel.append_output("Uploading sketch and opening serial monitor...")
         self.upload_sketch()
-        # Show serial monitor after upload
-        if not self.serial_dock.isVisible():
-            self.serial_dock.show()
-        self.serial_dock.raise_()
+        # Switch to Serial Monitor tab after upload
+        serial_index = self.bottom_tabs.indexOf(self.serial_monitor)
+        if serial_index >= 0:
+            self.bottom_tabs.setCurrentIndex(serial_index)
         self.status_bar.set_status("Upload complete - Serial monitor opened")
         # Reset to Ready after a moment
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
