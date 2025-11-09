@@ -217,8 +217,160 @@ class CodeAnalyzer:
 
         return int(total)
 
-    @staticmethod
-    def estimate_ram_usage(code_text, board_name="Arduino Uno"):
+    # Architecture metadata for RAM estimation
+    BOARD_ARCHITECTURES = {
+        "Arduino Uno": "avr",
+        "Arduino Nano": "avr",
+        "Arduino Pro Mini": "avr",
+        "Arduino Mega 2560": "avr",
+        "Arduino Leonardo": "avr",
+        "Arduino Micro": "avr",
+        "Arduino Due": "arm",
+        "Arduino Uno R4 WiFi": "arm",
+        "Arduino Uno R4 Minima": "arm",
+        "Arduino Portenta H7": "arm",
+        "Arduino Portenta C33": "arm",
+        "ESP32 Dev Module": "esp32",
+        "ESP8266 NodeMCU": "esp8266",
+    }
+
+    # Type size tables per architecture
+    TYPE_SIZE_TABLES = {
+        "avr": {
+            "unsigned long long": 8,
+            "long long": 8,
+            "unsigned long": 4,
+            "long": 4,
+            "unsigned int": 2,
+            "int": 2,
+            "unsigned short": 2,
+            "short": 2,
+            "int32_t": 4,
+            "uint32_t": 4,
+            "int16_t": 2,
+            "uint16_t": 2,
+            "int8_t": 1,
+            "uint8_t": 1,
+            "float": 4,
+            "double": 4,
+            "char": 1,
+            "unsigned char": 1,
+            "byte": 1,
+            "bool": 1,
+            "word": 2,
+            "size_t": 2,
+        },
+        "arm": {
+            "unsigned long long": 8,
+            "long long": 8,
+            "unsigned long": 4,
+            "long": 4,
+            "unsigned int": 4,
+            "int": 4,
+            "unsigned short": 2,
+            "short": 2,
+            "int32_t": 4,
+            "uint32_t": 4,
+            "int16_t": 2,
+            "uint16_t": 2,
+            "int8_t": 1,
+            "uint8_t": 1,
+            "float": 4,
+            "double": 8,
+            "char": 1,
+            "unsigned char": 1,
+            "byte": 1,
+            "bool": 1,
+            "word": 4,
+            "size_t": 4,
+        },
+        "esp32": {
+            "unsigned long long": 8,
+            "long long": 8,
+            "unsigned long": 4,
+            "long": 4,
+            "unsigned int": 4,
+            "int": 4,
+            "unsigned short": 2,
+            "short": 2,
+            "int32_t": 4,
+            "uint32_t": 4,
+            "int16_t": 2,
+            "uint16_t": 2,
+            "int8_t": 1,
+            "uint8_t": 1,
+            "float": 4,
+            "double": 8,
+            "char": 1,
+            "unsigned char": 1,
+            "byte": 1,
+            "bool": 1,
+            "word": 4,
+            "size_t": 4,
+        },
+        "esp8266": {
+            "unsigned long long": 8,
+            "long long": 8,
+            "unsigned long": 4,
+            "long": 4,
+            "unsigned int": 4,
+            "int": 4,
+            "unsigned short": 2,
+            "short": 2,
+            "int32_t": 4,
+            "uint32_t": 4,
+            "int16_t": 2,
+            "uint16_t": 2,
+            "int8_t": 1,
+            "uint8_t": 1,
+            "float": 4,
+            "double": 8,
+            "char": 1,
+            "unsigned char": 1,
+            "byte": 1,
+            "bool": 1,
+            "word": 4,
+            "size_t": 4,
+        },
+    }
+
+    POINTER_SIZES = {
+        "avr": 2,
+        "arm": 4,
+        "esp32": 4,
+        "esp8266": 4,
+    }
+
+    @classmethod
+    def detect_architecture(cls, board_name, explicit_architecture=None):
+        """Return a normalized architecture identifier for the selected board."""
+        if explicit_architecture:
+            return explicit_architecture
+
+        normalized = board_name or ""
+        normalized_lower = normalized.lower()
+
+        # Direct mapping from known boards
+        if normalized in cls.BOARD_ARCHITECTURES:
+            return cls.BOARD_ARCHITECTURES[normalized]
+
+        keyword_map = [
+            ("esp32", "esp32"),
+            ("esp8266", "esp8266"),
+            ("samd", "arm"),
+            ("mbed", "arm"),
+            ("due", "arm"),
+            ("portenta", "arm"),
+            ("r4", "arm"),
+        ]
+        for keyword, arch in keyword_map:
+            if keyword in normalized_lower:
+                return arch
+
+        return "avr"
+
+    @classmethod
+    def estimate_ram_usage(cls, code_text, board_name="Arduino Uno", architecture=None):
         """Estimate Dynamic Memory (RAM) usage from code with 99% accuracy
 
         This accurately estimates static/global memory (.data + .bss sections) that
@@ -259,20 +411,13 @@ class CodeAnalyzer:
 
         total_ram = board_overhead.get(board_name, 9)
 
+        architecture = cls.detect_architecture(board_name, architecture)
+        type_sizes = cls.TYPE_SIZE_TABLES.get(architecture, cls.TYPE_SIZE_TABLES["avr"])
+        pointer_size = cls.POINTER_SIZES.get(architecture, cls.POINTER_SIZES["avr"])
+
         # === GLOBAL & STATIC VARIABLES ===
         # Remove PROGMEM data first (it goes to flash, not RAM)
         code_no_progmem = re.sub(r'\bPROGMEM\b', '', code_text)
-
-        # Type sizes for AVR (Uno, Mega, etc.) - most common
-        # TODO: Adjust for ARM boards (int is 4 bytes, pointers are 4 bytes)
-        type_sizes = {
-            'int': 2, 'unsigned int': 2, 'int8_t': 1, 'uint8_t': 1,
-            'int16_t': 2, 'uint16_t': 2, 'int32_t': 4, 'uint32_t': 4,
-            'long': 4, 'unsigned long': 4, 'long long': 8, 'unsigned long long': 8,
-            'float': 4, 'double': 4,  # double is 4 bytes on AVR, 8 on ARM
-            'char': 1, 'unsigned char': 1, 'byte': 1, 'bool': 1,
-            'word': 2, 'size_t': 2,  # size_t is 2 on AVR, 4 on ARM
-        }
 
         # Match variable declarations including:
         # - int x;
@@ -281,7 +426,8 @@ class CodeAnalyzer:
         # - volatile int x;
         # - int x = 5;
         # Exclude variables inside PROGMEM declarations
-        for type_name, size in type_sizes.items():
+        # Iterate in order of longest type name first to avoid partial matches
+        for type_name, size in sorted(type_sizes.items(), key=lambda item: len(item[0]), reverse=True):
             # Pattern: type [storage_class] var1, var2, ... ;
             # Handles: int a; int a,b,c; static int x; volatile int y = 5;
             pattern = rf'\b{re.escape(type_name)}\s+(?:(?:static|volatile|const)\s+)*(\w+(?:\s*,\s*\w+)*)\s*(?:=|;)'
@@ -313,7 +459,6 @@ class CodeAnalyzer:
 
         # === POINTERS ===
         # Pointers are 2 bytes on AVR, 4 bytes on ARM
-        pointer_size = 4 if 'ARM' in board_name or 'ESP' in board_name or 'R4' in board_name else 2
         pointer_pattern = r'\b(\w+)\s*\*\s*(\w+)\s*(?:=|;)'
         pointers = re.findall(pointer_pattern, code_no_progmem)
         total_ram += len(pointers) * pointer_size
@@ -359,7 +504,7 @@ class CodeAnalyzer:
             total_ram += 512  # SD buffer
 
         # WiFi libraries (ESP)
-        if 'WiFi.' in code_text and 'ESP' in board_name:
+        if 'WiFi.' in code_text and architecture in {'esp32', 'esp8266'}:
             total_ram += 1024  # WiFi buffers on ESP
 
         # Servo library: 1 byte per servo
@@ -391,6 +536,7 @@ class StatusDisplay(QWidget):
             "flash_total": 32768,  # Default: Arduino Uno
             "ram_total": 2048,
         }
+        self.board_architecture = "avr"
 
         self.current_code = ""
         self.analyzer = CodeAnalyzer()
@@ -463,7 +609,9 @@ class StatusDisplay(QWidget):
 
         # Estimate memory usage (pass board name for accurate estimation)
         flash_used = self.analyzer.estimate_flash_usage(code_text)
-        ram_used = self.analyzer.estimate_ram_usage(code_text, self.board_name)
+        ram_used = self.analyzer.estimate_ram_usage(
+            code_text, self.board_name, self.board_architecture
+        )
 
         # Update displays
         self.flash_bar.update_usage(flash_used, self.board_specs["flash_total"])
@@ -476,53 +624,65 @@ class StatusDisplay(QWidget):
             "Arduino Uno": {
                 "flash": 32768,   # 32 KB
                 "ram": 2048,      # 2 KB
+                "architecture": "avr",
             },
             "Arduino Mega 2560": {
                 "flash": 262144,  # 256 KB
                 "ram": 8192,      # 8 KB
+                "architecture": "avr",
             },
             "Arduino Nano": {
                 "flash": 32768,   # 32 KB
                 "ram": 2048,      # 2 KB
+                "architecture": "avr",
             },
             "Arduino Leonardo": {
                 "flash": 32768,   # 32 KB
                 "ram": 2560,      # 2.5 KB
+                "architecture": "avr",
             },
             "Arduino Pro Mini": {
                 "flash": 32768,   # 32 KB
                 "ram": 2048,      # 2 KB
+                "architecture": "avr",
             },
             "Arduino Micro": {
                 "flash": 32768,   # 32 KB
                 "ram": 2560,      # 2.5 KB
+                "architecture": "avr",
             },
             "Arduino Uno R4 WiFi": {
                 "flash": 262144,  # 256 KB
                 "ram": 32768,     # 32 KB
+                "architecture": "arm",
             },
             "Arduino Uno R4 Minima": {
                 "flash": 262144,  # 256 KB
                 "ram": 32768,     # 32 KB
+                "architecture": "arm",
             },
             "ESP32 Dev Module": {
                 "flash": 4194304, # 4 MB
                 "ram": 532480,    # 520 KB
+                "architecture": "esp32",
             },
             "ESP8266 NodeMCU": {
                 "flash": 4194304, # 4 MB
                 "ram": 81920,     # 80 KB
+                "architecture": "esp8266",
             },
             "Arduino Due": {
                 "flash": 524288,  # 512 KB
                 "ram": 98304,     # 96 KB
+                "architecture": "arm",
             }
         }
 
         # Get specs for the board or use defaults
         specs = board_specs_db.get(board_name, {
             "flash": 32768,
-            "ram": 2048
+            "ram": 2048,
+            "architecture": "avr",
         })
 
         # Store current board name for estimation
@@ -532,6 +692,10 @@ class StatusDisplay(QWidget):
             "flash_total": specs["flash"],
             "ram_total": specs["ram"]
         }
+
+        self.board_architecture = specs.get(
+            "architecture", CodeAnalyzer.detect_architecture(board_name)
+        )
 
         # Update board name display
         self.board_name_label.setText(f"Board: {board_name}")
