@@ -313,16 +313,23 @@ class ArduinoCLI:
 
     def compile_sketch(self, fqbn: str, sketch: str, build_path: Optional[str] = None,
                        config: Optional[str] = None) -> int:
-        """Simulate compilation of a sketch for the requested board."""
+        """Compile a sketch for the requested board using avr-gcc."""
+        # Import toolchain manager
+        from arduino_ide.services.toolchain_manager import ToolchainManager
+        import subprocess
+        import re
+
         board = self.board_manager.get_board(fqbn)
         if not board:
             print(f"✗ Board '{fqbn}' not found", file=sys.stderr)
             return 1
+
         try:
             sketch_file = self._resolve_sketch_path(sketch)
         except FileNotFoundError as exc:
             print(f"✗ {exc}", file=sys.stderr)
             return 1
+
         try:
             source = sketch_file.read_text(encoding="utf-8")
         except Exception as exc:
@@ -334,6 +341,7 @@ class ArduinoCLI:
         if config:
             print(f"Build configuration: {config}", flush=True)
 
+        # Basic validation
         if "void setup" not in source and "int main" not in source:
             print("✗ Sketch must define a setup() function", file=sys.stderr, flush=True)
             return 2
@@ -341,9 +349,16 @@ class ArduinoCLI:
         if "void loop" not in source and "int main" not in source:
             print("⚠️  Warning: sketch does not define loop()", flush=True)
 
+        # Ensure toolchain is installed
+        toolchain = ToolchainManager()
+        if not toolchain.ensure_installed():
+            print("✗ Failed to install AVR toolchain", file=sys.stderr)
+            return 1
+
         print("Generating function prototypes...", flush=True)
         print("Performing static analysis...", flush=True)
 
+        # Prepare build directory
         build_dir = Path(build_path).expanduser().resolve() if build_path else sketch_file.parent / "build"
         try:
             build_dir.mkdir(parents=True, exist_ok=True)
@@ -351,60 +366,135 @@ class ArduinoCLI:
             print(f"✗ Failed to prepare build directory: {exc}", file=sys.stderr)
             return 1
 
-        artifact = build_dir / f"{sketch_file.stem}.bin"
+        # Create preprocessed sketch with Arduino wrappers
+        cpp_file = build_dir / f"{sketch_file.stem}.cpp"
         try:
-            artifact.write_text("// simulated binary output\n", encoding="utf-8")
+            # Add Arduino.h include and wrap sketch code
+            cpp_content = '#include <Arduino.h>\n\n' + source
+            cpp_file.write_text(cpp_content, encoding="utf-8")
         except Exception as exc:
-            print(f"✗ Failed to write build artifact: {exc}", file=sys.stderr)
+            print(f"✗ Failed to create preprocessed sketch: {exc}", file=sys.stderr)
             return 1
 
-        # Get board memory specifications
-        flash_max = self._parse_memory_size(board.specs.flash, is_flash=True)
-        ram_max = self._parse_memory_size(board.specs.ram, is_flash=False)
+        # Compile with avr-gcc
+        obj_file = build_dir / f"{sketch_file.stem}.o"
+        elf_file = build_dir / f"{sketch_file.stem}.elf"
+        hex_file = build_dir / f"{sketch_file.stem}.hex"
 
-        # Calculate realistic compiled sizes
-        # Base overhead for Arduino core (including runtime, initialization, etc.)
-        base_flash = 666  # Arduino core base overhead
-        base_ram = 9  # Global variables base overhead
+        # Get MCU type from board
+        mcu = 'atmega328p' if 'uno' in board.fqbn.lower() else 'atmega2560'
+        f_cpu = '16000000L'
 
-        # Estimate based on source code complexity
-        source_len = len(source)
-        lines = source.count('\n') + 1
+        # Compilation flags for Arduino Uno
+        compile_flags = [
+            str(toolchain.get_avr_gcc_path()),
+            '-c',  # Compile only, don't link
+            '-g',  # Debug info
+            '-Os',  # Optimize for size
+            '-w',  # Suppress warnings
+            f'-mmcu={mcu}',
+            f'-DF_CPU={f_cpu}',
+            '-DARDUINO=10819',
+            '-DARDUINO_AVR_UNO',
+            '-DARDUINO_ARCH_AVR',
+            '-I' + str(Path(__file__).parent / 'arduino_ide' / 'cores' / 'arduino'),
+            str(cpp_file),
+            '-o', str(obj_file)
+        ]
 
-        # Flash calculation: realistic estimate based on actual Arduino compilation
-        # Arduino code typically compiles to ~15-25 bytes per line of actual code
-        sketch_size = base_flash + (lines * 15) + (source_len // 4)
+        try:
+            result = subprocess.run(compile_flags, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                print(f"✗ Compilation failed:\n{result.stderr}", file=sys.stderr)
+                return result.returncode
+        except subprocess.TimeoutExpired:
+            print("✗ Compilation timed out", file=sys.stderr)
+            return 1
+        except Exception as exc:
+            print(f"✗ Compilation error: {exc}", file=sys.stderr)
+            return 1
 
-        # RAM calculation: estimate global variables and buffers
-        # Look for common patterns that use RAM
-        ram_usage = base_ram
+        # Link
+        link_flags = [
+            str(toolchain.get_avr_gcc_path()),
+            '-Os',
+            f'-mmcu={mcu}',
+            '-o', str(elf_file),
+            str(obj_file),
+            '-lm'  # Math library
+        ]
 
-        # Serial buffer is allocated once if Serial is used at all
-        if 'Serial' in source:
-            ram_usage += 188  # Serial RX/TX buffers (~188 bytes total)
+        try:
+            result = subprocess.run(link_flags, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                print(f"✗ Linking failed:\n{result.stderr}", file=sys.stderr)
+                return result.returncode
+        except Exception as exc:
+            print(f"✗ Linking error: {exc}", file=sys.stderr)
+            return 1
 
-        # Count other RAM usage
-        ram_usage += source.count('String') * 16  # String objects
-        ram_usage += source.count('int ') * 2  # int variables
-        ram_usage += source.count('long') * 4  # long variables
-        ram_usage += source.count('float') * 4  # float variables
-        ram_usage += source.count('char ') * 1  # char variables
-        ram_usage += source.count('[') * 10  # Arrays (estimate)
+        # Create hex file
+        objcopy_flags = [
+            str(toolchain.get_avr_objcopy_path()),
+            '-O', 'ihex',
+            '-R', '.eeprom',
+            str(elf_file),
+            str(hex_file)
+        ]
 
-        # Ensure minimum realistic values
-        if sketch_size < 1000:
-            sketch_size = max(1000, sketch_size)
-        if ram_usage < 100:
-            ram_usage = max(100, ram_usage)
+        try:
+            result = subprocess.run(objcopy_flags, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                print(f"✗ objcopy failed:\n{result.stderr}", file=sys.stderr)
+                return result.returncode
+        except Exception as exc:
+            print(f"✗ objcopy error: {exc}", file=sys.stderr)
+            return 1
 
-        # Calculate percentages
-        prog_percent = int((sketch_size / flash_max) * 100) if flash_max > 0 else 0
-        ram_percent = int((ram_usage / ram_max) * 100) if ram_max > 0 else 0
-        ram_remaining = ram_max - ram_usage
+        # Get size information using avr-size
+        size_flags = [
+            str(toolchain.get_avr_size_path()),
+            '-A',
+            str(elf_file)
+        ]
 
-        print(f"Sketch uses {sketch_size} bytes ({prog_percent}%) of program storage space. Maximum is {flash_max} bytes.", flush=True)
-        print(f"Global variables use {ram_usage} bytes ({ram_percent}%) of dynamic memory, leaving {ram_remaining} bytes for local variables. Maximum is {ram_max} bytes.", flush=True)
-        print("✔ Compilation successful.", flush=True)
+        try:
+            result = subprocess.run(size_flags, capture_output=True, text=True, timeout=10)
+            if result.returncode != 0:
+                print(f"✗ Failed to get size information", file=sys.stderr)
+                return result.returncode
+
+            # Parse avr-size output
+            flash_size = 0
+            ram_size = 0
+
+            # Regex patterns matching Arduino's recipes
+            flash_pattern = re.compile(r'^(?:\.text|\.data|\.bootloader)\s+(\d+)', re.MULTILINE)
+            ram_pattern = re.compile(r'^(?:\.data|\.bss|\.noinit)\s+(\d+)', re.MULTILINE)
+
+            for match in flash_pattern.finditer(result.stdout):
+                flash_size += int(match.group(1))
+
+            for match in ram_pattern.finditer(result.stdout):
+                ram_size += int(match.group(1))
+
+            # Get board memory specifications
+            flash_max = self._parse_memory_size(board.specs.flash, is_flash=True)
+            ram_max = self._parse_memory_size(board.specs.ram, is_flash=False)
+
+            # Calculate percentages
+            prog_percent = int((flash_size / flash_max) * 100) if flash_max > 0 else 0
+            ram_percent = int((ram_size / ram_max) * 100) if ram_max > 0 else 0
+            ram_remaining = ram_max - ram_size
+
+            print(f"Sketch uses {flash_size} bytes ({prog_percent}%) of program storage space. Maximum is {flash_max} bytes.", flush=True)
+            print(f"Global variables use {ram_size} bytes ({ram_percent}%) of dynamic memory, leaving {ram_remaining} bytes for local variables. Maximum is {ram_max} bytes.", flush=True)
+            print("✔ Compilation successful.", flush=True)
+
+        except Exception as exc:
+            print(f"✗ Size calculation error: {exc}", file=sys.stderr)
+            return 1
+
         return 0
 
     def upload_sketch(self, fqbn: str, port: str, sketch: str, build_path: Optional[str] = None,

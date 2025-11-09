@@ -14,7 +14,16 @@ from pathlib import Path
 from typing import List, Optional, Dict
 from datetime import datetime
 import requests
-from PySide6.QtCore import QObject, Signal
+
+# Optional PySide6 support
+try:
+    from PySide6.QtCore import QObject, Signal
+    HAS_QT = True
+except ImportError:
+    # Provide stub for non-Qt usage
+    QObject = object
+    Signal = lambda *args, **kwargs: None
+    HAS_QT = False
 
 from ..models import (
     Board, BoardPackage, BoardIndex, BoardPackageVersion,
@@ -25,19 +34,23 @@ from ..models import (
 class BoardManager(QObject):
     """Manages Arduino board packages"""
 
-    # Signals
-    package_installed = Signal(str, str)  # (name, version)
-    package_uninstalled = Signal(str)  # (name)
-    package_updated = Signal(str, str, str)  # (name, old_version, new_version)
-    index_updated = Signal()
-    progress_changed = Signal(int)  # Progress percentage
-    status_message = Signal(str)  # Status message
+    # Signals (only functional with Qt)
+    if HAS_QT:
+        package_installed = Signal(str, str)  # (name, version)
+        package_uninstalled = Signal(str)  # (name)
+        package_updated = Signal(str, str, str)  # (name, old_version, new_version)
+        index_updated = Signal()
+        progress_changed = Signal(int)  # Progress percentage
+        status_message = Signal(str)  # Status message
 
     # Arduino Board Package Index URL
     PACKAGE_INDEX_URL = "https://downloads.arduino.cc/packages/package_index.json"
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        if HAS_QT:
+            super().__init__(parent)
+        else:
+            super().__init__()
 
         # Initialize paths
         self.base_dir = Path.home() / ".arduino-ide-modern"
