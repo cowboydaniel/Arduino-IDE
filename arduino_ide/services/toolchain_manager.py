@@ -38,7 +38,18 @@ class ToolchainManager:
             tools_dir: Custom tools directory. If None, uses ~/.arduino-ide/tools
         """
         if tools_dir is None:
-            self.tools_dir = Path.home() / '.arduino-ide' / 'tools'
+            # Try multiple locations in order of preference
+            # 1. User's home directory
+            home_tools = Path.home() / '.arduino-ide' / 'tools'
+
+            # 2. Project directory (for portability)
+            project_tools = Path(__file__).parent.parent.parent / '.arduino-ide' / 'tools'
+
+            # Use home directory by default, but check project directory if home doesn't exist
+            if home_tools.exists() or not project_tools.exists():
+                self.tools_dir = home_tools
+            else:
+                self.tools_dir = project_tools
         else:
             self.tools_dir = Path(tools_dir)
 
@@ -172,10 +183,9 @@ class ToolchainManager:
                                 reporthook(block_num, block_size, total_size)
 
             except Exception as e:
-                # If download fails, try fallback to system package
+                # If download fails, report error
                 print(f"\n✗ Download failed: {e}", file=sys.stderr)
-                print("Attempting to use system AVR toolchain...", file=sys.stderr)
-                return self._try_system_toolchain()
+                return False
             print()  # New line after progress
 
             # Extract archive
@@ -212,51 +222,6 @@ class ToolchainManager:
             print(f"✗ Failed to download toolchain: {e}", file=sys.stderr)
             return False
 
-    def _try_system_toolchain(self) -> bool:
-        """Try to use system-installed AVR toolchain as fallback
-
-        Returns:
-            True if system toolchain is available, False otherwise
-        """
-        try:
-            # Check if avr-gcc is in PATH
-            result = subprocess.run(
-                ['which', 'avr-gcc'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-
-            if result.returncode == 0:
-                system_avr_gcc = Path(result.stdout.strip())
-                system_bin_dir = system_avr_gcc.parent
-
-                # Create avr-gcc directory structure
-                self.avr_dir.mkdir(parents=True, exist_ok=True)
-                local_bin_dir = self.avr_dir / 'bin'
-                local_bin_dir.mkdir(parents=True, exist_ok=True)
-
-                # Create symlinks to system tools
-                tools = ['avr-gcc', 'avr-g++', 'avr-size', 'avr-objcopy', 'avr-objdump', 'avr-ar']
-                for tool in tools:
-                    system_tool = system_bin_dir / tool
-                    local_tool = local_bin_dir / tool
-                    if system_tool.exists() and not local_tool.exists():
-                        try:
-                            local_tool.symlink_to(system_tool)
-                        except Exception:
-                            # If symlink fails, copy the file
-                            shutil.copy2(system_tool, local_tool)
-
-                if self.is_installed():
-                    print("✓ Using system AVR toolchain")
-                    return True
-
-        except Exception as e:
-            print(f"✗ Failed to use system toolchain: {e}", file=sys.stderr)
-
-        return False
-
     def ensure_installed(self) -> bool:
         """Ensure toolchain is installed, download if necessary
 
@@ -266,13 +231,7 @@ class ToolchainManager:
         if self.is_installed():
             return True
 
-        print("AVR toolchain not found. Installing automatically...")
-
-        # First try system toolchain
-        if self._try_system_toolchain():
-            return True
-
-        # If system toolchain not available, try downloading
+        print("AVR toolchain not found. Downloading automatically...")
         return self.download_toolchain()
 
     def get_version(self) -> Optional[str]:
