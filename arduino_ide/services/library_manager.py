@@ -10,7 +10,7 @@ import shutil
 import zipfile
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Set
 from datetime import datetime
 import requests
 from PySide6.QtCore import QObject, Signal
@@ -427,16 +427,134 @@ class LibraryManager(QObject):
 
     def detect_conflicts(self, library_name: str) -> List[str]:
         """Detect potential conflicts when installing a library"""
-        conflicts = []
+        conflicts: List[str] = []
 
         library = self.get_library(library_name)
         if not library:
             return conflicts
 
-        # Check for libraries with same headers
-        # This would require scanning library headers
-        # For now, return empty list
-        # TODO: Implement header conflict detection
+        # We only care about libraries that are actually installed on disk
+        installed_libraries = [
+            lib for lib in self.library_index.get_installed_libraries()
+            if lib.install_path or (self.libraries_dir / lib.name).exists()
+        ]
+
+        if not installed_libraries:
+            return conflicts
+
+        header_occurrences: Dict[str, Dict[str, Set[str]]] = {}
+        header_display_names: Dict[str, Dict[str, str]] = {}
+        namespace_occurrences: Dict[str, Dict[str, Set[str]]] = {}
+        namespace_display_names: Dict[str, Dict[str, str]] = {}
+
+        header_extensions = {".h", ".hpp", ".hh", ".hxx"}
+        ignored_namespace_dirs = {"src", "examples", "extras", "docs", "tests", "test"}
+
+        def include_roots(path: Path) -> List[Path]:
+            roots: List[Path] = []
+            src_path = path / "src"
+            if src_path.is_dir():
+                roots.append(src_path)
+            if path.is_dir():
+                roots.append(path)
+            # Remove duplicates while maintaining order
+            unique_roots = []
+            seen: Set[Path] = set()
+            for root in roots:
+                if root not in seen:
+                    unique_roots.append(root)
+                    seen.add(root)
+            return unique_roots
+
+        for lib in installed_libraries:
+            lib_path = Path(lib.install_path) if lib.install_path else self.libraries_dir / lib.name
+            if not lib_path.exists():
+                continue
+
+            lib_header_map = header_display_names.setdefault(lib.name, {})
+            lib_namespace_map = namespace_display_names.setdefault(lib.name, {})
+
+            seen_headers: Set[str] = set()
+            seen_namespaces: Set[str] = set()
+
+            for root in include_roots(lib_path):
+                if not root.exists():
+                    continue
+
+                # Collect namespaces (top-level directories within include root)
+                try:
+                    for child in root.iterdir():
+                        if child.is_dir():
+                            ns_key = child.name.lower()
+                            if ns_key in ignored_namespace_dirs:
+                                continue
+                            if ns_key in seen_namespaces:
+                                continue
+                            namespace_occurrences.setdefault(ns_key, {}).setdefault(lib.name, set()).add(str(child))
+                            lib_namespace_map.setdefault(ns_key, child.name)
+                            seen_namespaces.add(ns_key)
+                except PermissionError:
+                    continue
+
+                # Collect header files recursively
+                for dirpath, _, filenames in os.walk(root):
+                    for filename in filenames:
+                        if Path(filename).suffix.lower() not in header_extensions:
+                            continue
+                        header_key = filename.lower()
+                        if header_key in seen_headers:
+                            continue
+                        header_occurrences.setdefault(header_key, {}).setdefault(lib.name, set()).add(
+                            str(Path(dirpath) / filename)
+                        )
+                        lib_header_map.setdefault(header_key, filename)
+                        seen_headers.add(header_key)
+
+        target_headers = header_display_names.get(library_name, {})
+        for header_key, header_name in target_headers.items():
+            libs_with_header = header_occurrences.get(header_key, {})
+            if len(libs_with_header) <= 1:
+                continue
+
+            others = [
+                f"{other_lib} ({', '.join(sorted(paths))})"
+                for other_lib, paths in sorted(libs_with_header.items())
+                if other_lib != library_name
+            ]
+            if not others:
+                continue
+
+            conflicts.append(
+                "Header '{header}' from {target} also exists in: {others}. "
+                "Remove or rename duplicates to avoid ambiguous '#include' resolution.".format(
+                    header=header_name,
+                    target=library_name,
+                    others=", ".join(others)
+                )
+            )
+
+        target_namespaces = namespace_display_names.get(library_name, {})
+        for namespace_key, namespace_name in target_namespaces.items():
+            libs_with_namespace = namespace_occurrences.get(namespace_key, {})
+            if len(libs_with_namespace) <= 1:
+                continue
+
+            others = [
+                f"{other_lib} ({', '.join(sorted(paths))})"
+                for other_lib, paths in sorted(libs_with_namespace.items())
+                if other_lib != library_name
+            ]
+            if not others:
+                continue
+
+            conflicts.append(
+                "Namespace directory '{namespace}' from {target} also exists in: {others}. "
+                "Consider removing duplicates or adjusting include paths to avoid collisions.".format(
+                    namespace=namespace_name,
+                    target=library_name,
+                    others=", ".join(others)
+                )
+            )
 
         return conflicts
 
