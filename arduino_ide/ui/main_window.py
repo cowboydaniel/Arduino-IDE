@@ -908,16 +908,16 @@ void loop() {
             self.status_bar.update_board(board.name)
 
     def save_state(self):
-        """Save window state"""
-        self.settings.setValue("geometry", self.saveGeometry())
+        """Save window state (dock widgets only, not window geometry)"""
+        # Don't save geometry - we always want to start maximized
         self.settings.setValue("windowState", self.saveState())
 
     def restore_state(self):
-        """Restore window state"""
-        geometry = self.settings.value("geometry")
-        if geometry:
-            self.restoreGeometry(geometry)
+        """Restore window state (dock widgets only, not window geometry)"""
+        # Clear any old saved geometry to prevent issues
+        self.settings.remove("geometry")
 
+        # Only restore dock widget state
         state = self.settings.value("windowState")
         if state:
             self.restoreState(state)
