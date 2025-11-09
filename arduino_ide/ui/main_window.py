@@ -5,9 +5,9 @@ Main window for Arduino IDE Modern
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget,
-    QComboBox, QLabel
+    QComboBox, QLabel, QSizePolicy
 )
-from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtCore import Qt, QSettings, QTimer, QWIDGETSIZE_MAX
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor, QGuiApplication
 import serial.tools.list_ports
 from pathlib import Path
@@ -121,13 +121,15 @@ class MainWindow(QMainWindow):
         # show the minimize/maximize controls.  Some window managers (notably
         # GNOME on Wayland) will omit the maximize button unless the system
         # menu hint is explicitly enabled.
-        window_flags = self.windowFlags()
-        window_flags |= (
-            Qt.WindowMinimizeButtonHint
-            | Qt.WindowMaximizeButtonHint
-            | Qt.WindowSystemMenuHint
-        )
-        self.setWindowFlags(window_flags)
+        self.setWindowFlag(Qt.WindowMinimizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
+        self.setWindowFlag(Qt.WindowSystemMenuHint, True)
+
+        # Guarantee the window advertises a resizable geometry so window
+        # managers keep the maximize control visible.
+        self.setMinimumSize(640, 480)
+        self.setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # Track initial maximize attempts so we can retry until the window is
         # actually maximized when first shown.
