@@ -250,6 +250,110 @@ class ArduinoCLI:
 
         return 0
 
+    def _resolve_sketch_path(self, sketch: str) -> Path:
+        """Resolve the primary sketch file for a path."""
+        sketch_path = Path(sketch).expanduser().resolve()
+        if not sketch_path.exists():
+            raise FileNotFoundError(f"Sketch path not found: {sketch_path}")
+        if sketch_path.is_dir():
+            candidates = list(sketch_path.glob("*.ino"))
+            if not candidates:
+                candidates = list(sketch_path.glob("*.pde"))
+            if not candidates:
+                candidates = list(sketch_path.glob("*.cpp"))
+            if not candidates:
+                raise FileNotFoundError(
+                    f"No sketch files (*.ino, *.pde, *.cpp) found in {sketch_path}"
+                )
+            candidates.sort()
+            sketch_path = candidates[0]
+        return sketch_path
+
+    def compile_sketch(self, fqbn: str, sketch: str, build_path: Optional[str] = None,
+                       config: Optional[str] = None) -> int:
+        """Simulate compilation of a sketch for the requested board."""
+        board = self.board_manager.get_board(fqbn)
+        if not board:
+            print(f"✗ Board '{fqbn}' not found", file=sys.stderr)
+            return 1
+        try:
+            sketch_file = self._resolve_sketch_path(sketch)
+        except FileNotFoundError as exc:
+            print(f"✗ {exc}", file=sys.stderr)
+            return 1
+        try:
+            source = sketch_file.read_text(encoding="utf-8")
+        except Exception as exc:
+            print(f"✗ Failed to read sketch: {exc}", file=sys.stderr)
+            return 1
+
+        print(f"Compiling sketch: {sketch_file}", flush=True)
+        print(f"Target board: {board.name} ({board.fqbn})", flush=True)
+        if config:
+            print(f"Build configuration: {config}", flush=True)
+
+        if "void setup" not in source and "int main" not in source:
+            print("✗ Sketch must define a setup() function", file=sys.stderr, flush=True)
+            return 2
+
+        if "void loop" not in source and "int main" not in source:
+            print("⚠️  Warning: sketch does not define loop()", flush=True)
+
+        print("Generating function prototypes...", flush=True)
+        print("Performing static analysis...", flush=True)
+
+        build_dir = Path(build_path).expanduser().resolve() if build_path else sketch_file.parent / "build"
+        try:
+            build_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            print(f"✗ Failed to prepare build directory: {exc}", file=sys.stderr)
+            return 1
+
+        artifact = build_dir / f"{sketch_file.stem}.bin"
+        try:
+            artifact.write_text("// simulated binary output\n", encoding="utf-8")
+        except Exception as exc:
+            print(f"✗ Failed to write build artifact: {exc}", file=sys.stderr)
+            return 1
+
+        sketch_size = len(source.encode("utf-8"))
+        ram_usage = max(32, min(8192, int(len(source) * 0.25)))
+        prog_percent = min(100, sketch_size // 512 if sketch_size else 0)
+
+        print(f"Sketch uses {sketch_size} bytes ({prog_percent}% of program storage space).", flush=True)
+        print(f"Global variables use {ram_usage} bytes of dynamic memory.", flush=True)
+        print("✔ Compilation successful.", flush=True)
+        return 0
+
+    def upload_sketch(self, fqbn: str, port: str, sketch: str, build_path: Optional[str] = None,
+                      verify: bool = False) -> int:
+        """Simulate uploading a sketch to the requested board."""
+        if not port:
+            print("✗ Serial port must be specified with -p/--port.", file=sys.stderr)
+            return 1
+
+        result = self.compile_sketch(fqbn, sketch, build_path=build_path)
+        if result != 0:
+            return result
+
+        try:
+            sketch_file = self._resolve_sketch_path(sketch)
+        except FileNotFoundError:
+            sketch_file = None
+
+        print(f"Connecting to board on {port}...", flush=True)
+        print("Uploading firmware image...", flush=True)
+        print("✔ Upload complete.", flush=True)
+
+        if verify:
+            print("Verifying upload...", flush=True)
+            print("✔ Verification successful.", flush=True)
+
+        if sketch_file:
+            print(f"Resetting board for sketch {sketch_file.stem}...", flush=True)
+
+        return 0
+
 
 def main():
     """Main CLI entry point"""
@@ -306,6 +410,21 @@ def main():
 
     # core list
     core_list_parser = core_subparsers.add_parser('list', help='List platforms')
+
+    # Compile command
+    compile_parser = subparsers.add_parser('compile', help='Compile sketch')
+    compile_parser.add_argument('-b', '--fqbn', required=True, help='Fully qualified board name')
+    compile_parser.add_argument('--build-path', help='Directory to place build artifacts')
+    compile_parser.add_argument('--config', help='Build configuration name')
+    compile_parser.add_argument('sketch', help='Path to sketch (file or directory)')
+
+    # Upload command
+    upload_parser = subparsers.add_parser('upload', help='Upload sketch to board')
+    upload_parser.add_argument('-b', '--fqbn', required=True, help='Fully qualified board name')
+    upload_parser.add_argument('-p', '--port', required=True, help='Serial port or device identifier')
+    upload_parser.add_argument('--build-path', help='Directory containing build artifacts')
+    upload_parser.add_argument('--verify', action='store_true', help='Verify after upload')
+    upload_parser.add_argument('sketch', help='Path to sketch (file or directory)')
 
     # Board commands
     board_parser = subparsers.add_parser('board', help='Board management')
@@ -369,6 +488,11 @@ def main():
             elif args.board_command == 'search':
                 return cli.board_search(args.query)
 
+        elif args.command == 'compile':
+            return cli.compile_sketch(args.fqbn, args.sketch, build_path=args.build_path, config=args.config)
+
+        elif args.command == 'upload':
+            return cli.upload_sketch(args.fqbn, args.port, args.sketch, build_path=args.build_path, verify=args.verify)
         else:
             parser.print_help()
             return 1
