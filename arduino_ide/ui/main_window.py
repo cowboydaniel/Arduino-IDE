@@ -182,13 +182,6 @@ class MainWindow(QMainWindow):
         """Initialize the main UI"""
         self.setWindowTitle("Arduino IDE Modern")
 
-        # Configure dock widget behavior (only for left docks now)
-        self.setDockOptions(
-            QMainWindow.AnimatedDocks |
-            QMainWindow.AllowNestedDocks |
-            QMainWindow.AllowTabbedDocks
-        )
-
         # Central widget with editor tabs
         self.editor_tabs = QTabWidget()
         self.editor_tabs.setTabsClosable(True)
@@ -202,31 +195,38 @@ class MainWindow(QMainWindow):
         central_layout.setContentsMargins(0, 0, 0, 0)
         central_layout.setSpacing(0)
 
-        # Top block: horizontal splitter
+        # Horizontal splitter: left column | editor | right column
         self.top_splitter = QSplitter(Qt.Horizontal)
         self.top_splitter.setHandleWidth(4)
+
+        # Left column (Quick Actions + Project Explorer)
+        self.left_column = QWidget()
+        self.left_column_layout = QVBoxLayout(self.left_column)
+        self.left_column_layout.setContentsMargins(0, 0, 0, 0)
+        self.left_column_layout.setSpacing(0)
+
+        self.top_splitter.addWidget(self.left_column)
+
+        # Editor (already exists)
         self.top_splitter.addWidget(self.editor_tabs)
 
-        # Right side: column of widgets
+        # Right column (Board/Watch/Status/Context)
         self.right_column = QWidget()
-        self.right_layout = QVBoxLayout(self.right_column)
-        self.right_layout.setContentsMargins(0, 0, 0, 0)
-        self.right_layout.setSpacing(0)
-
-        right_panel_width = 320
-        self.right_column.setMinimumWidth(right_panel_width)
-        self.right_column.setMaximumWidth(right_panel_width)
+        self.right_column_layout = QVBoxLayout(self.right_column)
+        self.right_column_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_column_layout.setSpacing(0)
 
         self.top_splitter.addWidget(self.right_column)
 
+        # Fixed widths for left and right
+        self.left_column.setFixedWidth(260)
+        self.right_column.setFixedWidth(300)
+
         central_layout.addWidget(self.top_splitter)
 
-        # Bottom block: serial monitor and other panels
-        self.bottom_panel = QWidget()
-        self.bottom_layout = QVBoxLayout(self.bottom_panel)
-        self.bottom_layout.setContentsMargins(0, 0, 0, 0)
-        self.bottom_layout.setSpacing(0)
-        central_layout.addWidget(self.bottom_panel)
+        # Bottom tab widget (serial monitor, plotter, etc.)
+        self.bottom_tabs = QTabWidget()
+        central_layout.addWidget(self.bottom_tabs)
 
         self.setCentralWidget(central)
 
@@ -482,40 +482,31 @@ class MainWindow(QMainWindow):
         main_toolbar.addAction(status_btn)
 
     def create_dock_widgets(self):
-        """Create dockable panels"""
-        # Quick Actions Panel (left)
-        self.quick_actions_dock = QDockWidget("Quick Actions", self)
-        self.quick_actions_dock.setObjectName("QuickActionsDock")
+        """Create panels (no dock widgets)"""
+        # --- LEFT COLUMN (Normal widgets, NOT docks) ---
+        # Create left-side panel widgets
         self.quick_actions_panel = QuickActionsPanel()
-        self.quick_actions_dock.setWidget(self.quick_actions_panel)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.quick_actions_dock)
-
-        # Project Explorer (left, tabbed with Quick Actions)
-        self.project_dock = QDockWidget("Project Explorer", self)
-        self.project_dock.setObjectName("ProjectExplorerDock")
         self.project_explorer = ProjectExplorer()
-        self.project_dock.setWidget(self.project_explorer)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.project_dock)
-        self.tabifyDockWidget(self.quick_actions_dock, self.project_dock)
 
-        # Show Quick Actions by default
-        self.quick_actions_dock.raise_()
+        # Add widgets to left column layout (NOT as dock widgets)
+        self.left_column_layout.addWidget(self.quick_actions_panel)
+        self.left_column_layout.addWidget(self.project_explorer)
 
         # --- RIGHT COLUMN (Normal widgets, NOT docks) ---
-        # Create right-side panel widgets and add to right layout
+        # Create right-side panel widgets
         self.board_panel = BoardPanel()
         self.variable_watch = VariableWatch()
         self.status_display = StatusDisplay()
         self.context_panel = ContextPanel()
 
-        # Add widgets to right layout (NOT as dock widgets)
-        self.right_layout.addWidget(self.board_panel)
-        self.right_layout.addWidget(self.variable_watch)
-        self.right_layout.addWidget(self.status_display)
-        self.right_layout.addWidget(self.context_panel)
-        self.right_layout.addStretch()
+        # Add widgets to right column layout (NOT as dock widgets)
+        self.right_column_layout.addWidget(self.board_panel)
+        self.right_column_layout.addWidget(self.variable_watch)
+        self.right_column_layout.addWidget(self.status_display)
+        self.right_column_layout.addWidget(self.context_panel)
+        self.right_column_layout.addStretch()
 
-        # --- BOTTOM PANEL (Normal widgets in tabs, NOT docks) ---
+        # --- BOTTOM TABS (Normal widgets in tabs, NOT docks) ---
         # Create bottom panels
         self.console_panel = ConsolePanel()
         self.serial_monitor = SerialMonitor()
@@ -526,27 +517,15 @@ class MainWindow(QMainWindow):
         # Connect serial monitor data to plotter
         self.serial_monitor.data_received.connect(self.plotter_panel.append_output)
 
-        # Create tab widget for bottom panels
-        self.bottom_tabs = QTabWidget()
+        # Add panels to bottom tabs (created in init_ui)
         self.bottom_tabs.addTab(self.console_panel, "Console")
         self.bottom_tabs.addTab(self.serial_monitor, "Serial Monitor")
         self.bottom_tabs.addTab(self.plotter_panel, "Plotter")
         self.bottom_tabs.addTab(self.problems_panel, "Problems")
         self.bottom_tabs.addTab(self.output_panel, "Output")
 
-        # Set minimum height for bottom panel
-        screen = QGuiApplication.primaryScreen()
-        if screen:
-            available_height = screen.availableGeometry().height()
-            max_bottom_height = max(int(available_height * 0.4), 240)
-        else:
-            max_bottom_height = 240
-
+        # Set minimum height for bottom tabs
         self.bottom_tabs.setMinimumHeight(150)
-        self.bottom_panel.setMinimumHeight(150)
-
-        # Add bottom tabs to bottom layout
-        self.bottom_layout.addWidget(self.bottom_tabs)
 
         # Connect Quick Actions Panel signals
         self.quick_actions_panel.upload_clicked.connect(self.upload_sketch)
