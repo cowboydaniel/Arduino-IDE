@@ -31,6 +31,7 @@ from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
 from arduino_ide.services.project_manager import ProjectManager
+from arduino_ide.ui.example_templates import build_missing_example_template
 from arduino_ide.services import ArduinoCliService
 
 
@@ -863,7 +864,8 @@ void loop() {
             return
         lines = chunk.splitlines()
         if chunk.endswith("
-") or chunk.endswith(""):
+") or chunk.endswith("
+"):
             lines.append("")
         for line in lines:
             self.console_panel.append_output(line, color=color)
@@ -1380,7 +1382,16 @@ void loop() {
         }
 
         # Get example code or use default
-        example_code = examples.get(example_name, f"// {example_name} Example\n// TODO: Add example code\n\nvoid setup() {{\n  \n}}\n\nvoid loop() {{\n  \n}}\n")
+        board_name = "Unknown board"
+        if hasattr(self, "board_selector") and self.board_selector:
+            current_text = self.board_selector.currentText().strip()
+            if current_text:
+                board_name = current_text
+
+        example_code = examples.get(
+            example_name,
+            build_missing_example_template(example_name, board_name),
+        )
 
         # Create new editor with example
         editor_container = self.create_new_editor(f"{example_name}.ino")
