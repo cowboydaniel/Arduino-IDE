@@ -5,9 +5,9 @@ Main window for Arduino IDE Modern
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget,
-    QComboBox, QLabel
+    QComboBox, QLabel, QSizePolicy
 )
-from PySide6.QtCore import Qt, QSettings, QTimer
+from PySide6.QtCore import Qt, QSettings, QTimer, QWIDGETSIZE_MAX
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor, QGuiApplication
 import serial.tools.list_ports
 from pathlib import Path
