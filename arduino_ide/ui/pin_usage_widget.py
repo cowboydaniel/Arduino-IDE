@@ -316,6 +316,10 @@ class PinUsageWidget(QWidget):
                 potential_pin_vars[var_name] = (pin_num, comment)
                 print(f"[PIN PARSER DEBUG] Found potential pin variable: {var_name} = {pin_num}")
 
+        # Determine which potential variables are likely pins based on naming patterns
+        likely_pin_vars = self.filter_likely_pin_names(potential_pin_vars)
+        print(f"[PIN PARSER DEBUG] Likely pin variables after name filtering: {list(likely_pin_vars.keys())}")
+
         # Second pass: Search for pin functions and resolve variable names
         # Process pinMode() first to establish definitive modes
         pinMode_pins = {}  # Track pins with explicit pinMode declarations
@@ -431,12 +435,80 @@ class PinUsageWidget(QWidget):
                     if desc and desc not in ['led', 'builtin']:
                         pin_info[resolved_pin]['descriptions'].append(desc)
 
+        # Third pass: Add likely pin variables that weren't confirmed by function usage
+        # This handles files with pin definitions but no actual pin function calls
+        for var_name, (pin_num, comment) in likely_pin_vars.items():
+            if var_name not in var_to_pin:  # Not yet confirmed by function usage
+                resolved_pin = self.resolve_pin_name(pin_num, {})
+                var_to_pin[var_name] = resolved_pin
+                print(f"[PIN PARSER DEBUG] Auto-confirmed likely pin: {var_name} -> {resolved_pin}")
+
+                # Initialize pin info
+                if resolved_pin not in pin_info:
+                    pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': var_name}
+
+                # Add UNKNOWN mode since we don't have pinMode info
+                if not pin_info[resolved_pin]['modes']:
+                    pin_info[resolved_pin]['modes'].append('UNKNOWN')
+
+                # Add description from comment if available
+                if comment and comment not in pin_info[resolved_pin]['descriptions']:
+                    pin_info[resolved_pin]['descriptions'].append(comment.strip())
+
         print(f"[PIN PARSER DEBUG] Confirmed variable mapping: {var_to_pin}")
         print(f"[PIN PARSER DEBUG] Final result: {len(pin_info)} pins found")
         for pin, info in pin_info.items():
             print(f"  {pin}: modes={info['modes']}, desc={info['descriptions']}")
 
         return pin_info
+
+    def filter_likely_pin_names(self, potential_vars):
+        """Filter potential pin variables to identify likely pins based on naming patterns
+
+        Args:
+            potential_vars: Dict mapping var_name to (pin_num, comment)
+
+        Returns:
+            Dict with same structure, containing only likely pin variables
+        """
+        # Common keywords that indicate a pin variable
+        pin_keywords = [
+            'PIN', 'RELAY', 'LED', 'BUTTON', 'SWITCH', 'SENSOR', 'MOTOR',
+            'SERVO', 'LIGHT', 'LAMP', 'BUZZER', 'SPEAKER', 'INPUT', 'OUTPUT',
+            'PWM', 'ANALOG', 'DIGITAL', 'TX', 'RX', 'SDA', 'SCL', 'MOSI', 'MISO',
+            'SCK', 'CS', 'SS', 'ENABLE', 'TRIGGER', 'ECHO', 'ROUTE', 'TURNOUT',
+            'SIGNAL', 'CROSSING'
+        ]
+
+        # Keywords that indicate NOT a pin (configuration values, thresholds, etc.)
+        non_pin_keywords = [
+            'THRESHOLD', 'DELAY', 'TIMEOUT', 'INTERVAL', 'DURATION', 'COUNT',
+            'SIZE', 'LENGTH', 'WIDTH', 'HEIGHT', 'SAMPLES', 'RATE', 'SPEED',
+            'BAUD', 'FREQUENCY', 'PERIOD', 'HYSTERESIS', 'OFFSET', 'MULTIPLIER',
+            'DIVISOR', 'MINIMUM', 'MAXIMUM', 'MIN', 'MAX', 'LIMIT', 'RANGE',
+            'DEBOUNCE_TIME', 'CALIBRATION', 'FILTER'
+        ]
+
+        likely_pins = {}
+
+        for var_name, (pin_num, comment) in potential_vars.items():
+            var_upper = var_name.upper()
+
+            # Check for non-pin keywords first (these take priority)
+            is_non_pin = any(keyword in var_upper for keyword in non_pin_keywords)
+            if is_non_pin:
+                print(f"[PIN FILTER DEBUG] Excluding {var_name} - contains non-pin keyword")
+                continue
+
+            # Check for pin keywords
+            is_likely_pin = any(keyword in var_upper for keyword in pin_keywords)
+            if is_likely_pin:
+                likely_pins[var_name] = (pin_num, comment)
+                print(f"[PIN FILTER DEBUG] Including {var_name} - contains pin keyword")
+            else:
+                print(f"[PIN FILTER DEBUG] Excluding {var_name} - no pin keywords found")
+
+        return likely_pins
 
     def resolve_pin_name(self, pin_name, var_to_pin=None):
         """Resolve special pin names to actual pin numbers
