@@ -403,10 +403,12 @@ class ArduinoCLI:
             r'^\s*(?:typedef\s+)?struct\s+([a-zA-Z_]\w*)',
             r'^\s*(?:typedef\s+)?class\s+([a-zA-Z_]\w*)',
             r'^\s*(?:typedef\s+)?enum\s+([a-zA-Z_]\w*)',
+            # Old C-style: typedef struct { ... } Name;
+            r'^\s*typedef\s+(?:struct|class|enum)\s*\{[^}]*\}\s*([a-zA-Z_]\w*)\s*;',
         ]
 
         for pattern in type_patterns:
-            for match in re.finditer(pattern, type_definitions, re.MULTILINE):
+            for match in re.finditer(pattern, type_definitions, re.MULTILINE | re.DOTALL):
                 custom_types.add(match.group(1))
 
         return custom_types
@@ -474,11 +476,13 @@ class ArduinoCLI:
             r'^\s*(?:typedef\s+)?struct\s+([a-zA-Z_]\w*)',
             r'^\s*(?:typedef\s+)?class\s+([a-zA-Z_]\w*)',
             r'^\s*(?:typedef\s+)?enum\s+([a-zA-Z_]\w*)',
+            # Old C-style: typedef struct { ... } Name;
+            r'^\s*typedef\s+(?:struct|class|enum)\s*\{[^}]*\}\s*([a-zA-Z_]\w*)\s*;',
             r'^\s*typedef\s+.*?\s+([a-zA-Z_]\w*)\s*;',
         ]
 
         for pattern in type_patterns:
-            for match in re.finditer(pattern, source_no_comments, re.MULTILINE):
+            for match in re.finditer(pattern, source_no_comments, re.MULTILINE | re.DOTALL):
                 custom_types.add(match.group(1))
 
         # Pattern to match function definitions
