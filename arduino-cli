@@ -4,6 +4,12 @@ Arduino CLI - Command Line Interface for Arduino IDE
 
 Compatible with arduino-cli commands for CI/CD integration
 
+This wrapper automatically:
+  - Downloads and caches the Arduino package index from:
+    https://downloads.arduino.cc/packages/package_index.json
+  - Auto-installs Arduino AVR Boards (Uno, Mega, Nano, etc.) on first run
+  - Provides board discovery via the Arduino platform framework
+
 Usage:
     arduino-cli lib install <library>[@version]
     arduino-cli lib uninstall <library>
@@ -18,8 +24,8 @@ Usage:
     arduino-cli core list
     arduino-cli core upgrade
 
-    arduino-cli board list
-    arduino-cli board search <query>
+    arduino-cli board list [--format json]
+    arduino-cli board search <query> [--format json]
 
     arduino-cli compile -b <fqbn> <sketch>
     arduino-cli upload -b <fqbn> -p <port> <sketch>
@@ -39,9 +45,42 @@ sys.path.insert(0, str(Path(__file__).parent))
 class ArduinoCLI:
     """Arduino CLI implementation"""
 
+    PACKAGE_INDEX_URL = "https://downloads.arduino.cc/packages/package_index.json"
+
     def __init__(self):
         self._lib_manager = None
         self._board_manager = None
+        self._initialized = False
+
+    def _ensure_initialized(self):
+        """Ensure arduino-cli is properly initialized with package index"""
+        if self._initialized:
+            return
+
+        # Update board package index on first use
+        try:
+            # Check if index needs updating (will download if not cached)
+            self.board_manager.update_index(force=False)
+
+            # Auto-install Arduino AVR core if no platforms are installed
+            installed = self.board_manager.search_packages(installed_only=True)
+            if not installed:
+                print("No board platforms installed. Installing Arduino AVR Boards...", file=sys.stderr)
+                try:
+                    # Install latest Arduino AVR core (Uno, Mega, Nano, etc.)
+                    success = self.board_manager.install_package("Arduino AVR Boards")
+                    if success:
+                        print("✓ Arduino AVR Boards installed successfully", file=sys.stderr)
+                    else:
+                        print("✗ Failed to install Arduino AVR Boards", file=sys.stderr)
+                except Exception as e:
+                    print(f"Warning: Could not auto-install Arduino AVR Boards: {e}", file=sys.stderr)
+
+            self._initialized = True
+        except Exception as e:
+            # Non-fatal: continue even if index update fails
+            print(f"Warning: Could not update package index: {e}", file=sys.stderr)
+            self._initialized = True
 
     @property
     def lib_manager(self):
@@ -57,6 +96,8 @@ class ArduinoCLI:
         if self._board_manager is None:
             from arduino_ide.services.board_manager import BoardManager
             self._board_manager = BoardManager()
+            # Ensure package index is available
+            self._ensure_initialized()
         return self._board_manager
 
     def lib_install(self, library: str, version: Optional[str] = None, with_deps: bool = True):
