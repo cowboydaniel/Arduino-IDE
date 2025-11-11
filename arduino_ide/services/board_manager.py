@@ -693,8 +693,12 @@ class BoardManager(QObject):
                                     boards_txt_candidates.append(nested_boards_txt)
 
                         for boards_txt_path in boards_txt_candidates:
+                            platform_root = boards_txt_path.parent
                             platform_boards = BoardsTxtParser.parse_boards_txt(
-                                boards_txt_path, package_name, architecture
+                                boards_txt_path,
+                                package_name,
+                                architecture,
+                                platform_root=platform_root,
                             )
                             if platform_boards:
                                 boards.extend(platform_boards)
