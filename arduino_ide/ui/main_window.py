@@ -868,6 +868,8 @@ void loop() {
 
         self.add_recent_file(path)
         self.status_bar.set_status(f"Opened {path.name}")
+        # Explicitly update pin usage after opening file
+        self.update_pin_usage()
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
         self.status_bar.set_status(f"Saved {path.name}")
