@@ -564,6 +564,29 @@ class ArduinoCLI:
                 print(f"✗ Core compilation error for {core_source.name}: {exc}", file=sys.stderr)
                 return 1
 
+        # Create static library archive from core object files
+        # This is critical - the official Arduino IDE creates core.a and links against it
+        # Linking against an archive (.a) only includes needed object files
+        # Linking against individual .o files includes ALL of them (causing bloat)
+        core_archive = build_dir / 'core.a'
+
+        # Use avr-ar to create the archive
+        ar_cmd = [
+            str(toolchain.get_avr_ar_path()),
+            'rcs',  # r=insert/replace, c=create, s=index
+            str(core_archive)
+        ]
+        ar_cmd.extend([str(obj) for obj in core_obj_files])
+
+        try:
+            result = subprocess.run(ar_cmd, capture_output=True, text=True, timeout=30, env=env)
+            if result.returncode != 0:
+                print(f"✗ Archive creation failed:\n{result.stderr}", file=sys.stderr)
+                return result.returncode
+        except Exception as exc:
+            print(f"✗ Archive creation error: {exc}", file=sys.stderr)
+            return 1
+
         # Link - matches official Arduino AVR core platform.txt compiler.c.elf.flags
         link_flags = [
             str(toolchain.get_avr_gcc_path()),
@@ -598,10 +621,12 @@ class ArduinoCLI:
             str(sketch_obj_file),
         ])
 
-        # Add all core object files
-        link_flags.extend([str(obj) for obj in core_obj_files])
+        # Add core archive library
+        # The order matters: sketch objects first, then core archive, then system libraries
+        # The linker will only extract needed object files from the archive
+        link_flags.append(str(core_archive))
 
-        # Add math library
+        # Add math library (-lm must come after object files/archives)
         link_flags.append('-lm')
 
         try:
