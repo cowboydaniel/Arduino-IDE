@@ -1075,8 +1075,14 @@ void loop() {
             self._last_cli_error = ""
             self._compilation_output = ""
 
-            # Run silent compilation
-            self.cli_service.run_compile(str(temp_sketch), board.fqbn, config=build_config)
+            # Run silent background compilation (no verbose output, no export)
+            self.cli_service.run_compile(
+                str(temp_sketch),
+                board.fqbn,
+                config=build_config,
+                verbose=False,
+                export_binaries=False
+            )
 
         except Exception as exc:
             # Silently ignore any errors in background compile
@@ -1157,7 +1163,14 @@ void loop() {
         self._last_cli_error = ""
 
         try:
-            self.cli_service.run_compile(str(sketch_path), board.fqbn, config=build_config)
+            # User-initiated verify: enable verbose output for detailed logs
+            self.cli_service.run_compile(
+                str(sketch_path),
+                board.fqbn,
+                config=build_config,
+                verbose=False,  # Keep false for cleaner output, can be toggled via UI later
+                export_binaries=True  # Export binaries to sketch folder like official IDE
+            )
         except (RuntimeError, FileNotFoundError) as exc:
             self._cli_current_operation = None
             self.console_panel.append_output(f"✗ {exc}", color="#F48771")
@@ -1233,7 +1246,14 @@ void loop() {
         self._upload_after_compile = True  # Flag to trigger upload after compile
 
         try:
-            self.cli_service.run_compile(str(sketch_path), board.fqbn, config=build_config)
+            # Upload requires compilation first: export binaries for upload
+            self.cli_service.run_compile(
+                str(sketch_path),
+                board.fqbn,
+                config=build_config,
+                verbose=False,  # Keep false for cleaner output
+                export_binaries=True  # Export binaries for upload
+            )
         except (RuntimeError, FileNotFoundError) as exc:
             self._cli_current_operation = None
             self._upload_after_compile = False
