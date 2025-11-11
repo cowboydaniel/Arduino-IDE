@@ -442,19 +442,27 @@ class PinUsageWidget(QWidget):
     def detect_conflicts(self, pin_info):
         """Detect pins with conflicting modes
 
+        Real conflicts are only when ANALOG mode is mixed with digital modes.
+        Digital modes (OUTPUT, INPUT, INPUT_PULLUP, PWM) are all compatible:
+        - Reading from OUTPUT pins is valid (e.g., verifying pin state)
+        - PWM is just OUTPUT with analogWrite()
+        - INPUT and INPUT_PULLUP are compatible
+
         Returns:
             Set of pin names with conflicts
         """
         conflicts = set()
 
         for pin, info in pin_info.items():
-            modes = info['modes']
-            # Check if pin has multiple different modes
-            if len(set(modes)) > 1:
-                # INPUT_PULLUP and INPUT are not conflicts
-                unique_modes = set(modes)
-                if unique_modes - {'INPUT', 'INPUT_PULLUP'}:
-                    conflicts.add(pin)
+            modes = set(info['modes'])
+
+            # Only real conflict: ANALOG mode mixed with digital modes
+            digital_modes = {'OUTPUT', 'INPUT', 'INPUT_PULLUP', 'PWM'}
+            has_analog = 'ANALOG' in modes
+            has_digital = bool(modes & digital_modes)
+
+            if has_analog and has_digital:
+                conflicts.add(pin)
 
         return conflicts
 
