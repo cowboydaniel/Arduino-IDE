@@ -220,7 +220,7 @@ class MainWindow(QMainWindow):
         self._background_compile_timer = QTimer(self)
         self._background_compile_timer.setSingleShot(True)
         self._background_compile_timer.timeout.connect(self._do_background_compile)
-        self._background_compile_delay = 3000  # 3 seconds after user stops typing
+        self._background_compile_delay = 2000  # 2 seconds after user stops typing
 
         self.init_ui()
         self.create_menus()
@@ -634,10 +634,9 @@ class MainWindow(QMainWindow):
         if content is None and not mark_clean:
             editor_container.editor.document().setModified(True)
 
-        # Connect editor changes to pin usage update and status display
+        # Connect editor changes to pin usage update and background compilation
         editor_container.editor.textChanged.connect(self.update_pin_usage)
-        editor_container.editor.textChanged.connect(self.update_status_display)
-        editor_container.editor.textChanged.connect(self._on_code_changed)
+        editor_container.editor.textChanged.connect(self._on_code_changed)  # Triggers background compile for memory
 
         # Connect cursor position changes to status bar
         editor_container.editor.cursorPositionChanged.connect(self.update_cursor_position)
@@ -656,10 +655,12 @@ class MainWindow(QMainWindow):
 
         # Initial updates
         self.update_pin_usage()
-        self.update_status_display()
         self.update_status_bar_for_file(editor_container.filename)
         self.update_cursor_position()
         self.update_tab_title(index)
+
+        # Trigger initial background compile for memory usage (immediate, no delay)
+        QTimer.singleShot(100, self._do_background_compile)
 
         return editor_container
 
@@ -1742,22 +1743,26 @@ void loop() {
             self.board_panel.update_pin_usage(code_text)
 
     def update_status_display(self):
-        """Update real-time status display from current editor"""
-        current_widget = self.editor_tabs.currentWidget()
-        if current_widget and hasattr(current_widget, 'editor'):
-            code_text = current_widget.editor.toPlainText()
-            self.status_display.update_from_code(code_text)
+        """DEPRECATED: Now uses background compilation instead of estimates.
+
+        This method is kept for backwards compatibility but does nothing.
+        Memory usage is updated automatically via background compilation.
+        """
+        # No longer using estimation - background compilation updates memory
+        pass
 
     def on_tab_changed(self, index):
         """Handle tab change - update pin usage and status for new tab"""
         if index >= 0:
             self.update_pin_usage()
-            self.update_status_display()
             # Update status bar for new tab
             current_widget = self.editor_tabs.currentWidget()
             if current_widget and hasattr(current_widget, 'filename'):
                 self.update_status_bar_for_file(current_widget.filename)
             self.update_cursor_position()
+
+            # Trigger background compile for new tab (immediate)
+            QTimer.singleShot(100, self._do_background_compile)
 
     def update_cursor_position(self):
         """Update cursor position in status bar"""
