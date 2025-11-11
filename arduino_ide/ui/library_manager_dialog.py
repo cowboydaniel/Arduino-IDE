@@ -15,10 +15,11 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QTreeWidget, QTreeWidgetItem,
     QTextBrowser, QCheckBox, QComboBox, QGroupBox, QFormLayout,
     QProgressBar, QTabWidget, QWidget, QScrollArea, QRadioButton,
-    QMessageBox, QMenu
+    QMessageBox, QMenu, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QAction
+from pathlib import Path
 
 from ..models import Library, LibraryStatus, LibraryType
 from ..services.library_manager import LibraryManager
@@ -333,6 +334,11 @@ class LibraryManagerDialog(QDialog):
         refresh_btn.clicked.connect(self.update_index)
         toolbar.addWidget(refresh_btn)
 
+        # Install from ZIP button
+        install_zip_btn = QPushButton("📦 Install from ZIP")
+        install_zip_btn.clicked.connect(self.install_from_zip)
+        toolbar.addWidget(install_zip_btn)
+
         toolbar.addStretch()
 
         layout.addLayout(toolbar)
@@ -626,6 +632,48 @@ class LibraryManagerDialog(QDialog):
         """Update library index"""
         self.progress_bar.setVisible(True)
         self.library_manager.update_index(force=True)
+
+    def install_from_zip(self):
+        """Install library from ZIP file"""
+        # Open file dialog
+        zip_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Library ZIP File",
+            "",
+            "ZIP Files (*.zip);;All Files (*)"
+        )
+
+        if zip_path:
+            # Convert to Path object
+            zip_file = Path(zip_path)
+
+            # Confirm installation
+            reply = QMessageBox.question(
+                self,
+                "Install Library from ZIP",
+                f"Install library from:\n{zip_file.name}?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if reply == QMessageBox.Yes:
+                self.progress_bar.setVisible(True)
+                success = self.library_manager.install_library_from_zip(zip_file)
+
+                if success:
+                    QMessageBox.information(
+                        self,
+                        "Installation Successful",
+                        "Library installed successfully from ZIP file."
+                    )
+                else:
+                    QMessageBox.warning(
+                        self,
+                        "Installation Failed",
+                        "Failed to install library from ZIP file. Check the status messages for details."
+                    )
+
+                self.progress_bar.setVisible(False)
+                self.refresh_libraries()
 
     def on_status_message(self, message: str):
         """Handle status message"""

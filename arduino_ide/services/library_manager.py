@@ -1015,3 +1015,136 @@ class LibraryManager(QObject):
                     installed_count += 1
 
         return installed_count
+
+    def install_library_from_zip(self, zip_path: Path) -> bool:
+        """Install a library from a ZIP file
+
+        Args:
+            zip_path: Path to the ZIP file containing the library
+
+        Returns:
+            True if installation was successful, False otherwise
+        """
+        self.status_message.emit(f"Installing library from ZIP: {zip_path.name}...")
+
+        try:
+            # Validate ZIP file exists
+            if not zip_path.exists():
+                self.status_message.emit(f"Error: ZIP file not found: {zip_path}")
+                return False
+
+            # Create temporary extraction directory
+            temp_extract = self.cache_dir / "temp_zip_extract"
+            if temp_extract.exists():
+                shutil.rmtree(temp_extract)
+            temp_extract.mkdir(parents=True, exist_ok=True)
+
+            # Extract ZIP file
+            self.status_message.emit("Extracting ZIP file...")
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                # Get all file names
+                names = zip_ref.namelist()
+                if not names:
+                    self.status_message.emit("Error: ZIP file is empty")
+                    return False
+
+                # Extract all files
+                zip_ref.extractall(temp_extract)
+
+            # Find the library root directory
+            # Arduino libraries can be structured as:
+            # 1. library.zip contains library_folder/library.properties
+            # 2. library.zip contains library.properties directly
+            library_root = None
+            library_name = None
+            library_version = None
+
+            # Check if library.properties is in the root
+            root_props = temp_extract / "library.properties"
+            if root_props.exists():
+                library_root = temp_extract
+            else:
+                # Look for library.properties in subdirectories
+                for item in temp_extract.iterdir():
+                    if item.is_dir():
+                        props_file = item / "library.properties"
+                        if props_file.exists():
+                            library_root = item
+                            break
+
+            if not library_root:
+                self.status_message.emit("Error: No library.properties file found in ZIP")
+                shutil.rmtree(temp_extract)
+                return False
+
+            # Parse library.properties
+            props_file = library_root / "library.properties"
+            try:
+                props = self._parse_library_properties(props_file)
+                library_name = props.get("name")
+                library_version = props.get("version", "unknown")
+
+                if not library_name:
+                    self.status_message.emit("Error: library.properties missing 'name' field")
+                    shutil.rmtree(temp_extract)
+                    return False
+
+            except Exception as e:
+                self.status_message.emit(f"Error parsing library.properties: {e}")
+                shutil.rmtree(temp_extract)
+                return False
+
+            # Check if library already exists
+            install_path = self.libraries_dir / library_name
+            if install_path.exists():
+                # Get existing version
+                existing_props_file = install_path / "library.properties"
+                if existing_props_file.exists():
+                    try:
+                        existing_props = self._parse_library_properties(existing_props_file)
+                        existing_version = existing_props.get("version", "unknown")
+                        self.status_message.emit(
+                            f"Library '{library_name}' v{existing_version} already installed. "
+                            f"Replacing with v{library_version}..."
+                        )
+                    except:
+                        self.status_message.emit(
+                            f"Library '{library_name}' already installed. Replacing..."
+                        )
+
+                # Remove existing installation
+                shutil.rmtree(install_path)
+
+            # Copy library to libraries directory
+            self.status_message.emit(f"Installing {library_name} v{library_version}...")
+            shutil.copytree(library_root, install_path)
+
+            # Update installed libraries tracking
+            self.installed_libraries[library_name] = library_version
+            self._save_installed_libraries()
+
+            # Update library object in index if it exists
+            library = self.get_library(library_name)
+            if library:
+                library.installed_version = library_version
+                library.install_path = str(install_path)
+
+            # Clean up temporary extraction
+            shutil.rmtree(temp_extract)
+
+            self.status_message.emit(f"Successfully installed {library_name} v{library_version} from ZIP")
+            self.library_installed.emit(library_name, library_version)
+
+            return True
+
+        except zipfile.BadZipFile:
+            self.status_message.emit(f"Error: Invalid ZIP file: {zip_path}")
+            return False
+        except Exception as e:
+            self.status_message.emit(f"Error installing library from ZIP: {str(e)}")
+            if temp_extract and temp_extract.exists():
+                try:
+                    shutil.rmtree(temp_extract)
+                except:
+                    pass
+            return False

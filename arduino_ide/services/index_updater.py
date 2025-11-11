@@ -102,19 +102,20 @@ class IndexUpdater(QObject):
 
             self.status_message.emit(f"Checking for index updates...")
 
-            # Make HEAD request first to check if modified
-            head_response = requests.head(index_url, headers=headers, timeout=10)
+            # Add User-Agent to avoid 403 errors from Arduino servers
+            headers['User-Agent'] = 'Mozilla/5.0 (Arduino IDE Modern) AppleWebKit/537.36'
 
-            if head_response.status_code == 304:
+            # Skip HEAD request for now - some servers block it
+            # Make GET request directly with If-None-Match for conditional download
+            self.status_message.emit("Downloading index...")
+            response = requests.get(index_url, headers=headers, timeout=60)
+
+            if response.status_code == 304:
                 # Not modified, use cached version
                 self.status_message.emit("Index not modified (HTTP 304)")
                 self._update_metadata_timestamp(index_key)
                 self.update_completed.emit(True)
                 return True
-
-            # Download full index
-            self.status_message.emit("Downloading index...")
-            response = requests.get(index_url, headers=headers, timeout=30)
 
             if response.status_code == 200:
                 # Save index
