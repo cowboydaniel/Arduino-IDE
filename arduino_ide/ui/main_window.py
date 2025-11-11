@@ -659,8 +659,8 @@ class MainWindow(QMainWindow):
         self.update_cursor_position()
         self.update_tab_title(index)
 
-        # Trigger initial background compile for memory usage (immediate, no delay)
-        QTimer.singleShot(100, self._do_background_compile)
+        # Trigger initial background compile for memory usage (after a short delay to ensure setup is complete)
+        QTimer.singleShot(500, self._do_background_compile)
 
         return editor_container
 
@@ -1032,28 +1032,31 @@ void loop() {
         if not current_widget or not hasattr(current_widget, "editor"):
             return
 
-        # Need a saved file to compile
-        if not getattr(current_widget, "file_path", None):
-            # For unsaved files, we can't compile - just use estimates
-            return
-
-        sketch_path = Path(current_widget.file_path)
-        if not sketch_path.exists():
-            return
-
         board = self._get_selected_board()
         if not board:
             return
 
-        # Save current content to a temporary file for compilation
-        # (don't force save if user doesn't want to)
+        # Get current code content
         temp_content = current_widget.editor.toPlainText()
+
+        # Skip if content is empty
+        if not temp_content or not temp_content.strip():
+            return
+
         try:
             # Write to temp file for compilation
             import tempfile
             temp_dir = Path(tempfile.gettempdir()) / "arduino-ide-bg-compile"
             temp_dir.mkdir(exist_ok=True)
-            temp_sketch = temp_dir / sketch_path.name
+
+            # Use filename from saved file if available, otherwise use generic name
+            if getattr(current_widget, "file_path", None) and Path(current_widget.file_path).exists():
+                temp_filename = Path(current_widget.file_path).name
+            else:
+                # For unsaved files, use a generic name
+                temp_filename = "sketch.ino"
+
+            temp_sketch = temp_dir / temp_filename
             temp_sketch.write_text(temp_content, encoding="utf-8")
 
             build_config = self.config_selector.currentText() if hasattr(self, "config_selector") else None
@@ -1761,8 +1764,8 @@ void loop() {
                 self.update_status_bar_for_file(current_widget.filename)
             self.update_cursor_position()
 
-            # Trigger background compile for new tab (immediate)
-            QTimer.singleShot(100, self._do_background_compile)
+            # Trigger background compile for new tab (after a short delay)
+            QTimer.singleShot(500, self._do_background_compile)
 
     def update_cursor_position(self):
         """Update cursor position in status bar"""
