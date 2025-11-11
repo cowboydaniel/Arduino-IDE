@@ -600,11 +600,28 @@ class BoardManager(QObject):
                         if not version_dir.is_dir():
                             continue
 
-                        # Look for boards.txt in this platform
+                        # Look for boards.txt in this platform. Some packages keep the
+                        # file directly in the version directory while others nest the
+                        # extracted archive in an additional folder (e.g. avr-1.8.6).
+                        boards_txt_candidates = []
+
                         boards_txt = version_dir / "boards.txt"
                         if boards_txt.exists():
+                            boards_txt_candidates.append(boards_txt)
+                        else:
+                            # Handle nested archive directory (common in Arduino
+                            # platform packages).
+                            for nested_dir in version_dir.iterdir():
+                                if not nested_dir.is_dir():
+                                    continue
+
+                                nested_boards_txt = nested_dir / "boards.txt"
+                                if nested_boards_txt.exists():
+                                    boards_txt_candidates.append(nested_boards_txt)
+
+                        for boards_txt_path in boards_txt_candidates:
                             platform_boards = BoardsTxtParser.parse_boards_txt(
-                                boards_txt, package_name, architecture
+                                boards_txt_path, package_name, architecture
                             )
                             boards.extend(platform_boards)
 
