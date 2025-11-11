@@ -76,10 +76,14 @@ class PinUsageWidget(QWidget):
 
     def clear_pins(self):
         """Clear all pin items"""
+        print(f"[CLEAR_PINS DEBUG] Layout count before clear: {self.pin_layout.count()}")
+        cleared_count = 0
         while self.pin_layout.count() > 1:  # Keep the stretch
             item = self.pin_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+                cleared_count += 1
+        print(f"[CLEAR_PINS DEBUG] Cleared {cleared_count} pin widgets")
 
     def add_pin(self, pin_name, mode, description="", conflict=False):
         """Add a pin to the display
@@ -91,10 +95,12 @@ class PinUsageWidget(QWidget):
             conflict: Whether this pin has a conflict
         """
         # Remove empty state if present
-        if self.pin_layout.count() == 2:  # Header + empty state + stretch
+        layout_count = self.pin_layout.count()
+        if layout_count == 2:  # Header + empty state + stretch
             item = self.pin_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+                print(f"[ADD_PIN DEBUG] Removed empty state for first pin {pin_name}")
 
         # Determine icon based on status
         if conflict:
@@ -179,7 +185,9 @@ class PinUsageWidget(QWidget):
         pin_item.mousePressEvent = lambda e: self.pin_clicked.emit(pin_name)
 
         # Insert before stretch
-        self.pin_layout.insertWidget(self.pin_layout.count() - 1, pin_item)
+        insert_position = self.pin_layout.count() - 1
+        self.pin_layout.insertWidget(insert_position, pin_item)
+        print(f"[ADD_PIN DEBUG] Added {pin_name} ({mode}) at position {insert_position}, layout now has {self.pin_layout.count()} items")
 
         # Store in dictionary
         self.pins[pin_name] = {
@@ -205,6 +213,8 @@ class PinUsageWidget(QWidget):
         Args:
             code_text: Arduino sketch code as string
         """
+        print(f"\n[UPDATE_FROM_CODE DEBUG] Called with {len(code_text)} chars of code")
+        print(f"[UPDATE_FROM_CODE DEBUG] Current board: {self.current_board.name if self.current_board else 'None'}")
         self.clear_pins()
         self.pins = {}
 
@@ -234,6 +244,9 @@ class PinUsageWidget(QWidget):
         print(f"[PIN WIDGET DEBUG] Adding {len(available_pins)} available pins to display")
         for pin in available_pins:  # Show ALL available pins
             self.add_pin(pin, "AVAILABLE", "")
+
+        print(f"[UPDATE_FROM_CODE DEBUG] Finished. Layout has {self.pin_layout.count()} items total")
+        print(f"[UPDATE_FROM_CODE DEBUG] Pins dictionary has {len(self.pins)} entries\n")
 
     def parse_arduino_code(self, code):
         """Parse Arduino code to extract pin usage
