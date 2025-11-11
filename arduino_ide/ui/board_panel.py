@@ -70,16 +70,14 @@ class BoardPanel(QWidget):
 
         layout.addStretch()
 
-    def update_board_info(self, board_type=None, board=None):
+    def update_board_info(self, board):
         """Update board information based on selected board.
 
-        This method now dynamically extracts board specifications from the Board
-        object instead of using a hardcoded dictionary. This allows it to work
-        with any board from the Arduino ecosystem.
+        Dynamically extracts board specifications from the Board object,
+        allowing it to work with any board from the Arduino ecosystem.
 
         Args:
-            board_type: Legacy parameter - board name (kept for backward compatibility)
-            board: Board object from arduino_ide.models.board (preferred)
+            board: Board object from arduino_ide.models.board (required)
         """
         # Default values
         cpu = "Unknown"
@@ -87,18 +85,13 @@ class BoardPanel(QWidget):
         ram = "Unknown"
         clock = "Unknown"
 
-        # If we have a Board object, extract specs from it
+        # Extract specs from Board object
         if board and hasattr(board, 'specs'):
             specs = board.specs
             cpu = specs.cpu if specs.cpu else "Unknown"
             flash = specs.flash if specs.flash else "Unknown"
             ram = specs.ram if specs.ram else "Unknown"
             clock = specs.clock if specs.clock else "Unknown"
-        elif board_type:
-            # Legacy: Try to look up board by name (for backward compatibility)
-            # This is a fallback and won't work for all boards
-            # The UI should pass Board objects instead
-            pass
 
         # Update labels
         self.cpu_label.setText(cpu)

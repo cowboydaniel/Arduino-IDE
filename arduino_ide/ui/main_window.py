@@ -1108,73 +1108,43 @@ void loop() {
         """Populate board selector with boards from arduino-cli.
 
         This method dynamically discovers boards from installed platforms using
-        arduino-cli, replacing the previous hardcoded approach. This allows
-        support for the entire Arduino ecosystem including third-party boards.
+        arduino-cli. Requires arduino-cli to be properly configured.
         """
         self.board_selector.clear()
 
-        try:
-            # Get boards from arduino-cli (installed platforms)
-            boards = self.board_manager.get_boards_from_cli()
+        # Get boards from arduino-cli (installed platforms only)
+        boards = self.board_manager.get_boards_from_cli()
 
-            if boards:
-                # Sort boards by name for better UX
-                boards.sort(key=lambda b: b.name)
+        if boards:
+            # Sort boards by name for better UX
+            boards.sort(key=lambda b: b.name)
 
-                # Add boards to selector
-                for board in boards:
-                    self.board_selector.addItem(board.name)
+            # Add boards to selector
+            for board in boards:
+                self.board_selector.addItem(board.name)
 
-                self.status_bar.set_status(f"Loaded {len(boards)} boards from installed platforms")
-            else:
-                # No installed platforms - show helpful message
-                self.board_selector.addItem("No boards available - Install a platform first")
-                self.status_bar.set_status("No boards found. Install a platform via Tools > Board Manager")
-
-        except RuntimeError as e:
-            # CLI not available or error - fall back to board manager's index
-            print(f"Could not load boards from arduino-cli: {e}")
-            print("Falling back to board manager index")
-
-            # Use the existing board index as fallback
-            boards = self.board_manager.get_all_boards()
-            if boards:
-                boards.sort(key=lambda b: b.name)
-                for board in boards:
-                    self.board_selector.addItem(board.name)
-                self.status_bar.set_status(f"Loaded {len(boards)} boards from index")
-            else:
-                self.board_selector.addItem("No boards available")
-                self.status_bar.set_status("No boards available")
+            self.status_bar.set_status(f"Loaded {len(boards)} boards from installed platforms")
+        else:
+            # No installed platforms - show helpful message
+            self.board_selector.addItem("No boards available - Install a platform first")
+            self.status_bar.set_status("No boards found. Install a platform via Tools > Board Manager")
 
     def _get_selected_board(self):
-        """Get the currently selected board object.
+        """Get the currently selected board object from arduino-cli.
 
-        This method now prioritizes boards from arduino-cli (installed platforms)
-        before falling back to the board index. This ensures compatibility with
-        the generalized board support architecture.
+        Only boards from installed platforms (via arduino-cli) are supported.
         """
         board_name = self.board_selector.currentText().strip() if hasattr(self, "board_selector") else ""
         if not board_name:
             return None
 
-        # First try to get from arduino-cli boards (installed platforms)
-        try:
-            cli_boards = self.board_manager.get_boards_from_cli()
-            for board in cli_boards:
-                if board.name == board_name or board.fqbn == board_name:
-                    return board
-        except (RuntimeError, AttributeError):
-            # CLI not available or error, fall back to index search
-            pass
-
-        # Fallback to searching the board index
-        boards = self.board_manager.search_boards(query=board_name)
-        for board in boards:
+        # Get board from arduino-cli (installed platforms only)
+        cli_boards = self.board_manager.get_boards_from_cli()
+        for board in cli_boards:
             if board.name == board_name or board.fqbn == board_name:
                 return board
 
-        return self.board_manager.get_board(board_name)
+        return None
 
     def _get_selected_port(self):
         if not hasattr(self, "port_selector"):
@@ -1525,14 +1495,12 @@ void loop() {
         """Handle board selection change"""
         self.status_bar.set_status(f"Board changed to: {board_name}")
         self.console_panel.append_output(f"Selected board: {board_name}")
-        # Get the Board object
+        # Get the Board object from arduino-cli
         board = self._get_selected_board()
-        # Update board panel with Board object (or name as fallback)
+        # Update board panel with Board object
         if board:
-            self.board_panel.update_board_info(board=board)
+            self.board_panel.update_board_info(board)
             self.board_panel.set_board(board)
-        else:
-            self.board_panel.update_board_info(board_type=board_name)
         # Update status display with new board specs
         self.status_display.update_board(board_name)
         # Update status bar
