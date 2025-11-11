@@ -1180,6 +1180,11 @@ class CodeEditor(QPlainTextEdit):
     def update_line_number_area_width(self, _):
         """Update line number area width"""
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+        # Update the line number area's geometry to reflect the new width
+        cr = self.contentsRect()
+        self.line_number_area.setGeometry(QRect(cr.left(), cr.top(),
+                                               self.line_number_area_width(),
+                                               cr.height()))
 
     def update_line_number_area(self, rect, dy):
         """Update line number area"""
