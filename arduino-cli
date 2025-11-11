@@ -311,6 +311,78 @@ class ArduinoCLI:
         # Default fallback (assumes Uno-like board with 2KB bootloader)
         return 30720 if is_flash else 2048
 
+    def _extract_and_remove_type_definitions(self, source: str) -> tuple:
+        """
+        Extract struct, class, and enum definitions from the sketch source,
+        and return both the definitions and the source with those definitions removed.
+
+        This ensures type definitions appear before any code that uses them,
+        matching the behavior of the official Arduino IDE 2.x preprocessor.
+
+        Args:
+            source: The sketch source code
+
+        Returns:
+            Tuple of (type_definitions_string, source_without_type_definitions)
+        """
+        import re
+
+        type_defs = []
+        # Work with the original source (keeping comments for the output)
+        original_lines = source.split('\n')
+
+        # But use source without comments for detection
+        source_no_comments = re.sub(r'//.*?$', '', source, flags=re.MULTILINE)
+        source_no_comments = re.sub(r'/\*.*?\*/', '', source_no_comments, flags=re.DOTALL)
+        detection_lines = source_no_comments.split('\n')
+
+        # Track line ranges to remove from original source
+        lines_to_remove = set()
+
+        i = 0
+        while i < len(detection_lines):
+            line = detection_lines[i].strip()
+
+            # Check if this line starts a type definition
+            if re.match(r'^\s*(?:typedef\s+)?(struct|class|enum)\s+\w+', line):
+                # Found a type definition start
+                start_line = i
+                type_def_lines = [original_lines[i]]
+                brace_count = detection_lines[i].count('{') - detection_lines[i].count('}')
+                i += 1
+
+                # Continue collecting lines until braces are balanced
+                while i < len(detection_lines) and brace_count > 0:
+                    type_def_lines.append(original_lines[i])
+                    brace_count += detection_lines[i].count('{') - detection_lines[i].count('}')
+                    i += 1
+
+                # Collect any remaining lines until we hit a semicolon
+                while i < len(detection_lines) and not type_def_lines[-1].rstrip().endswith(';'):
+                    type_def_lines.append(original_lines[i])
+                    i += 1
+                    if ';' in type_def_lines[-1]:
+                        break
+
+                # Mark these lines for removal
+                for line_num in range(start_line, i):
+                    lines_to_remove.add(line_num)
+
+                type_defs.append('\n'.join(type_def_lines))
+            else:
+                i += 1
+
+        # Build source without type definitions
+        source_without_types_lines = [
+            line for idx, line in enumerate(original_lines)
+            if idx not in lines_to_remove
+        ]
+        source_without_types = '\n'.join(source_without_types_lines)
+
+        type_definitions_string = '\n\n'.join(type_defs) if type_defs else ''
+
+        return type_definitions_string, source_without_types
+
     def _generate_function_prototypes(self, source: str) -> List[str]:
         """
         Generate forward declarations for all user-defined functions in the sketch.
@@ -477,18 +549,35 @@ class ArduinoCLI:
             print(f"✗ Failed to prepare build directory: {exc}", file=sys.stderr)
             return 1
 
-        # Generate function prototypes
+        # Extract type definitions (structs, classes, enums) from source
+        # These need to be placed early to avoid forward declaration issues
+        type_definitions, source_without_types = self._extract_and_remove_type_definitions(source)
+
+        # Generate function prototypes (will skip functions using custom types)
         prototypes = self._generate_function_prototypes(source)
 
         # Create preprocessed sketch with Arduino wrappers
         cpp_file = build_dir / f"{sketch_file.stem}.cpp"
         try:
-            # Add Arduino.h include, function prototypes, and then the sketch code
+            # Build the .cpp file in the correct order:
+            # 1. Arduino.h include
+            # 2. Type definitions (structs/classes/enums) - extracted from source
+            # 3. Function prototypes
+            # 4. Original sketch code (with type definitions removed to avoid redefinition)
             cpp_content = '#include <Arduino.h>\n\n'
+
+            # Add extracted type definitions first
+            if type_definitions:
+                cpp_content += '// Forward declarations for custom types\n'
+                cpp_content += type_definitions + '\n\n'
+
+            # Add function prototypes
             if prototypes:
                 cpp_content += '// Function prototypes\n'
                 cpp_content += '\n'.join(prototypes) + '\n\n'
-            cpp_content += source
+
+            # Add the original sketch code (with type definitions removed)
+            cpp_content += source_without_types
             cpp_file.write_text(cpp_content, encoding="utf-8")
         except Exception as exc:
             print(f"✗ Failed to create preprocessed sketch: {exc}", file=sys.stderr)
