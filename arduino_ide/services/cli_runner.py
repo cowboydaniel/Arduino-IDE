@@ -98,7 +98,7 @@ class ArduinoCliService(QObject):
         Raises:
             RuntimeError: If arduino-cli command fails
         """
-        return self._run_sync_command(["board", "listall", "--format", "json"])
+        return self._run_sync_command(["board", "list", "--format", "json"])
 
     def list_platforms(self) -> List[Dict[str, Any]]:
         """List installed platforms/cores.
