@@ -5,7 +5,8 @@ Code editor with syntax highlighting and IntelliSense
 from PySide6.QtWidgets import (
     QPlainTextEdit, QWidget, QTextEdit, QCompleter, QLabel, QHBoxLayout,
     QVBoxLayout, QScrollBar, QToolTip, QMenu, QDialog, QFormLayout, QPushButton,
-    QListWidget, QListWidgetItem, QTextBrowser, QDialogButtonBox, QStyledItemDelegate
+    QListWidget, QListWidgetItem, QTextBrowser, QDialogButtonBox, QStyledItemDelegate,
+    QStyle
 )
 from PySide6.QtCore import Qt, QRect, QSize, Signal, QStringListModel, QTimer, QPoint, QAbstractListModel, QModelIndex
 from PySide6.QtGui import (
@@ -585,9 +586,9 @@ class CompletionDelegate(QStyledItemDelegate):
             return
 
         # Set background color
-        if option.state & self.State_Selected:
+        if option.state & QStyle.State_Selected:
             painter.fillRect(option.rect, QColor("#094771"))  # Selected blue
-        elif option.state & self.State_MouseOver:
+        elif option.state & QStyle.State_MouseOver:
             painter.fillRect(option.rect, QColor("#2A2D2E"))  # Hover gray
         else:
             painter.fillRect(option.rect, QColor("#1E1E1E"))  # Background
