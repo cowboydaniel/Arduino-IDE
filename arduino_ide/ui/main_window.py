@@ -921,6 +921,10 @@ void loop() {
                     self.console_panel.append_output("✔ Compilation completed successfully.", color="#6A9955")
                     self.status_bar.set_status("Compilation Succeeded")
                     QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+                else:
+                    # Background compile succeeded - show brief status
+                    self.status_bar.set_status("Memory updated")
+                    QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
                 # If this was a compile before upload, trigger the upload now
                 if self._upload_after_compile:
@@ -1034,6 +1038,8 @@ void loop() {
 
         board = self._get_selected_board()
         if not board:
+            # Show why background compile isn't running
+            self.status_bar.set_status("Background compile: No board selected")
             return
 
         # Get current code content
@@ -1061,6 +1067,9 @@ void loop() {
 
             build_config = self.config_selector.currentText() if hasattr(self, "config_selector") else None
 
+            # Show status that background compile is starting
+            self.status_bar.set_status("⚡ Updating memory usage...")
+
             # Mark this as a background compile
             self._is_background_compile = True
             self._cli_current_operation = "compile"
@@ -1074,6 +1083,8 @@ void loop() {
             # Silently ignore any errors in background compile
             self._is_background_compile = False
             self._cli_current_operation = None
+            self.status_bar.set_status(f"Background compile error: {exc}")
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def _get_selected_board(self):
         board_name = self.board_selector.currentText().strip() if hasattr(self, "board_selector") else ""
