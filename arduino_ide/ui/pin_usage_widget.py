@@ -277,95 +277,99 @@ class PinUsageWidget(QWidget):
             (r'analogRead\s*\(\s*([A-Z0-9_]+)\s*\)', 'ANALOG'),
         ]
 
-        # First pass: Find POTENTIAL pin variable definitions with comments for descriptions
-        # We'll only add them to pin_info if they're actually used in pin functions
-        potential_pin_vars = {}  # Map var_name to (pin_num, comment)
+        # First pass: Build symbol table - map ALL variable names to their values
+        # This is what the compiler does: build a symbol table during compilation
+        var_to_value = {}  # Map variable name to its literal value (number or constant)
+        var_to_comment = {}  # Map variable name to its comment
+
         lines = code.split('\n')
         for i, line in enumerate(lines):
-            # Look for const/int pin definitions with comments
-            # Only match at the start of lines (after whitespace), not in function signatures or loops
-            pin_def_match = re.search(r'^\s*(?:const\s+)?int\s+(\w+)\s*=\s*([0-9A-Z_]+)\s*;', line)
-            if pin_def_match:
-                var_name = pin_def_match.group(1)
-                pin_num = pin_def_match.group(2)
+            # Match variable definitions: const int VAR = VALUE;
+            var_def_match = re.search(r'^\s*(?:const\s+)?int\s+(\w+)\s*=\s*([0-9A-Z_]+)\s*;', line)
+            if var_def_match:
+                var_name = var_def_match.group(1)
+                value = var_def_match.group(2)
 
-                # Skip if this looks like a loop variable (single letter like 'i', 'j', 'x', etc.)
+                # Skip single-letter variables (loop counters)
                 if len(var_name) == 1:
                     continue
 
-                # Only process if it looks like a valid pin number
-                # Valid: A0-A7, 0-13, LED_BUILTIN
-                is_valid_pin = False
-                if pin_num in ['LED_BUILTIN']:
-                    is_valid_pin = True
-                elif pin_num.startswith('A') and len(pin_num) == 2 and pin_num[1].isdigit():
-                    # A0-A9
-                    is_valid_pin = True
-                elif pin_num.isdigit() and 0 <= int(pin_num) <= 13:
-                    # Digital pins 0-13
-                    is_valid_pin = True
-
-                if not is_valid_pin:
-                    continue
+                var_to_value[var_name] = value
 
                 # Extract comment if present
                 comment_match = re.search(r'//\s*(.+)', line)
-                comment = comment_match.group(1) if comment_match else ''
+                if comment_match:
+                    var_to_comment[var_name] = comment_match.group(1).strip()
 
-                # Store as potential pin variable - we'll confirm it later
-                potential_pin_vars[var_name] = (pin_num, comment)
-                print(f"[PIN PARSER DEBUG] Found potential pin variable: {var_name} = {pin_num}")
+                print(f"[SYMBOL TABLE DEBUG] {var_name} = {value}")
 
-        # Second pass: Search for pin functions and resolve variable names
-        # Process pinMode() first to establish definitive modes
+        print(f"[SYMBOL TABLE DEBUG] Built symbol table with {len(var_to_value)} entries")
+
+        # Second pass: Find all pin function calls (pinMode, digitalWrite, etc.)
+        # This is what the compiler does: analyze function calls
         pinMode_pins = {}  # Track pins with explicit pinMode declarations
-        used_vars = set()  # Track which variables are actually used in pin functions
 
-        # First, find all pinMode declarations
+        # Helper function to resolve a symbol to its actual pin value
+        def resolve_symbol_to_pin(symbol):
+            """Resolve a symbol through the symbol table to get actual pin number"""
+            # If it's a direct pin number or analog pin, use it
+            if symbol.isdigit():
+                pin_num = int(symbol)
+                if 0 <= pin_num <= 13:
+                    return f'D{pin_num}', symbol, None
+                return None, None, None
+            elif symbol in ['LED_BUILTIN']:
+                return 'D13', symbol, None
+            elif symbol.startswith('A') and len(symbol) == 2 and symbol[1].isdigit():
+                return symbol, symbol, None
+
+            # Look up in symbol table
+            if symbol in var_to_value:
+                value = var_to_value[symbol]
+                comment = var_to_comment.get(symbol, None)
+
+                # Recursively resolve if value is also a symbol
+                if value in var_to_value:
+                    resolved, _, _ = resolve_symbol_to_pin(value)
+                    return resolved, symbol, comment
+
+                # Check if value is a valid pin
+                if value.isdigit():
+                    pin_num = int(value)
+                    if 0 <= pin_num <= 13:
+                        return f'D{pin_num}', symbol, comment
+                elif value.startswith('A') and len(value) == 2 and value[1].isdigit():
+                    return value, symbol, comment
+                elif value == 'LED_BUILTIN':
+                    return 'D13', symbol, comment
+
+            return None, None, None
+
+        # Process pinMode() first to establish definitive modes
         pinMode_pattern = r'pinMode\s*\(\s*([A-Z0-9_]+)\s*,\s*(\w+)\s*\)'
         for match in re.finditer(pinMode_pattern, code, re.IGNORECASE):
-            pin = match.group(1)
+            symbol = match.group(1)
             mode = match.group(2).upper()
 
-            # If this is a potential pin variable, confirm it and add to var_to_pin
-            if pin in potential_pin_vars and pin not in var_to_pin:
-                pin_num, comment = potential_pin_vars[pin]
-                resolved_pin = self.resolve_pin_name(pin_num, {})
-                var_to_pin[pin] = resolved_pin
-                used_vars.add(pin)
-                print(f"[PIN PARSER DEBUG] Confirmed pin variable: {pin} -> {resolved_pin}")
-
-                # Initialize pin info with description
-                if resolved_pin not in pin_info:
-                    pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': pin}
-                if comment:
-                    pin_info[resolved_pin]['descriptions'].append(comment.strip())
-
-            # Resolve pin name
-            resolved_pin = self.resolve_pin_name(pin, var_to_pin)
-
-            # Validate that resolved pin looks like a real pin
-            if pin not in var_to_pin:
-                if not (resolved_pin.startswith('D') or resolved_pin.startswith('A') or resolved_pin == 'LED_BUILTIN'):
-                    continue
-                if resolved_pin.startswith('D'):
-                    try:
-                        pin_num = int(resolved_pin[1:])
-                        if pin_num > 13:
-                            continue
-                    except ValueError:
-                        continue
+            resolved_pin, var_name, comment = resolve_symbol_to_pin(symbol)
+            if resolved_pin is None:
+                print(f"[PIN FUNCTION DEBUG] pinMode: Cannot resolve '{symbol}' to a valid pin")
+                continue
 
             # Store pinMode declaration
             pinMode_pins[resolved_pin] = mode
 
             if resolved_pin not in pin_info:
-                pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': pin}
+                pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': var_name or symbol}
 
             pin_info[resolved_pin]['modes'].append(mode)
-            print(f"[PIN PARSER DEBUG] pinMode found: {resolved_pin} -> {mode}")
 
-        # Now process other function calls, but don't override pinMode declarations
+            if comment and comment not in pin_info[resolved_pin]['descriptions']:
+                pin_info[resolved_pin]['descriptions'].append(comment)
+
+            print(f"[PIN FUNCTION DEBUG] pinMode({symbol}) -> {resolved_pin} ({mode})")
+
+        # Process other pin function calls (digitalWrite, digitalRead, analogRead, analogWrite)
         for pattern, mode_type in patterns:
             if mode_type == 'mode':
                 # Skip pinMode since we already processed it
@@ -373,65 +377,29 @@ class PinUsageWidget(QWidget):
 
             matches = re.finditer(pattern, code, re.IGNORECASE)
             for match in matches:
-                pin = match.group(1)
+                symbol = match.group(1)
 
-                # If this is a potential pin variable, confirm it and add to var_to_pin
-                if pin in potential_pin_vars and pin not in var_to_pin:
-                    pin_num, comment = potential_pin_vars[pin]
-                    resolved_pin_temp = self.resolve_pin_name(pin_num, {})
-                    var_to_pin[pin] = resolved_pin_temp
-                    used_vars.add(pin)
-                    print(f"[PIN PARSER DEBUG] Confirmed pin variable: {pin} -> {resolved_pin_temp}")
-
-                    # Initialize pin info with description
-                    if resolved_pin_temp not in pin_info:
-                        pin_info[resolved_pin_temp] = {'modes': [], 'descriptions': [], 'var_name': pin}
-                    if comment:
-                        pin_info[resolved_pin_temp]['descriptions'].append(comment.strip())
-
-                # Resolve pin name (handle LED_BUILTIN, variable names, etc.)
-                resolved_pin = self.resolve_pin_name(pin, var_to_pin)
-
-                # Validate that resolved pin looks like a real pin
-                # Skip if it's not a known variable and doesn't look like a valid pin
-                if pin not in var_to_pin:
-                    # Check if it's a valid direct pin reference
-                    if not (resolved_pin.startswith('D') or resolved_pin.startswith('A') or resolved_pin == 'LED_BUILTIN'):
-                        continue
-                    # Check pin number range
-                    if resolved_pin.startswith('D'):
-                        try:
-                            pin_num = int(resolved_pin[1:])
-                            if pin_num > 13:
-                                continue
-                        except ValueError:
-                            continue
+                resolved_pin, var_name, comment = resolve_symbol_to_pin(symbol)
+                if resolved_pin is None:
+                    print(f"[PIN FUNCTION DEBUG] {mode_type}: Cannot resolve '{symbol}' to a valid pin")
+                    continue
 
                 # Skip if this pin has a pinMode declaration - that's the source of truth
                 if resolved_pin in pinMode_pins:
-                    print(f"[PIN PARSER DEBUG] Skipping {mode_type} for {resolved_pin} - pinMode already declared as {pinMode_pins[resolved_pin]}")
+                    print(f"[PIN FUNCTION DEBUG] {mode_type}({symbol}): Skipping - pinMode already declared as {pinMode_pins[resolved_pin]}")
                     continue
 
-                actual_mode = mode_type
-
+                # This pin is used without pinMode - infer mode from usage
                 if resolved_pin not in pin_info:
-                    pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': pin}
+                    pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': var_name or symbol}
 
-                pin_info[resolved_pin]['modes'].append(actual_mode)
-                print(f"[PIN PARSER DEBUG] Inferred {mode_type} for {resolved_pin}")
+                pin_info[resolved_pin]['modes'].append(mode_type)
 
-                # Try to infer description from variable name if not already set
-                if pin != resolved_pin and not pin_info[resolved_pin]['descriptions']:
-                    # Convert snake_case and remove common pin suffixes
-                    desc = pin.replace('_PIN', '').replace('_pin', '').replace('_', ' ')
-                    # Handle camelCase: add space before uppercase letter that follows lowercase
-                    desc = re.sub(r'([a-z])([A-Z])', r'\1 \2', desc)
-                    # Clean up and normalize
-                    desc = desc.replace('  ', ' ').strip().lower()
-                    if desc and desc not in ['led', 'builtin']:
-                        pin_info[resolved_pin]['descriptions'].append(desc)
+                if comment and comment not in pin_info[resolved_pin]['descriptions']:
+                    pin_info[resolved_pin]['descriptions'].append(comment)
 
-        print(f"[PIN PARSER DEBUG] Confirmed variable mapping: {var_to_pin}")
+                print(f"[PIN FUNCTION DEBUG] {mode_type}({symbol}) -> {resolved_pin} (inferred {mode_type})")
+
         print(f"[PIN PARSER DEBUG] Final result: {len(pin_info)} pins found")
         for pin, info in pin_info.items():
             print(f"  {pin}: modes={info['modes']}, desc={info['descriptions']}")
