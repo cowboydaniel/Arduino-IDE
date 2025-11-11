@@ -234,6 +234,7 @@ class PinUsageWidget(QWidget):
             Dictionary mapping pin names to their usage information
         """
         pin_info = {}
+        var_to_pin = {}  # Map variable names to pin numbers
 
         # Common Arduino pin functions
         patterns = [
@@ -249,7 +250,7 @@ class PinUsageWidget(QWidget):
             (r'analogRead\s*\(\s*([A-Z0-9_]+)\s*\)', 'ANALOG'),
         ]
 
-        # Find pin assignments with comments for descriptions
+        # First pass: Find pin variable definitions with comments for descriptions
         lines = code.split('\n')
         for i, line in enumerate(lines):
             # Look for const/int pin definitions with comments
@@ -259,20 +260,26 @@ class PinUsageWidget(QWidget):
                 pin_num = pin_def_match.group(2)
                 comment = pin_def_match.group(3) if pin_def_match.group(3) else ''
 
-                # Store mapping for later
-                if pin_num not in pin_info:
-                    pin_info[pin_num] = {'modes': [], 'descriptions': [], 'var_name': var_name}
-                if comment:
-                    pin_info[pin_num]['descriptions'].append(comment.strip())
+                # Resolve the pin number to standard format (e.g., A0 -> A0, 9 -> D9)
+                resolved_pin = self.resolve_pin_name(pin_num, {})
 
-        # Search for pin functions
+                # Build variable to pin mapping
+                var_to_pin[var_name] = resolved_pin
+
+                # Initialize pin info
+                if resolved_pin not in pin_info:
+                    pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': var_name}
+                if comment:
+                    pin_info[resolved_pin]['descriptions'].append(comment.strip())
+
+        # Second pass: Search for pin functions and resolve variable names
         for pattern, mode_type in patterns:
             matches = re.finditer(pattern, code, re.IGNORECASE)
             for match in matches:
                 pin = match.group(1)
 
-                # Resolve pin name (handle LED_BUILTIN, etc.)
-                resolved_pin = self.resolve_pin_name(pin)
+                # Resolve pin name (handle LED_BUILTIN, variable names, etc.)
+                resolved_pin = self.resolve_pin_name(pin, var_to_pin)
 
                 if mode_type == 'mode':
                     # Extract the actual mode from pinMode
@@ -289,7 +296,7 @@ class PinUsageWidget(QWidget):
 
                 pin_info[resolved_pin]['modes'].append(actual_mode)
 
-                # Try to infer description from variable name
+                # Try to infer description from variable name if not already set
                 if pin != resolved_pin and not pin_info[resolved_pin]['descriptions']:
                     # Convert camelCase or snake_case to readable
                     desc = re.sub(r'([A-Z])', r' \1', pin).strip()
@@ -299,8 +306,24 @@ class PinUsageWidget(QWidget):
 
         return pin_info
 
-    def resolve_pin_name(self, pin_name):
-        """Resolve special pin names to actual pin numbers"""
+    def resolve_pin_name(self, pin_name, var_to_pin=None):
+        """Resolve special pin names to actual pin numbers
+
+        Args:
+            pin_name: The pin name to resolve (could be a variable name, number, or special name)
+            var_to_pin: Optional dictionary mapping variable names to pin numbers
+
+        Returns:
+            Resolved pin name in standard format (e.g., 'D9', 'A0')
+        """
+        if var_to_pin is None:
+            var_to_pin = {}
+
+        # First check if it's a variable name we've seen
+        if pin_name in var_to_pin:
+            return var_to_pin[pin_name]
+
+        # Check for special pin names
         special_pins = {
             'LED_BUILTIN': 'D13',
             'A0': 'A0', 'A1': 'A1', 'A2': 'A2', 'A3': 'A3',
