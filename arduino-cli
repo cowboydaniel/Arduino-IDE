@@ -293,9 +293,9 @@ class ArduinoCLI:
             try:
                 kb = int(num_str)
                 # Arduino flash is reported in KiB (1024 bytes) but some bootloader space is reserved
-                # For Uno: 32KB = 32768 bytes, but usable is 32256 (bootloader uses 512 bytes)
+                # For Uno: 32KB = 32768 bytes, but usable is 30720 (bootloader uses 2048 bytes)
                 if is_flash and kb == 32:
-                    return 32256  # Reserve 512 bytes for bootloader (32768 - 512)
+                    return 30720  # Reserve 2048 bytes for Optiboot bootloader (32768 - 2048)
                 else:
                     return kb * 1024
             except ValueError:
@@ -308,8 +308,8 @@ class ArduinoCLI:
             except ValueError:
                 pass
 
-        # Default fallback
-        return 32256 if is_flash else 2048
+        # Default fallback (assumes Uno-like board with 2KB bootloader)
+        return 30720 if is_flash else 2048
 
     def compile_sketch(self, fqbn: str, sketch: str, build_path: Optional[str] = None,
                        config: Optional[str] = None) -> int:
@@ -399,23 +399,23 @@ class ArduinoCLI:
             # Try usr/lib location
             specs_dir = toolchain.avr_dir / 'usr' / 'lib' / 'gcc' / 'avr' / '7.3.0' / 'device-specs'
 
-        # Compilation flags for Arduino Uno
+        # Compilation flags for Arduino sketch (treated as C++)
+        # Matches official Arduino AVR core platform.txt compiler.cpp.flags
         compile_flags = [
             str(toolchain.get_avr_gcc_path()),
             '-c',  # Compile only, don't link
             '-g',  # Debug info
             '-Os',  # Optimize for size
-            '-flto',  # Enable link time optimization like the official IDE
-            '-fno-fat-lto-objects',  # Match Arduino's LTO configuration
-            '-fuse-linker-plugin',  # Required to make -flto effective with avr-gcc
-            '-ffunction-sections',  # Place each function in its own section
-            '-fdata-sections',  # Place each data item in its own section
-            '-fno-exceptions',  # Match Arduino's C++ flags
-            '-fno-threadsafe-statics',  # Reduce static initialization overhead
-            '-std=gnu++11',  # Use the same C++ dialect as the official toolchain
-            '-ffunction-sections',  # Place each function in its own section
-            '-fdata-sections',  # Place each data item in its own section
             '-w',  # Suppress warnings
+            '-std=gnu++11',  # Use the same C++ dialect as the official toolchain
+            '-fpermissive',  # Allow non-conforming code
+            '-fno-exceptions',  # Disable C++ exceptions
+            '-ffunction-sections',  # Place each function in its own section
+            '-fdata-sections',  # Place each data item in its own section
+            '-fno-threadsafe-statics',  # Reduce static initialization overhead
+            '-Wno-error=narrowing',  # Don't error on narrowing conversions
+            '-MMD',  # Generate dependency files
+            '-flto',  # Enable link time optimization (C++ uses -flto without -fno-fat-lto-objects)
             f'-mmcu={mcu}',
         ]
 
@@ -494,9 +494,6 @@ class ArduinoCLI:
                 str(toolchain.get_avr_gcc_path()),
                 '-c',
                 '-g',
-                '-flto',
-                '-fno-fat-lto-objects',
-                '-fuse-linker-plugin',
             ]
 
             # Assembly files need different flags
@@ -509,17 +506,28 @@ class ArduinoCLI:
                     '-Os',  # Optimize for size (not for assembly)
                     '-ffunction-sections',
                     '-fdata-sections',
+                    '-MMD',  # Generate dependency files
                 ])
 
             # Apply language-specific flags
             if core_source.suffix.lower() in ('.cpp', '.cxx', '.cc'):
                 core_compile_flags.extend([
-                    '-fno-exceptions',
-                    '-fno-threadsafe-statics',
                     '-std=gnu++11',
+                    '-fpermissive',
+                    '-fno-exceptions',
+                    '-ffunction-sections',
+                    '-fdata-sections',
+                    '-fno-threadsafe-statics',
+                    '-Wno-error=narrowing',
+                    '-MMD',
+                    '-flto',  # LTO for C++ without -fno-fat-lto-objects
                 ])
             elif core_source.suffix.lower() == '.c':
-                core_compile_flags.append('-std=gnu11')
+                core_compile_flags.extend([
+                    '-std=gnu11',
+                    '-flto',  # LTO for C
+                    '-fno-fat-lto-objects',  # C-specific LTO flag
+                ])
 
             core_compile_flags.append('-w')  # Suppress warnings
             core_compile_flags.append(f'-mmcu={mcu}')
@@ -556,14 +564,16 @@ class ArduinoCLI:
                 print(f"✗ Core compilation error for {core_source.name}: {exc}", file=sys.stderr)
                 return 1
 
-        # Link
+        # Link - matches official Arduino AVR core platform.txt compiler.c.elf.flags
         link_flags = [
             str(toolchain.get_avr_gcc_path()),
-            '-Os',
-            '-flto',
-            '-fuse-linker-plugin',
+            '-w',  # Suppress warnings
+            '-Os',  # Optimize for size
+            '-g',  # Include debug info
+            '-flto',  # Link time optimization
+            '-fuse-linker-plugin',  # Required for LTO with avr-gcc
             f'-mmcu={mcu}',
-            '-Wl,--gc-sections',
+            '-Wl,--gc-sections',  # Garbage collect unused sections
         ]
 
         # Add same -B flags for linking
