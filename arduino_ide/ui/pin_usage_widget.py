@@ -257,11 +257,34 @@ class PinUsageWidget(QWidget):
         lines = code.split('\n')
         for i, line in enumerate(lines):
             # Look for const/int pin definitions with comments
-            pin_def_match = re.search(r'(?:const\s+)?int\s+(\w+)\s*=\s*([0-9A-Z_]+)\s*;?\s*(?://\s*(.+))?', line)
+            # Only match at the start of lines (after whitespace), not in function signatures or loops
+            pin_def_match = re.search(r'^\s*(?:const\s+)?int\s+(\w+)\s*=\s*([0-9A-Z_]+)\s*;', line)
             if pin_def_match:
                 var_name = pin_def_match.group(1)
                 pin_num = pin_def_match.group(2)
-                comment = pin_def_match.group(3) if pin_def_match.group(3) else ''
+
+                # Skip if this looks like a loop variable (single letter like 'i', 'j', 'x', etc.)
+                if len(var_name) == 1:
+                    continue
+
+                # Only process if it looks like a valid pin number
+                # Valid: A0-A7, 0-13, LED_BUILTIN
+                is_valid_pin = False
+                if pin_num in ['LED_BUILTIN']:
+                    is_valid_pin = True
+                elif pin_num.startswith('A') and len(pin_num) == 2 and pin_num[1].isdigit():
+                    # A0-A9
+                    is_valid_pin = True
+                elif pin_num.isdigit() and 0 <= int(pin_num) <= 13:
+                    # Digital pins 0-13
+                    is_valid_pin = True
+
+                if not is_valid_pin:
+                    continue
+
+                # Extract comment if present
+                comment_match = re.search(r'//\s*(.+)', line)
+                comment = comment_match.group(1) if comment_match else ''
 
                 # Resolve the pin number to standard format (e.g., A0 -> A0, 9 -> D9)
                 resolved_pin = self.resolve_pin_name(pin_num, {})
@@ -286,6 +309,21 @@ class PinUsageWidget(QWidget):
 
                 # Resolve pin name (handle LED_BUILTIN, variable names, etc.)
                 resolved_pin = self.resolve_pin_name(pin, var_to_pin)
+
+                # Validate that resolved pin looks like a real pin
+                # Skip if it's not a known variable and doesn't look like a valid pin
+                if pin not in var_to_pin:
+                    # Check if it's a valid direct pin reference
+                    if not (resolved_pin.startswith('D') or resolved_pin.startswith('A') or resolved_pin == 'LED_BUILTIN'):
+                        continue
+                    # Check pin number range
+                    if resolved_pin.startswith('D'):
+                        try:
+                            pin_num = int(resolved_pin[1:])
+                            if pin_num > 13:
+                                continue
+                        except ValueError:
+                            continue
 
                 if mode_type == 'mode':
                     # Extract the actual mode from pinMode
