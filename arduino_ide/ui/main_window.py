@@ -1399,8 +1399,13 @@ void loop() {
         """Handle board selection change"""
         self.status_bar.set_status(f"Board changed to: {board_name}")
         self.console_panel.append_output(f"Selected board: {board_name}")
-        # Update board panel
+        # Get the Board object
+        board = self._get_selected_board()
+        # Update board panel with board name
         self.board_panel.update_board_info(board_name)
+        # Update pin usage widget with Board object
+        if board:
+            self.board_panel.set_board(board)
         # Update status display with new board specs
         self.status_display.update_board(board_name)
         # Update status bar
@@ -1811,6 +1816,10 @@ void loop() {
         """Initialize status bar with default values"""
         # Set initial board
         self.status_bar.set_board(self.board_selector.currentText())
+        # Set initial board for pin widget
+        board = self._get_selected_board()
+        if board:
+            self.board_panel.set_board(board)
 
         # Set initial port
         current_port = self.port_selector.currentText()

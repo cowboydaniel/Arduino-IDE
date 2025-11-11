@@ -19,6 +19,7 @@ class PinUsageWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.pins = {}  # Dictionary to store pin information
+        self.current_board = None  # Current board (Board object)
         self.init_ui()
 
     def init_ui(self):
@@ -188,6 +189,16 @@ class PinUsageWidget(QWidget):
             'widget': pin_item
         }
 
+    def set_board(self, board):
+        """Set the current board
+
+        Args:
+            board: Board object from arduino_ide.models.board
+        """
+        self.current_board = board
+        # Trigger a refresh of the pin display if we have code
+        # This will update available pins based on the new board
+
     def update_from_code(self, code_text):
         """Parse Arduino code and update pin display
 
@@ -200,17 +211,13 @@ class PinUsageWidget(QWidget):
         # Parse the code
         pin_info = self.parse_arduino_code(code_text)
 
-        if not pin_info:
-            self.show_empty_state()
-            return
-
         # Check for conflicts (same pin used in different modes)
-        conflicts = self.detect_conflicts(pin_info)
+        conflicts = self.detect_conflicts(pin_info) if pin_info else set()
 
         # Sort pins for display (digital first, then analog)
-        sorted_pins = sorted(pin_info.keys(), key=self.pin_sort_key)
+        sorted_pins = sorted(pin_info.keys(), key=self.pin_sort_key) if pin_info else []
 
-        # Add pins to display
+        # Add used pins to display
         for pin_name in sorted_pins:
             info = pin_info[pin_name]
             is_conflict = pin_name in conflicts
@@ -221,10 +228,10 @@ class PinUsageWidget(QWidget):
 
             self.add_pin(pin_name, mode, description, is_conflict)
 
-        # Add some common available pins if space permits
+        # Add ALL available pins from the board
         used_pins = set(pin_info.keys())
         available_pins = self.get_available_pins(used_pins)
-        for pin in available_pins[:5]:  # Show up to 5 available pins
+        for pin in available_pins:  # Show ALL available pins
             self.add_pin(pin, "AVAILABLE", "")
 
     def parse_arduino_code(self, code):
@@ -428,7 +435,7 @@ class PinUsageWidget(QWidget):
             return (2, 0)
 
     def get_available_pins(self, used_pins):
-        """Get list of commonly available pins not in use
+        """Get list of available pins from the current board
 
         Args:
             used_pins: Set of pin names already in use
@@ -436,11 +443,21 @@ class PinUsageWidget(QWidget):
         Returns:
             List of available pin names
         """
-        # Common Arduino Uno pins
-        all_pins = (
-            [f'D{i}' for i in range(14)] +  # D0-D13
-            [f'A{i}' for i in range(6)]      # A0-A5
-        )
+        # If no board is set, default to Arduino Uno pins
+        if not self.current_board:
+            all_pins = (
+                [f'D{i}' for i in range(14)] +  # D0-D13
+                [f'A{i}' for i in range(6)]      # A0-A5
+            )
+        else:
+            # Use the board's pin configuration
+            digital_pins = self.current_board.specs.digital_pins
+            analog_pins = self.current_board.specs.analog_pins
+
+            all_pins = (
+                [f'D{i}' for i in range(digital_pins)] +
+                [f'A{i}' for i in range(analog_pins)]
+            )
 
         available = [p for p in all_pins if p not in used_pins]
         return available

@@ -142,6 +142,14 @@ class BoardPanel(QWidget):
         """Set connected port"""
         self.port_label.setText(port)
 
+    def set_board(self, board):
+        """Set the current board
+
+        Args:
+            board: Board object from arduino_ide.models.board
+        """
+        self.pin_usage_widget.set_board(board)
+
     def update_pin_usage(self, code_text):
         """Update pin usage overview from code
 
