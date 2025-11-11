@@ -231,6 +231,7 @@ class PinUsageWidget(QWidget):
         # Add ALL available pins from the board
         used_pins = set(pin_info.keys())
         available_pins = self.get_available_pins(used_pins)
+        print(f"[PIN WIDGET DEBUG] Adding {len(available_pins)} available pins to display")
         for pin in available_pins:  # Show ALL available pins
             self.add_pin(pin, "AVAILABLE", "")
 
@@ -445,6 +446,7 @@ class PinUsageWidget(QWidget):
         """
         # If no board is set, default to Arduino Uno pins
         if not self.current_board:
+            print("[PIN WIDGET DEBUG] No board set, using Arduino Uno defaults")
             all_pins = (
                 [f'D{i}' for i in range(14)] +  # D0-D13
                 [f'A{i}' for i in range(6)]      # A0-A5
@@ -453,11 +455,17 @@ class PinUsageWidget(QWidget):
             # Use the board's pin configuration
             digital_pins = self.current_board.specs.digital_pins
             analog_pins = self.current_board.specs.analog_pins
+            print(f"[PIN WIDGET DEBUG] Board: {self.current_board.name}")
+            print(f"[PIN WIDGET DEBUG] Digital pins: {digital_pins}, Analog pins: {analog_pins}")
 
             all_pins = (
                 [f'D{i}' for i in range(digital_pins)] +
                 [f'A{i}' for i in range(analog_pins)]
             )
 
+        print(f"[PIN WIDGET DEBUG] Total pins generated: {len(all_pins)}")
+        print(f"[PIN WIDGET DEBUG] Used pins: {used_pins}")
         available = [p for p in all_pins if p not in used_pins]
+        print(f"[PIN WIDGET DEBUG] Available pins: {len(available)} pins")
+        print(f"[PIN WIDGET DEBUG] First 10 available: {available[:10]}")
         return available
