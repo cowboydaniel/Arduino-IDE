@@ -617,6 +617,23 @@ class StatusDisplay(QWidget):
         self.flash_bar.update_usage(flash_used, self.board_specs["flash_total"])
         self.ram_bar.update_usage(ram_used, self.board_specs["ram_total"])
 
+    def update_from_compilation(self, flash_used, flash_max, ram_used, ram_max):
+        """Update memory usage from actual compilation results
+
+        Args:
+            flash_used: Actual flash/program storage used in bytes
+            flash_max: Maximum flash available in bytes
+            ram_used: Actual RAM/dynamic memory used in bytes
+            ram_max: Maximum RAM available in bytes
+        """
+        # Update board specs with actual values from compilation
+        self.board_specs["flash_total"] = flash_max
+        self.board_specs["ram_total"] = ram_max
+
+        # Update displays with actual compilation results
+        self.flash_bar.update_usage(flash_used, flash_max)
+        self.ram_bar.update_usage(ram_used, ram_max)
+
     def update_board(self, board_name):
         """Update board specifications"""
         # Board specifications database

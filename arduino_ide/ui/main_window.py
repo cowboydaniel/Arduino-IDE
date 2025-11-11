@@ -33,6 +33,7 @@ from arduino_ide.services.board_manager import BoardManager
 from arduino_ide.services.project_manager import ProjectManager
 from arduino_ide.ui.example_templates import build_missing_example_template
 from arduino_ide.services import ArduinoCliService
+import re
 
 
 class EditorContainer(QWidget):
@@ -208,6 +209,8 @@ class MainWindow(QMainWindow):
         self._last_cli_error = ""
         self._open_monitor_after_upload = False
         self._last_selected_port = None
+        self._compilation_output = ""  # Store compilation output for parsing
+        self._upload_after_compile = False  # Flag to trigger upload after successful compilation
 
         # Current build configuration
         self.build_config = "Release"
@@ -879,6 +882,9 @@ void loop() {
 
     def _handle_cli_output(self, text):
         self._append_console_stream(text)
+        # Store compilation output for parsing memory usage
+        if self._cli_current_operation == "compile":
+            self._compilation_output += text
 
     def _handle_cli_error(self, text):
         if not text:
@@ -894,6 +900,15 @@ void loop() {
             if operation == "compile":
                 self.console_panel.append_output("✔ Compilation completed successfully.", color="#6A9955")
                 self.status_bar.set_status("Compilation Succeeded")
+
+                # Parse and update memory usage from compilation output
+                self._parse_and_update_memory_usage(self._compilation_output)
+
+                # If this was a compile before upload, trigger the upload now
+                if self._upload_after_compile:
+                    self._upload_after_compile = False
+                    QTimer.singleShot(500, self._do_upload)
+
             elif operation == "upload":
                 self.console_panel.append_output("✔ Upload completed successfully.", color="#6A9955")
                 self.status_bar.set_status("Upload Succeeded")
@@ -909,6 +924,8 @@ void loop() {
                 self.console_panel.append_output("✗ Compilation failed.", color="#F48771")
                 self.status_bar.set_status("Compilation Failed")
                 QMessageBox.critical(self, "Compilation Failed", detail)
+                # Cancel upload if compilation failed
+                self._upload_after_compile = False
             elif operation == "upload":
                 self.console_panel.append_output("✗ Upload failed.", color="#F48771")
                 self.status_bar.set_status("Upload Failed")
@@ -919,7 +936,46 @@ void loop() {
             self._open_monitor_after_upload = False
             QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
+        # Clear compilation output buffer
+        self._compilation_output = ""
         self._last_cli_error = ""
+
+    def _parse_and_update_memory_usage(self, output_text):
+        """Parse memory usage from compilation output and update status display
+
+        Parses lines like:
+        Sketch uses 1438 bytes (4%) of program storage space. Maximum is 30720 bytes.
+        Global variables use 184 bytes (8%) of dynamic memory, leaving 1864 bytes for local variables. Maximum is 2048 bytes.
+        """
+        if not output_text:
+            return
+
+        # Parse flash/program storage
+        # Pattern: "Sketch uses X bytes (Y%) of program storage space. Maximum is Z bytes."
+        flash_pattern = r'Sketch uses (\d+) bytes.*?Maximum is (\d+) bytes'
+        flash_match = re.search(flash_pattern, output_text)
+
+        # Parse RAM/dynamic memory
+        # Pattern: "Global variables use X bytes (Y%) of dynamic memory... Maximum is Z bytes."
+        ram_pattern = r'Global variables use (\d+) bytes.*?Maximum is (\d+) bytes'
+        ram_match = re.search(ram_pattern, output_text)
+
+        if flash_match and ram_match:
+            flash_used = int(flash_match.group(1))
+            flash_max = int(flash_match.group(2))
+            ram_used = int(ram_match.group(1))
+            ram_max = int(ram_match.group(2))
+
+            # Update the status display with actual compilation results
+            self.status_display.update_from_compilation(
+                flash_used, flash_max, ram_used, ram_max
+            )
+
+            # Log to console
+            self.console_panel.append_output(
+                f"✓ Memory updated: Flash {flash_used}/{flash_max} bytes, RAM {ram_used}/{ram_max} bytes",
+                color="#6A9955"
+            )
 
     def _get_selected_board(self):
         board_name = self.board_selector.currentText().strip() if hasattr(self, "board_selector") else ""
@@ -1002,7 +1058,7 @@ void loop() {
             QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def upload_sketch(self):
-        """Upload sketch to board"""
+        """Upload sketch to board (compiles first, then uploads)"""
         current_widget = self.editor_tabs.currentWidget()
         if not current_widget or not hasattr(current_widget, "editor"):
             QMessageBox.warning(self, "Upload Sketch", "No sketch is currently open.")
@@ -1054,8 +1110,53 @@ void loop() {
             self._open_monitor_after_upload = False
             return
 
+        # Step 1: Compile first (verify)
+        build_config = self.config_selector.currentText() if hasattr(self, "config_selector") else None
+
         self.console_panel.append_output(
-            f"Uploading {sketch_path.name} to {board.name} via {port}..."
+            f"Step 1: Compiling {sketch_path.name} for {board.name}...",
+            color="#6A9955"
+        )
+        if build_config:
+            self.console_panel.append_output(f"Using configuration: {build_config}")
+        self.status_bar.set_status("Compiling (before upload)...")
+        self._cli_current_operation = "compile"
+        self._last_cli_error = ""
+        self._upload_after_compile = True  # Flag to trigger upload after compile
+
+        try:
+            self.cli_service.run_compile(str(sketch_path), board.fqbn, config=build_config)
+        except (RuntimeError, FileNotFoundError) as exc:
+            self._cli_current_operation = None
+            self._upload_after_compile = False
+            self.console_panel.append_output(f"✗ {exc}", color="#F48771")
+            self.status_bar.set_status("Compilation Failed")
+            QMessageBox.critical(self, "Upload Sketch", f"Compilation failed: {exc}")
+            self._open_monitor_after_upload = False
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
+    def _do_upload(self):
+        """Perform the actual upload after successful compilation"""
+        current_widget = self.editor_tabs.currentWidget()
+        if not current_widget or not hasattr(current_widget, "file_path"):
+            return
+
+        sketch_path = Path(current_widget.file_path)
+        board = self._get_selected_board()
+        port = self._get_selected_port()
+
+        if not sketch_path.exists() or not board or not port:
+            self.console_panel.append_output(
+                "✗ Upload cancelled: missing sketch, board, or port",
+                color="#F48771"
+            )
+            self._open_monitor_after_upload = False
+            return
+
+        # Step 2: Upload
+        self.console_panel.append_output(
+            f"Step 2: Uploading {sketch_path.name} to {board.name} via {port}...",
+            color="#6A9955"
         )
         self.status_bar.set_status("Uploading...")
         self._cli_current_operation = "upload"
