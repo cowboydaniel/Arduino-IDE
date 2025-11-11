@@ -345,6 +345,13 @@ class ArduinoCLI:
 
             # Check if this line starts a type definition
             if re.match(r'^\s*(?:typedef\s+)?(struct|class|enum)\s+\w+', line):
+                # Check if this is a forward declaration (ends with semicolon, no braces)
+                # We only want to extract FULL definitions, not forward declarations
+                if ';' in line and '{' not in line:
+                    # This is a forward declaration, skip it
+                    i += 1
+                    continue
+
                 # Found a type definition start
                 start_line = i
                 type_def_lines = [original_lines[i]]
