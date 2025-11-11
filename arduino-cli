@@ -390,6 +390,58 @@ class ArduinoCLI:
 
         return type_definitions_string, source_without_types
 
+    def _extract_custom_type_names(self, type_definitions: str) -> set:
+        """Extract type names from type definition string."""
+        import re
+
+        if not type_definitions:
+            return set()
+
+        custom_types = set()
+        # Match struct, class, or enum name
+        type_patterns = [
+            r'^\s*(?:typedef\s+)?struct\s+([a-zA-Z_]\w*)',
+            r'^\s*(?:typedef\s+)?class\s+([a-zA-Z_]\w*)',
+            r'^\s*(?:typedef\s+)?enum\s+([a-zA-Z_]\w*)',
+        ]
+
+        for pattern in type_patterns:
+            for match in re.finditer(pattern, type_definitions, re.MULTILINE):
+                custom_types.add(match.group(1))
+
+        return custom_types
+
+    def _remove_prototypes_using_custom_types(self, source: str, custom_types: set) -> str:
+        """Remove function prototypes that use custom types."""
+        import re
+
+        if not custom_types:
+            return source
+
+        lines = source.split('\n')
+        filtered_lines = []
+
+        # Pattern to match function prototypes (declarations ending with semicolon, not definitions)
+        # This matches lines like: void initializePoint(PointControl& point);
+        prototype_pattern = r'^\s*(?:inline\s+|static\s+|extern\s+)?(?:const\s+)?([a-zA-Z_][\w\s\*&:<>,]*?)\s+([a-zA-Z_]\w*)\s*\((.*?)\)\s*;'
+
+        for line in lines:
+            # Check if this line looks like a function prototype
+            match = re.match(prototype_pattern, line)
+            if match:
+                # Check if the prototype uses any custom types
+                full_signature = match.group(0)
+                uses_custom_type = any(custom_type in full_signature for custom_type in custom_types)
+
+                if uses_custom_type:
+                    # Skip this prototype - it uses a custom type
+                    continue
+
+            # Keep this line
+            filtered_lines.append(line)
+
+        return '\n'.join(filtered_lines)
+
     def _generate_function_prototypes(self, source: str) -> List[str]:
         """
         Generate forward declarations for all user-defined functions in the sketch.
@@ -559,6 +611,13 @@ class ArduinoCLI:
         # Extract type definitions (structs, classes, enums) from source
         # These need to be placed early to avoid forward declaration issues
         type_definitions, source_without_types = self._extract_and_remove_type_definitions(source)
+
+        # Extract custom type names from the type definitions we found
+        custom_types = self._extract_custom_type_names(type_definitions)
+
+        # Remove any manual prototypes that use custom types from source_without_types
+        # These will conflict if they appear before the type definitions
+        source_without_types = self._remove_prototypes_using_custom_types(source_without_types, custom_types)
 
         # Generate function prototypes (will skip functions using custom types)
         prototypes = self._generate_function_prototypes(source)
