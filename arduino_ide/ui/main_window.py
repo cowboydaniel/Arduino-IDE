@@ -17,7 +17,6 @@ from arduino_ide.ui.serial_monitor import SerialMonitor
 from arduino_ide.ui.board_panel import BoardPanel
 from arduino_ide.ui.project_explorer import ProjectExplorer
 from arduino_ide.ui.console_panel import ConsolePanel
-from arduino_ide.ui.variable_watch import VariableWatch
 from arduino_ide.ui.status_display import StatusDisplay
 from arduino_ide.ui.context_panel import ContextPanel
 from arduino_ide.ui.plotter_panel import PlotterPanel
@@ -578,13 +577,11 @@ class MainWindow(QMainWindow):
         # --- RIGHT COLUMN (Normal widgets, NOT docks) ---
         # Create right-side panel widgets
         self.board_panel = BoardPanel()
-        self.variable_watch = VariableWatch()
         self.status_display = StatusDisplay()
         self.context_panel = ContextPanel()
 
         # Add widgets to right column layout (NOT as dock widgets)
         self.right_column_layout.addWidget(self.board_panel)
-        self.right_column_layout.addWidget(self.variable_watch)
         self.right_column_layout.addWidget(self.status_display)
         self.right_column_layout.addWidget(self.context_panel)
         self.right_column_layout.addStretch()
