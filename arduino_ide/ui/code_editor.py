@@ -1099,6 +1099,59 @@ class CodeEditor(QPlainTextEdit):
 
         return None
 
+    def find_matching_brace(self, start_block):
+        """Find the closing brace matching the opening brace in start_block"""
+        brace_count = 0
+        block = start_block
+
+        while block.isValid():
+            text = block.text()
+            for char in text:
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        return block.blockNumber()
+            block = block.next()
+
+        return None
+
+    def toggle_fold(self, line_num):
+        """Toggle folding for a block starting at line_num"""
+        block = self.document().findBlockByNumber(line_num)
+        if not block.isValid() or '{' not in block.text():
+            return
+
+        # Find matching closing brace
+        end_line = self.find_matching_brace(block)
+        if end_line is None or end_line <= line_num:
+            return
+
+        # Toggle folding state
+        if line_num in self.folded_blocks:
+            # Unfold: show all blocks
+            self.folded_blocks.remove(line_num)
+            for i in range(line_num + 1, end_line + 1):
+                b = self.document().findBlockByNumber(i)
+                if b.isValid():
+                    b.setVisible(True)
+        else:
+            # Fold: hide blocks between opening and closing brace
+            self.folded_blocks.add(line_num)
+            for i in range(line_num + 1, end_line + 1):
+                b = self.document().findBlockByNumber(i)
+                if b.isValid():
+                    b.setVisible(False)
+
+        # Update the document layout and viewport
+        self.document().markContentsDirty(
+            self.document().findBlockByNumber(line_num).position(),
+            self.document().findBlockByNumber(end_line).position() if end_line else 0
+        )
+        self.viewport().update()
+        self.update_line_number_area_width(0)
+
     def handle_line_number_click(self, event):
         """Handle clicks in line number area for code folding"""
         # Calculate which line was clicked
@@ -1110,13 +1163,7 @@ class CodeEditor(QPlainTextEdit):
             if top <= event.pos().y() <= bottom:
                 line_num = block.blockNumber()
                 # Toggle folding for this line
-                if line_num in self.folded_blocks:
-                    self.folded_blocks.remove(line_num)
-                else:
-                    # Check if this line can be folded (contains opening brace)
-                    if '{' in block.text():
-                        self.folded_blocks.add(line_num)
-                self.viewport().update()
+                self.toggle_fold(line_num)
                 break
 
             block = block.next()
