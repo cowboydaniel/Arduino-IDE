@@ -257,47 +257,7 @@ pyinstaller --name="Arduino IDE Modern" \
 
 ## 🗺️ Roadmap
 
-### Phase 1: Core Features ✅ (Current)
-- [x] Basic code editor with syntax highlighting
-- [x] Serial monitor
-- [x] Theme system
-- [x] Project explorer
-- [x] Board selection
-
-### Phase 2: Advanced Editing (In Progress)
-- [ ] IntelliSense with clangd integration
-- [ ] Code snippets library
-- [ ] Multi-file project support
-- [ ] Find and replace
-- [ ] Code folding
-
-### Phase 3: Build System
-- [ ] Arduino CLI integration
-- [ ] PlatformIO backend support
-- [ ] Library manager
-- [ ] Board manager
-- [ ] Custom build configurations
-
-### Phase 4: Debugging
-- [ ] Remote debugging over serial
-- [ ] Breakpoint support
-- [ ] Variable inspection
-- [ ] Memory profiler
-- [ ] Execution timeline
-
-### Phase 5: Advanced Features
-- [ ] Visual programming mode (block-based)
-- [ ] Circuit view with diagrams
-- [ ] Git integration
-- [ ] Collaborative features
-- [ ] Plugin system
-
-### Phase 6: Professional Tools
-- [ ] Unit testing framework
-- [ ] CI/CD integration
-- [ ] Performance profiler
-- [ ] Power consumption analyzer
-- [ ] Hardware-in-loop testing
+For the complete development roadmap, see [ROADMAP.md](ROADMAP.md).
 
 ## 🤝 Contributing
 

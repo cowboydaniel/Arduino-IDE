@@ -26,6 +26,8 @@ from arduino_ide.ui.status_bar import StatusBar
 from arduino_ide.ui.quick_actions_panel import QuickActionsPanel
 from arduino_ide.ui.library_manager_dialog import LibraryManagerDialog
 from arduino_ide.ui.board_manager_dialog import BoardManagerDialog
+from arduino_ide.ui.find_replace_dialog import FindReplaceDialog
+from arduino_ide.ui.snippets_panel import SnippetsPanel
 from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
@@ -579,11 +581,16 @@ class MainWindow(QMainWindow):
         self.board_panel = BoardPanel()
         self.status_display = StatusDisplay()
         self.context_panel = ContextPanel()
+        self.snippets_panel = SnippetsPanel()
+
+        # Connect snippets panel to insert snippets
+        self.snippets_panel.snippet_insert_requested.connect(self.insert_snippet)
 
         # Add widgets to right column layout (NOT as dock widgets)
         self.right_column_layout.addWidget(self.board_panel)
         self.right_column_layout.addWidget(self.status_display)
         self.right_column_layout.addWidget(self.context_panel)
+        self.right_column_layout.addWidget(self.snippets_panel)
         self.right_column_layout.addStretch()
 
         # --- BOTTOM TABS (Normal widgets in tabs, NOT docks) ---
@@ -1327,18 +1334,46 @@ void loop() {
         current_widget = self.editor_tabs.currentWidget()
         if current_widget:
             editor = current_widget.editor
-            # Show find dialog using Qt's built-in find functionality
-            from PySide6.QtWidgets import QInputDialog, QMessageBox
-            text, ok = QInputDialog.getText(self, "Find", "Find text:")
-            if ok and text:
-                # Search for text in the editor
-                if not editor.find(text):
-                    # If not found, try from the beginning
-                    cursor = editor.textCursor()
-                    cursor.movePosition(cursor.Start)
-                    editor.setTextCursor(cursor)
-                    if not editor.find(text):
-                        QMessageBox.information(self, "Find", f"Text '{text}' not found.")
+
+            # Create find/replace dialog if it doesn't exist
+            if not hasattr(self, 'find_replace_dialog') or self.find_replace_dialog is None:
+                self.find_replace_dialog = FindReplaceDialog(editor, self)
+            else:
+                # Update the editor reference
+                self.find_replace_dialog.editor = editor
+
+            # If text is selected, use it as the find text
+            cursor = editor.textCursor()
+            if cursor.hasSelection():
+                selected_text = cursor.selectedText()
+                self.find_replace_dialog.set_find_text(selected_text)
+
+            # Show the dialog
+            self.find_replace_dialog.show()
+            self.find_replace_dialog.raise_()
+            self.find_replace_dialog.activateWindow()
+
+    def insert_snippet(self, snippet):
+        """Insert a code snippet into the current editor"""
+        current_widget = self.editor_tabs.currentWidget()
+        if not current_widget:
+            return
+
+        editor = current_widget.editor
+        cursor = editor.textCursor()
+
+        # Get snippet text and cursor position
+        text, cursor_offset = snippet.insert_text()
+
+        # Insert the snippet
+        cursor.insertText(text)
+
+        # Position cursor at the placeholder location
+        if cursor_offset > 0:
+            # Move cursor back by offset
+            for _ in range(cursor_offset):
+                cursor.movePosition(QTextCursor.Left)
+            editor.setTextCursor(cursor)
 
     def show_about(self):
         """Show about dialog"""
