@@ -57,30 +57,14 @@ class ArduinoCLI:
         if self._initialized:
             return
 
-        # Update board package index on first use
+        # Try to update board package index on first use (non-fatal if fails)
         try:
-            # Check if index needs updating (will download if not cached)
             self.board_manager.update_index(force=False)
+        except Exception:
+            # Silently continue if index update fails
+            pass
 
-            # Auto-install Arduino AVR core if no platforms are installed
-            installed = self.board_manager.search_packages(installed_only=True)
-            if not installed:
-                print("No board platforms installed. Installing Arduino AVR Boards...", file=sys.stderr)
-                try:
-                    # Install latest Arduino AVR core (Uno, Mega, Nano, etc.)
-                    success = self.board_manager.install_package("Arduino AVR Boards")
-                    if success:
-                        print("✓ Arduino AVR Boards installed successfully", file=sys.stderr)
-                    else:
-                        print("✗ Failed to install Arduino AVR Boards", file=sys.stderr)
-                except Exception as e:
-                    print(f"Warning: Could not auto-install Arduino AVR Boards: {e}", file=sys.stderr)
-
-            self._initialized = True
-        except Exception as e:
-            # Non-fatal: continue even if index update fails
-            print(f"Warning: Could not update package index: {e}", file=sys.stderr)
-            self._initialized = True
+        self._initialized = True
 
     @property
     def lib_manager(self):
