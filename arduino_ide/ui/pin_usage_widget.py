@@ -233,6 +233,9 @@ class PinUsageWidget(QWidget):
         Returns:
             Dictionary mapping pin names to their usage information
         """
+        print(f"\n[PIN PARSER DEBUG] Parsing code, length: {len(code)} chars")
+        print(f"[PIN PARSER DEBUG] First 500 chars:\n{code[:500]}\n")
+
         pin_info = {}
         var_to_pin = {}  # Map variable names to pin numbers
 
@@ -265,12 +268,15 @@ class PinUsageWidget(QWidget):
 
                 # Build variable to pin mapping
                 var_to_pin[var_name] = resolved_pin
+                print(f"[PIN PARSER DEBUG] Found definition: {var_name} = {pin_num} -> {resolved_pin}")
 
                 # Initialize pin info
                 if resolved_pin not in pin_info:
                     pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': var_name}
                 if comment:
                     pin_info[resolved_pin]['descriptions'].append(comment.strip())
+
+        print(f"[PIN PARSER DEBUG] Variable mapping: {var_to_pin}")
 
         # Second pass: Search for pin functions and resolve variable names
         for pattern, mode_type in patterns:
@@ -306,6 +312,10 @@ class PinUsageWidget(QWidget):
                     desc = desc.replace('  ', ' ').strip().lower()
                     if desc and desc not in ['led', 'builtin']:
                         pin_info[resolved_pin]['descriptions'].append(desc)
+
+        print(f"[PIN PARSER DEBUG] Final result: {len(pin_info)} pins found")
+        for pin, info in pin_info.items():
+            print(f"  {pin}: modes={info['modes']}, desc={info['descriptions']}")
 
         return pin_info
 
