@@ -1113,7 +1113,12 @@ void loop() {
         self.board_selector.clear()
 
         # Get boards from arduino-cli (installed platforms only)
-        boards = self.board_manager.get_boards_from_cli()
+        try:
+            boards = self.board_manager.get_boards_from_cli()
+            print(f"DEBUG: get_boards_from_cli() returned {len(boards)} boards")
+        except Exception as e:
+            print(f"DEBUG: get_boards_from_cli() raised exception: {e}")
+            boards = []
 
         if boards:
             # Sort boards by name for better UX
