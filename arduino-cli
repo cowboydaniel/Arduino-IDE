@@ -311,6 +311,67 @@ class ArduinoCLI:
         # Default fallback (assumes Uno-like board with 2KB bootloader)
         return 30720 if is_flash else 2048
 
+    def _generate_function_prototypes(self, source: str) -> List[str]:
+        """
+        Generate forward declarations for all user-defined functions in the sketch.
+
+        This mimics the behavior of the official Arduino IDE which automatically
+        generates prototypes so functions can be called before they're defined.
+
+        Args:
+            source: The sketch source code
+
+        Returns:
+            List of function prototype strings
+        """
+        import re
+
+        prototypes = []
+
+        # Remove comments to avoid matching function-like patterns in comments
+        # Remove single-line comments
+        source_no_comments = re.sub(r'//.*?$', '', source, flags=re.MULTILINE)
+        # Remove multi-line comments
+        source_no_comments = re.sub(r'/\*.*?\*/', '', source_no_comments, flags=re.DOTALL)
+
+        # Pattern to match function definitions
+        # Matches: return_type function_name(parameters) {
+        # This pattern captures:
+        # - Optional inline/static keywords
+        # - Return type (including pointer types with *)
+        # - Function name
+        # - Parameters (including default values)
+        function_pattern = r'^\s*(?:inline\s+|static\s+)?([a-zA-Z_][\w\s\*&:<>,]*?)\s+([a-zA-Z_]\w*)\s*\((.*?)\)\s*(?:\{|$)'
+
+        # Find all function definitions
+        for match in re.finditer(function_pattern, source_no_comments, re.MULTILINE):
+            return_type = match.group(1).strip()
+            function_name = match.group(2).strip()
+            parameters = match.group(3).strip()
+
+            # Skip setup() and loop() - these are special Arduino functions
+            if function_name in ('setup', 'loop'):
+                continue
+
+            # Skip if this looks like a class method definition (has :: in return type)
+            if '::' in return_type:
+                continue
+
+            # Skip preprocessor directives
+            if return_type.startswith('#'):
+                continue
+
+            # Skip if return type contains keywords that indicate this isn't a function
+            skip_keywords = ['class', 'struct', 'enum', 'typedef', 'namespace', 'if', 'while', 'for', 'switch']
+            if any(keyword in return_type for keyword in skip_keywords):
+                continue
+
+            # Build the prototype
+            prototype = f"{return_type} {function_name}({parameters});"
+            prototypes.append(prototype)
+
+        return prototypes
+
     def compile_sketch(self, fqbn: str, sketch: str, build_path: Optional[str] = None,
                        config: Optional[str] = None) -> int:
         """Compile a sketch for the requested board using avr-gcc."""
@@ -373,11 +434,18 @@ class ArduinoCLI:
             print(f"✗ Failed to prepare build directory: {exc}", file=sys.stderr)
             return 1
 
+        # Generate function prototypes
+        prototypes = self._generate_function_prototypes(source)
+
         # Create preprocessed sketch with Arduino wrappers
         cpp_file = build_dir / f"{sketch_file.stem}.cpp"
         try:
-            # Add Arduino.h include and wrap sketch code
-            cpp_content = '#include <Arduino.h>\n\n' + source
+            # Add Arduino.h include, function prototypes, and then the sketch code
+            cpp_content = '#include <Arduino.h>\n\n'
+            if prototypes:
+                cpp_content += '// Function prototypes\n'
+                cpp_content += '\n'.join(prototypes) + '\n\n'
+            cpp_content += source
             cpp_file.write_text(cpp_content, encoding="utf-8")
         except Exception as exc:
             print(f"✗ Failed to create preprocessed sketch: {exc}", file=sys.stderr)
