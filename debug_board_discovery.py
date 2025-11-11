@@ -81,7 +81,10 @@ def main():
  
                     try:
                         boards = BoardsTxtParser.parse_boards_txt(
-                            boards_txt, package_name, architecture
+                            boards_txt,
+                            package_name,
+                            architecture,
+                            platform_root=boards_txt.parent,
                         )
                         print(f"   ✓ Parsed {len(boards)} boards")
  
