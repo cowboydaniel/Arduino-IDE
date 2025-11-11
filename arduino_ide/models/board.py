@@ -126,6 +126,7 @@ class BoardPackageVersion:
     size: int
     checksum: str
     release_date: datetime
+    architecture: str = ""  # Platform architecture (e.g., "avr", "esp32")
     changelog: str = ""
     boards_count: int = 0
     boards: List[str] = field(default_factory=list)  # List of board names
@@ -205,8 +206,9 @@ class BoardPackage:
                 size=v_data.get("size", 0),
                 checksum=v_data.get("checksum", ""),
                 release_date=datetime.fromisoformat(v_data.get("releaseDate", "2000-01-01")),
+                architecture=v_data.get("architecture", ""),
                 boards_count=len(v_data.get("boards", [])),
-                boards=v_data.get("boards", []),
+                boards=[b.get("name", b) if isinstance(b, dict) else b for b in v_data.get("boards", [])],
             )
             versions.append(version)
 
