@@ -348,6 +348,29 @@ class CompletionDatabase:
             CompletionItem('setClock()', 'Set I2C clock speed', 'setClock($0)', 'function'),
         ]
 
+        # SPI class methods
+        self.completions['SPI'] = [
+            CompletionItem('begin()', 'Initialize SPI bus', 'begin()', 'function'),
+            CompletionItem('end()', 'Disable SPI bus', 'end()', 'function'),
+            CompletionItem('transfer()', 'Transfer data (send and receive)', 'transfer($0)', 'function'),
+            CompletionItem('transfer16()', 'Transfer 16-bit data', 'transfer16($0)', 'function'),
+            CompletionItem('beginTransaction()', 'Start SPI transaction', 'beginTransaction(SPISettings($0))', 'function'),
+            CompletionItem('endTransaction()', 'End SPI transaction', 'endTransaction()', 'function'),
+            CompletionItem('setBitOrder()', 'Set bit order (MSBFIRST/LSBFIRST)', 'setBitOrder($0)', 'function'),
+            CompletionItem('setDataMode()', 'Set SPI mode (SPI_MODE0-3)', 'setDataMode($0)', 'function'),
+            CompletionItem('setClockDivider()', 'Set clock divider', 'setClockDivider($0)', 'function'),
+        ]
+
+        # EEPROM class methods
+        self.completions['EEPROM'] = [
+            CompletionItem('read()', 'Read byte from EEPROM', 'read($0)', 'function'),
+            CompletionItem('write()', 'Write byte to EEPROM', 'write($0, value)', 'function'),
+            CompletionItem('update()', 'Update byte (write only if changed)', 'update($0, value)', 'function'),
+            CompletionItem('get()', 'Read any data type from EEPROM', 'get($0, data)', 'function'),
+            CompletionItem('put()', 'Write any data type to EEPROM', 'put($0, data)', 'function'),
+            CompletionItem('length()', 'Get EEPROM size in bytes', 'length()', 'function'),
+        ]
+
         # String class methods
         self.completions['String'] = [
             CompletionItem('charAt()', 'Get character at index', 'charAt($0)', 'function'),
@@ -424,10 +447,22 @@ class CompletionDatabase:
             # Structure snippets
             CompletionItem('setup()', 'Setup function (runs once)', 'void setup() {\n  $0\n}', 'snippet'),
             CompletionItem('loop()', 'Loop function (runs repeatedly)', 'void loop() {\n  $0\n}', 'snippet'),
-            CompletionItem('if', 'If statement', 'if ($0) {\n  \n}', 'keyword'),
+            CompletionItem('if', 'If statement with else', 'if ($0) {\n  \n} else {\n  \n}', 'keyword'),
             CompletionItem('for', 'For loop', 'for (int i = 0; i < $0; i++) {\n  \n}', 'keyword'),
             CompletionItem('while', 'While loop', 'while ($0) {\n  \n}', 'keyword'),
+            CompletionItem('do', 'Do-while loop', 'do {\n  $0\n} while ();', 'keyword'),
             CompletionItem('switch', 'Switch statement', 'switch ($0) {\n  case value:\n    break;\n  default:\n    break;\n}', 'keyword'),
+
+            # Common Arduino patterns
+            CompletionItem('blink', 'Blink LED pattern', 'digitalWrite($0, HIGH);\ndelay(1000);\ndigitalWrite($0, LOW);\ndelay(1000);', 'snippet'),
+            CompletionItem('button', 'Read button with debounce', 'int buttonState = digitalRead($0);\nif (buttonState == HIGH) {\n  // Button pressed\n}', 'snippet'),
+            CompletionItem('analogMap', 'Map analog reading', 'int value = analogRead($0);\nvalue = map(value, 0, 1023, 0, 255);', 'snippet'),
+            CompletionItem('serialInit', 'Initialize Serial', 'Serial.begin(9600);\nwhile (!Serial) {\n  ; // Wait for serial port\n}', 'snippet'),
+            CompletionItem('serialRead', 'Read from Serial', 'if (Serial.available() > 0) {\n  char data = Serial.read();\n  $0\n}', 'snippet'),
+            CompletionItem('millis', 'Non-blocking delay with millis', 'unsigned long previousMillis = 0;\nconst long interval = 1000;\n\nunsigned long currentMillis = millis();\nif (currentMillis - previousMillis >= interval) {\n  previousMillis = currentMillis;\n  $0\n}', 'snippet'),
+            CompletionItem('interrupt', 'Attach interrupt', 'attachInterrupt(digitalPinToInterrupt($0), ISR_name, RISING);', 'snippet'),
+            CompletionItem('pwm', 'PWM output', 'pinMode($0, OUTPUT);\nanalogWrite($0, 128); // 0-255', 'snippet'),
+            CompletionItem('servo', 'Servo control pattern', '#include <Servo.h>\nServo myServo;\n\nvoid setup() {\n  myServo.attach($0);\n}\n\nvoid loop() {\n  myServo.write(90);\n}', 'snippet'),
         ]
 
         # Constants
@@ -438,15 +473,48 @@ class CompletionDatabase:
             CompletionItem('OUTPUT', 'Pin mode: output', 'OUTPUT', 'constant'),
             CompletionItem('INPUT_PULLUP', 'Pin mode: input with internal pullup', 'INPUT_PULLUP', 'constant'),
             CompletionItem('LED_BUILTIN', 'Built-in LED pin (usually 13)', 'LED_BUILTIN', 'constant'),
+            CompletionItem('true', 'Boolean true', 'true', 'constant'),
+            CompletionItem('false', 'Boolean false', 'false', 'constant'),
+
+            # Analog pins
             CompletionItem('A0', 'Analog input pin 0', 'A0', 'constant'),
             CompletionItem('A1', 'Analog input pin 1', 'A1', 'constant'),
             CompletionItem('A2', 'Analog input pin 2', 'A2', 'constant'),
             CompletionItem('A3', 'Analog input pin 3', 'A3', 'constant'),
             CompletionItem('A4', 'Analog input pin 4 (I2C SDA)', 'A4', 'constant'),
             CompletionItem('A5', 'Analog input pin 5 (I2C SCL)', 'A5', 'constant'),
+            CompletionItem('A6', 'Analog input pin 6', 'A6', 'constant'),
+            CompletionItem('A7', 'Analog input pin 7', 'A7', 'constant'),
+
+            # Math constants
             CompletionItem('PI', 'Pi constant (3.14159...)', 'PI', 'constant'),
             CompletionItem('HALF_PI', 'Half Pi constant', 'HALF_PI', 'constant'),
             CompletionItem('TWO_PI', 'Two Pi constant', 'TWO_PI', 'constant'),
+
+            # Interrupt modes
+            CompletionItem('RISING', 'Interrupt on rising edge', 'RISING', 'constant'),
+            CompletionItem('FALLING', 'Interrupt on falling edge', 'FALLING', 'constant'),
+            CompletionItem('CHANGE', 'Interrupt on any change', 'CHANGE', 'constant'),
+            CompletionItem('LOW', 'Interrupt when pin is LOW', 'LOW', 'constant'),
+
+            # Serial constants
+            CompletionItem('SERIAL_5N1', 'Serial config: 5 data, no parity, 1 stop', 'SERIAL_5N1', 'constant'),
+            CompletionItem('SERIAL_6N1', 'Serial config: 6 data, no parity, 1 stop', 'SERIAL_6N1', 'constant'),
+            CompletionItem('SERIAL_7N1', 'Serial config: 7 data, no parity, 1 stop', 'SERIAL_7N1', 'constant'),
+            CompletionItem('SERIAL_8N1', 'Serial config: 8 data, no parity, 1 stop (default)', 'SERIAL_8N1', 'constant'),
+
+            # Analog reference
+            CompletionItem('DEFAULT', 'Default analog reference (5V)', 'DEFAULT', 'constant'),
+            CompletionItem('INTERNAL', 'Internal analog reference', 'INTERNAL', 'constant'),
+            CompletionItem('EXTERNAL', 'External analog reference', 'EXTERNAL', 'constant'),
+
+            # SPI constants
+            CompletionItem('MSBFIRST', 'SPI bit order: most significant bit first', 'MSBFIRST', 'constant'),
+            CompletionItem('LSBFIRST', 'SPI bit order: least significant bit first', 'LSBFIRST', 'constant'),
+            CompletionItem('SPI_MODE0', 'SPI mode 0', 'SPI_MODE0', 'constant'),
+            CompletionItem('SPI_MODE1', 'SPI mode 1', 'SPI_MODE1', 'constant'),
+            CompletionItem('SPI_MODE2', 'SPI mode 2', 'SPI_MODE2', 'constant'),
+            CompletionItem('SPI_MODE3', 'SPI mode 3', 'SPI_MODE3', 'constant'),
         ]
 
     def get_completions(self, context=None):
@@ -1034,33 +1102,156 @@ class CodeEditor(QPlainTextEdit):
         self.setExtraSelections(extra_selections)
 
     def keyPressEvent(self, event):
-        """Handle key press for auto-indentation and autocomplete"""
+        """Handle key press for auto-indentation, autocomplete, and smart completions"""
         # Handle autocomplete popup navigation
         if self.completer.popup().isVisible():
             if event.key() in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Escape, Qt.Key_Tab):
                 event.ignore()
                 return
 
-        # Handle newline with auto-indentation
-        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
-            # Get current line indentation
+        # Handle smart bracket/quote auto-closing
+        cursor = self.textCursor()
+        char = event.text()
+
+        # Auto-close brackets, braces, parentheses, and quotes
+        closing_chars = {
+            '(': ')',
+            '[': ']',
+            '{': '}',
+            '"': '"',
+            "'": "'"
+        }
+
+        if char in closing_chars:
+            # Check if we should auto-close (not already followed by closing char)
+            next_char = self.get_next_char()
+            # Only auto-close quotes if not already in a string and not followed by same quote
+            if char in ['"', "'"]:
+                if next_char != char:
+                    super().keyPressEvent(event)
+                    self.insertPlainText(closing_chars[char])
+                    cursor = self.textCursor()
+                    cursor.movePosition(QTextCursor.Left)
+                    self.setTextCursor(cursor)
+                    return
+            else:
+                super().keyPressEvent(event)
+                self.insertPlainText(closing_chars[char])
+                cursor = self.textCursor()
+                cursor.movePosition(QTextCursor.Left)
+                self.setTextCursor(cursor)
+                return
+
+        # Handle smart code block completion for 'if', 'else', 'for', 'while'
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             cursor = self.textCursor()
             block = cursor.block()
             text = block.text()
+            stripped = text.strip()
 
             # Count leading spaces/tabs
             indent = len(text) - len(text.lstrip())
             indent_str = text[:indent]
 
-            # Check if line ends with { to add extra indent
-            extra_indent = ""
-            if text.rstrip().endswith('{'):
-                extra_indent = "  "  # 2 spaces
+            # Smart if/else completion
+            if stripped == 'if' or stripped.startswith('if '):
+                # Complete if statement with condition and braces
+                super().keyPressEvent(event)
+                if '(' not in stripped:
+                    self.insertPlainText(indent_str + "if () {\n")
+                    self.insertPlainText(indent_str + "  \n")
+                    self.insertPlainText(indent_str + "} else {\n")
+                    self.insertPlainText(indent_str + "  \n")
+                    self.insertPlainText(indent_str + "}")
+                    # Move cursor to condition
+                    cursor = self.textCursor()
+                    cursor.movePosition(QTextCursor.Up, QTextCursor.MoveAnchor, 4)
+                    cursor.movePosition(QTextCursor.EndOfLine)
+                    cursor.movePosition(QTextCursor.Left, QTextCursor.MoveAnchor, 4)
+                    self.setTextCursor(cursor)
+                elif '{' not in stripped:
+                    self.insertPlainText(indent_str + "  \n")
+                    self.insertPlainText(indent_str + "} else {\n")
+                    self.insertPlainText(indent_str + "  \n")
+                    self.insertPlainText(indent_str + "}")
+                    cursor = self.textCursor()
+                    cursor.movePosition(QTextCursor.Up, QTextCursor.MoveAnchor, 3)
+                    cursor.movePosition(QTextCursor.EndOfLine)
+                    self.setTextCursor(cursor)
+                else:
+                    self.insertPlainText(indent_str + "  ")
+                return
 
-            # Insert newline and indentation
-            super().keyPressEvent(event)
-            self.insertPlainText(indent_str + extra_indent)
-            return
+            # Smart else completion
+            elif stripped == 'else' or stripped == '} else':
+                super().keyPressEvent(event)
+                self.insertPlainText(indent_str + "  \n")
+                self.insertPlainText(indent_str + "}")
+                cursor = self.textCursor()
+                cursor.movePosition(QTextCursor.Up)
+                cursor.movePosition(QTextCursor.EndOfLine)
+                self.setTextCursor(cursor)
+                return
+
+            # Smart for loop completion
+            elif stripped == 'for' or stripped.startswith('for '):
+                super().keyPressEvent(event)
+                if '(' not in stripped:
+                    self.insertPlainText(indent_str + "for (int i = 0; i < 10; i++) {\n")
+                    self.insertPlainText(indent_str + "  \n")
+                    self.insertPlainText(indent_str + "}")
+                    cursor = self.textCursor()
+                    cursor.movePosition(QTextCursor.Up, QTextCursor.MoveAnchor, 2)
+                    cursor.movePosition(QTextCursor.EndOfLine)
+                    cursor.movePosition(QTextCursor.Left, QTextCursor.MoveAnchor, 14)
+                    # Select the "10" for easy replacement
+                    cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, 2)
+                    self.setTextCursor(cursor)
+                elif '{' not in stripped:
+                    self.insertPlainText(indent_str + "  \n")
+                    self.insertPlainText(indent_str + "}")
+                    cursor = self.textCursor()
+                    cursor.movePosition(QTextCursor.Up)
+                    cursor.movePosition(QTextCursor.EndOfLine)
+                    self.setTextCursor(cursor)
+                else:
+                    self.insertPlainText(indent_str + "  ")
+                return
+
+            # Smart while loop completion
+            elif stripped == 'while' or stripped.startswith('while '):
+                super().keyPressEvent(event)
+                if '(' not in stripped:
+                    self.insertPlainText(indent_str + "while () {\n")
+                    self.insertPlainText(indent_str + "  \n")
+                    self.insertPlainText(indent_str + "}")
+                    cursor = self.textCursor()
+                    cursor.movePosition(QTextCursor.Up, QTextCursor.MoveAnchor, 2)
+                    cursor.movePosition(QTextCursor.EndOfLine)
+                    cursor.movePosition(QTextCursor.Left, QTextCursor.MoveAnchor, 4)
+                    self.setTextCursor(cursor)
+                elif '{' not in stripped:
+                    self.insertPlainText(indent_str + "  \n")
+                    self.insertPlainText(indent_str + "}")
+                    cursor = self.textCursor()
+                    cursor.movePosition(QTextCursor.Up)
+                    cursor.movePosition(QTextCursor.EndOfLine)
+                    self.setTextCursor(cursor)
+                else:
+                    self.insertPlainText(indent_str + "  ")
+                return
+
+            # Standard newline with auto-indentation
+            else:
+                # Check if line ends with { to add extra indent
+                extra_indent = ""
+                if text.rstrip().endswith('{'):
+                    extra_indent = "  "  # 2 spaces
+
+                # Insert newline and indentation
+                super().keyPressEvent(event)
+                self.insertPlainText(indent_str + extra_indent)
+                return
 
         # Call parent to insert the character
         super().keyPressEvent(event)
@@ -1074,20 +1265,48 @@ class CodeEditor(QPlainTextEdit):
             self._last_completion_context = context
 
         # Trigger autocomplete if we have enough characters or just typed '.'
-        if event.text() == '.' or len(prefix) >= 2:
-            self.completer.setCompletionPrefix(prefix)
+        # IMPORTANT: Show popup even with empty prefix after '.'
+        if event.text() == '.':
+            # Just typed dot - show all methods for this object
+            self.completer.setCompletionPrefix("")
             popup = self.completer.popup()
-
-            # Set minimum width for popup to show descriptions
             popup.setMinimumWidth(600)
 
-            popup.setCurrentIndex(self.completer.completionModel().index(0, 0))
+            # Make sure we have items to show
+            if self.completion_model.rowCount() > 0:
+                popup.setCurrentIndex(self.completer.completionModel().index(0, 0))
+                cr = self.cursorRect()
+                cr.setWidth(600)
+                self.completer.complete(cr)
+            else:
+                popup.hide()
+        elif len(prefix) >= 2:
+            # Filter completions by prefix
+            self.completer.setCompletionPrefix(prefix)
+            popup = self.completer.popup()
+            popup.setMinimumWidth(600)
 
-            cr = self.cursorRect()
-            cr.setWidth(600)  # Fixed width for better description display
-            self.completer.complete(cr)
+            if self.completion_model.rowCount() > 0:
+                popup.setCurrentIndex(self.completer.completionModel().index(0, 0))
+                cr = self.cursorRect()
+                cr.setWidth(600)
+                self.completer.complete(cr)
+            else:
+                popup.hide()
+        elif len(prefix) == 0 and context:
+            # Context but no prefix - hide popup
+            self.completer.popup().hide()
         else:
             self.completer.popup().hide()
+
+    def get_next_char(self):
+        """Get the character immediately after the cursor"""
+        cursor = self.textCursor()
+        pos = cursor.position()
+        text = self.toPlainText()
+        if pos < len(text):
+            return text[pos]
+        return ""
 
     def mouseMoveEvent(self, event):
         """Show error and suggestion tooltips on hover"""
