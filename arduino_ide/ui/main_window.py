@@ -924,6 +924,9 @@ void loop() {
                 # Always parse and update memory usage on successful compile
                 self._parse_and_update_memory_usage(self._compilation_output)
 
+                # Parse compiler output for problems (warnings, etc.)
+                self.problems_panel.parse_compiler_output(self._compilation_output)
+
                 # Only show messages and handle UI for non-background compiles
                 if not is_background:
                     self.console_panel.append_output("✔ Compilation completed successfully.", color="#6A9955")
@@ -954,6 +957,12 @@ void loop() {
             # This allows the memory monitor to update even when code has compilation errors
             if is_background and operation == "compile":
                 self._parse_and_update_memory_usage(self._compilation_output)
+
+            # Parse compiler output for problems (errors, warnings)
+            if operation == "compile":
+                # Combine both stdout and stderr for complete error information
+                full_output = self._compilation_output + self._last_cli_error
+                self.problems_panel.parse_compiler_output(full_output)
 
             # Only show error dialogs and messages for non-background compiles
             if not is_background:
@@ -1083,6 +1092,8 @@ void loop() {
             self._cli_current_operation = "compile"
             self._last_cli_error = ""
             self._compilation_output = ""
+            # Clear previous problems before starting new compilation
+            self.problems_panel.clear_problems()
 
             # Run silent background compilation (no verbose output, no export)
             self.cli_service.run_compile(
@@ -1170,6 +1181,9 @@ void loop() {
         self.status_bar.set_status("Compiling...")
         self._cli_current_operation = "compile"
         self._last_cli_error = ""
+        self._compilation_output = ""
+        # Clear previous problems before starting new compilation
+        self.problems_panel.clear_problems()
 
         try:
             # User-initiated verify: enable verbose output for detailed logs
@@ -1252,7 +1266,10 @@ void loop() {
         self.status_bar.set_status("Compiling (before upload)...")
         self._cli_current_operation = "compile"
         self._last_cli_error = ""
+        self._compilation_output = ""
         self._upload_after_compile = True  # Flag to trigger upload after compile
+        # Clear previous problems before starting new compilation
+        self.problems_panel.clear_problems()
 
         try:
             # Upload requires compilation first: export binaries for upload
