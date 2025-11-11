@@ -100,6 +100,12 @@ class ToolchainManager:
             return self.avr_dir / 'bin' / 'avr-objcopy.exe'
         return self.avr_dir / 'bin' / 'avr-objcopy'
 
+    def get_avr_ar_path(self) -> Path:
+        """Get path to avr-ar (archiver) executable"""
+        if platform.system() == 'Windows':
+            return self.avr_dir / 'bin' / 'avr-ar.exe'
+        return self.avr_dir / 'bin' / 'avr-ar'
+
     def download_toolchain(self, progress_callback=None) -> bool:
         """Download and install AVR toolchain
 
