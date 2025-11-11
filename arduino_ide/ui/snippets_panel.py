@@ -1,10 +1,10 @@
 """
-Snippets panel for browsing and inserting code snippets
+Snippets library dialog for browsing and inserting code snippets
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-    QTextEdit, QPushButton, QLineEdit, QLabel, QSplitter
+    QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
+    QTextEdit, QPushButton, QLineEdit, QLabel, QSplitter, QDialogButtonBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -12,36 +12,25 @@ from PySide6.QtGui import QFont
 from arduino_ide.services.snippets_manager import SnippetsManager
 
 
-class SnippetsPanel(QWidget):
-    """Panel for browsing and inserting code snippets"""
+class SnippetsLibraryDialog(QDialog):
+    """Dialog for browsing and inserting code snippets"""
 
     snippet_insert_requested = Signal(object)  # Emits Snippet object
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.snippets_manager = SnippetsManager()
+        self.setWindowTitle("Code Snippets Library")
+        self.setModal(False)
+        self.resize(700, 600)
         self.setup_ui()
         self.populate_snippets()
 
     def setup_ui(self):
         """Setup the UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
-
-        # Title
-        title_label = QLabel("Code Snippets")
-        title_label.setStyleSheet("""
-            QLabel {
-                font-weight: bold;
-                font-size: 14px;
-                padding: 8px;
-                background-color: #2D2D30;
-                color: #FFFFFF;
-                border-bottom: 1px solid #3E3E42;
-            }
-        """)
-        layout.addWidget(title_label)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
 
         # Search box
         search_layout = QHBoxLayout()
@@ -140,14 +129,28 @@ class SnippetsPanel(QWidget):
 
         layout.addWidget(splitter)
 
-        # Insert button
+        # Buttons
         button_layout = QHBoxLayout()
-        button_layout.setContentsMargins(5, 5, 5, 5)
+        button_layout.addStretch()
 
         self.insert_button = QPushButton("Insert Snippet")
         self.insert_button.clicked.connect(self.insert_selected_snippet)
         self.insert_button.setEnabled(False)
-        self.insert_button.setStyleSheet("""
+        self.insert_button.setDefault(True)
+        button_layout.addWidget(self.insert_button)
+
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(self.close)
+        button_layout.addWidget(close_button)
+
+        layout.addLayout(button_layout)
+
+        # Apply dialog styling
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1E1E1E;
+                color: #FFFFFF;
+            }
             QPushButton {
                 background-color: #0E639C;
                 color: #FFFFFF;
@@ -167,9 +170,6 @@ class SnippetsPanel(QWidget):
                 color: #858585;
             }
         """)
-        button_layout.addWidget(self.insert_button)
-
-        layout.addLayout(button_layout)
 
     def populate_snippets(self):
         """Populate the tree with snippets"""

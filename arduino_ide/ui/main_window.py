@@ -27,7 +27,7 @@ from arduino_ide.ui.quick_actions_panel import QuickActionsPanel
 from arduino_ide.ui.library_manager_dialog import LibraryManagerDialog
 from arduino_ide.ui.board_manager_dialog import BoardManagerDialog
 from arduino_ide.ui.find_replace_dialog import FindReplaceDialog
-from arduino_ide.ui.snippets_panel import SnippetsPanel
+from arduino_ide.ui.snippets_panel import SnippetsLibraryDialog
 from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
@@ -403,6 +403,13 @@ class MainWindow(QMainWindow):
         library_action.triggered.connect(self.open_library_manager)
         tools_menu.addAction(library_action)
 
+        tools_menu.addSeparator()
+
+        snippets_action = QAction("Code Snippets...", self)
+        snippets_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_K)
+        snippets_action.triggered.connect(self.show_snippets_library)
+        tools_menu.addAction(snippets_action)
+
         # View Menu
         view_menu = menubar.addMenu("&View")
 
@@ -581,16 +588,11 @@ class MainWindow(QMainWindow):
         self.board_panel = BoardPanel()
         self.status_display = StatusDisplay()
         self.context_panel = ContextPanel()
-        self.snippets_panel = SnippetsPanel()
-
-        # Connect snippets panel to insert snippets
-        self.snippets_panel.snippet_insert_requested.connect(self.insert_snippet)
 
         # Add widgets to right column layout (NOT as dock widgets)
         self.right_column_layout.addWidget(self.board_panel)
         self.right_column_layout.addWidget(self.status_display)
         self.right_column_layout.addWidget(self.context_panel)
-        self.right_column_layout.addWidget(self.snippets_panel)
         self.right_column_layout.addStretch()
 
         # --- BOTTOM TABS (Normal widgets in tabs, NOT docks) ---
@@ -1751,6 +1753,19 @@ void loop() {
         dialog.exec_()
 
         self.status_bar.set_status("Ready")
+
+    def show_snippets_library(self):
+        """Show code snippets library dialog"""
+        # Create snippets dialog if it doesn't exist
+        if not hasattr(self, 'snippets_dialog') or self.snippets_dialog is None:
+            self.snippets_dialog = SnippetsLibraryDialog(self)
+            # Connect snippet insert signal
+            self.snippets_dialog.snippet_insert_requested.connect(self.insert_snippet)
+
+        # Show the dialog
+        self.snippets_dialog.show()
+        self.snippets_dialog.raise_()
+        self.snippets_dialog.activateWindow()
 
     def on_board_selected_from_manager(self, fqbn: str):
         """Handle board selection from board manager"""
