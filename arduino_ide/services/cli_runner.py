@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from PySide6.QtCore import QObject, QProcess, Signal
 
@@ -85,8 +87,143 @@ class ArduinoCliService(QObject):
         self._start_process(args)
 
     # ------------------------------------------------------------------
+    # Board and Platform Management (Synchronous)
+    # ------------------------------------------------------------------
+    def list_boards(self) -> List[Dict[str, Any]]:
+        """List all available boards from installed platforms.
+
+        Returns:
+            List of board dictionaries with keys: name, fqbn, platform
+
+        Raises:
+            RuntimeError: If arduino-cli command fails
+        """
+        return self._run_sync_command(["board", "listall", "--format", "json"])
+
+    def list_platforms(self) -> List[Dict[str, Any]]:
+        """List installed platforms/cores.
+
+        Returns:
+            List of platform dictionaries with keys: id, installed, latest, name
+
+        Raises:
+            RuntimeError: If arduino-cli command fails
+        """
+        return self._run_sync_command(["core", "list", "--format", "json"])
+
+    def search_platforms(self, query: str = "") -> List[Dict[str, Any]]:
+        """Search for available platforms.
+
+        Args:
+            query: Optional search query to filter platforms
+
+        Returns:
+            List of platform dictionaries
+
+        Raises:
+            RuntimeError: If arduino-cli command fails
+        """
+        args = ["core", "search", "--format", "json"]
+        if query:
+            args.append(query)
+        return self._run_sync_command(args)
+
+    def install_platform(self, platform_id: str) -> bool:
+        """Install a platform/core.
+
+        Args:
+            platform_id: Platform identifier (e.g., "arduino:avr", "esp32:esp32")
+
+        Returns:
+            True if installation succeeded, False otherwise
+        """
+        try:
+            self._run_sync_command(["core", "install", platform_id], expect_json=False)
+            return True
+        except RuntimeError:
+            return False
+
+    def uninstall_platform(self, platform_id: str) -> bool:
+        """Uninstall a platform/core.
+
+        Args:
+            platform_id: Platform identifier (e.g., "arduino:avr", "esp32:esp32")
+
+        Returns:
+            True if uninstallation succeeded, False otherwise
+        """
+        try:
+            self._run_sync_command(["core", "uninstall", platform_id], expect_json=False)
+            return True
+        except RuntimeError:
+            return False
+
+    def get_board_details(self, fqbn: str) -> Dict[str, Any]:
+        """Get detailed information about a specific board.
+
+        Args:
+            fqbn: Fully Qualified Board Name
+
+        Returns:
+            Dictionary with board details
+
+        Raises:
+            RuntimeError: If arduino-cli command fails
+        """
+        return self._run_sync_command(["board", "details", "-b", fqbn, "--format", "json"])
+
+    def update_platform_index(self) -> bool:
+        """Update the platform package index.
+
+        Returns:
+            True if update succeeded, False otherwise
+        """
+        try:
+            self._run_sync_command(["core", "update-index"], expect_json=False)
+            return True
+        except RuntimeError:
+            return False
+
+    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    def _run_sync_command(self, args: List[str], expect_json: bool = True) -> Any:
+        """Run arduino-cli command synchronously and return output.
+
+        Args:
+            args: Command arguments for arduino-cli
+            expect_json: If True, parse output as JSON
+
+        Returns:
+            Parsed JSON data if expect_json=True, otherwise raw stdout string
+
+        Raises:
+            RuntimeError: If command fails or JSON parsing fails
+        """
+        if not self._cli_path.exists():
+            raise FileNotFoundError(f"arduino-cli helper not found at {self._cli_path}")
+
+        try:
+            result = subprocess.run(
+                [sys.executable, str(self._cli_path)] + args,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30
+            )
+
+            if expect_json:
+                if not result.stdout.strip():
+                    return []
+                return json.loads(result.stdout)
+            return result.stdout
+
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"arduino-cli command failed: {e.stderr}")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("arduino-cli command timed out")
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Failed to parse arduino-cli JSON output: {e}")
     def _start_process(self, args: Iterable[str]) -> None:
         if self.is_running():
             raise RuntimeError("A CLI command is already running")

@@ -194,18 +194,19 @@ class MainWindow(QMainWindow):
         self._initial_maximize_attempts = 0
         self._max_initial_maximize_attempts = 5
 
-        # Initialize package managers
-        self.library_manager = LibraryManager()
-        self.board_manager = BoardManager()
-        self.project_manager = ProjectManager(
-            library_manager=self.library_manager,
-            board_manager=self.board_manager
-        )
-
+        # Initialize CLI service first (needed by managers)
         self.cli_service = ArduinoCliService(self)
         self.cli_service.output_received.connect(self._handle_cli_output)
         self.cli_service.error_received.connect(self._handle_cli_error)
         self.cli_service.finished.connect(self._handle_cli_finished)
+
+        # Initialize package managers
+        self.library_manager = LibraryManager()
+        self.board_manager = BoardManager(cli_runner=self.cli_service)
+        self.project_manager = ProjectManager(
+            library_manager=self.library_manager,
+            board_manager=self.board_manager
+        )
         self._cli_current_operation = None
         self._last_cli_error = ""
         self._open_monitor_after_upload = False
@@ -467,16 +468,8 @@ class MainWindow(QMainWindow):
         main_toolbar.addWidget(QLabel("Board: "))
         self.board_selector = QComboBox()
         self.board_selector.setMinimumWidth(200)
-        self.board_selector.addItems([
-            "Arduino Uno",
-            "Arduino Mega 2560",
-            "Arduino Nano",
-            "Arduino Leonardo",
-            "Arduino Pro Mini",
-            "ESP32 Dev Module",
-            "ESP8266 NodeMCU",
-            "Arduino Due"
-        ])
+        # Boards are populated dynamically from arduino-cli
+        self._populate_boards()
         self.board_selector.currentTextChanged.connect(self.on_board_changed)
         main_toolbar.addWidget(self.board_selector)
 
@@ -1111,14 +1104,76 @@ void loop() {
             self.status_bar.set_status(f"Background compile error: {exc}")
             QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
+    def _populate_boards(self):
+        """Populate board selector with boards from arduino-cli.
+
+        This method dynamically discovers boards from installed platforms using
+        arduino-cli, replacing the previous hardcoded approach. This allows
+        support for the entire Arduino ecosystem including third-party boards.
+        """
+        self.board_selector.clear()
+
+        try:
+            # Get boards from arduino-cli (installed platforms)
+            boards = self.board_manager.get_boards_from_cli()
+
+            if boards:
+                # Sort boards by name for better UX
+                boards.sort(key=lambda b: b.name)
+
+                # Add boards to selector
+                for board in boards:
+                    self.board_selector.addItem(board.name)
+
+                self.status_bar.set_status(f"Loaded {len(boards)} boards from installed platforms")
+            else:
+                # No installed platforms - show helpful message
+                self.board_selector.addItem("No boards available - Install a platform first")
+                self.status_bar.set_status("No boards found. Install a platform via Tools > Board Manager")
+
+        except RuntimeError as e:
+            # CLI not available or error - fall back to board manager's index
+            print(f"Could not load boards from arduino-cli: {e}")
+            print("Falling back to board manager index")
+
+            # Use the existing board index as fallback
+            boards = self.board_manager.get_all_boards()
+            if boards:
+                boards.sort(key=lambda b: b.name)
+                for board in boards:
+                    self.board_selector.addItem(board.name)
+                self.status_bar.set_status(f"Loaded {len(boards)} boards from index")
+            else:
+                self.board_selector.addItem("No boards available")
+                self.status_bar.set_status("No boards available")
+
     def _get_selected_board(self):
+        """Get the currently selected board object.
+
+        This method now prioritizes boards from arduino-cli (installed platforms)
+        before falling back to the board index. This ensures compatibility with
+        the generalized board support architecture.
+        """
         board_name = self.board_selector.currentText().strip() if hasattr(self, "board_selector") else ""
         if not board_name:
             return None
+
+        # First try to get from arduino-cli boards (installed platforms)
+        try:
+            cli_boards = self.board_manager.get_boards_from_cli()
+            for board in cli_boards:
+                if board.name == board_name or board.fqbn == board_name:
+                    return board
+        except (RuntimeError, AttributeError):
+            # CLI not available or error, fall back to index search
+            pass
+
+        # Fallback to searching the board index
         boards = self.board_manager.search_boards(query=board_name)
         for board in boards:
             if board.name == board_name or board.fqbn == board_name:
                 return board
+
         return self.board_manager.get_board(board_name)
 
     def _get_selected_port(self):
@@ -1472,11 +1527,12 @@ void loop() {
         self.console_panel.append_output(f"Selected board: {board_name}")
         # Get the Board object
         board = self._get_selected_board()
-        # Update board panel with board name
-        self.board_panel.update_board_info(board_name)
-        # Update pin usage widget with Board object
+        # Update board panel with Board object (or name as fallback)
         if board:
+            self.board_panel.update_board_info(board=board)
             self.board_panel.set_board(board)
+        else:
+            self.board_panel.update_board_info(board_type=board_name)
         # Update status display with new board specs
         self.status_display.update_board(board_name)
         # Update status bar

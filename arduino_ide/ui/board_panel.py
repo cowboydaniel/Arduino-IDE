@@ -70,73 +70,41 @@ class BoardPanel(QWidget):
 
         layout.addStretch()
 
-    def update_board_info(self, board_type):
-        """Update board information based on selected board"""
-        # Board specifications database
-        board_specs = {
-            "Arduino Uno": {
-                "cpu": "ATmega328P",
-                "flash": "32 KB",
-                "ram": "2 KB",
-                "clock": "16 MHz"
-            },
-            "Arduino Mega 2560": {
-                "cpu": "ATmega2560",
-                "flash": "256 KB",
-                "ram": "8 KB",
-                "clock": "16 MHz"
-            },
-            "Arduino Nano": {
-                "cpu": "ATmega328P",
-                "flash": "32 KB",
-                "ram": "2 KB",
-                "clock": "16 MHz"
-            },
-            "Arduino Leonardo": {
-                "cpu": "ATmega32u4",
-                "flash": "32 KB",
-                "ram": "2.5 KB",
-                "clock": "16 MHz"
-            },
-            "Arduino Pro Mini": {
-                "cpu": "ATmega328P",
-                "flash": "32 KB",
-                "ram": "2 KB",
-                "clock": "8/16 MHz"
-            },
-            "ESP32 Dev Module": {
-                "cpu": "ESP32 Dual-Core",
-                "flash": "4 MB",
-                "ram": "520 KB",
-                "clock": "240 MHz"
-            },
-            "ESP8266 NodeMCU": {
-                "cpu": "ESP8266",
-                "flash": "4 MB",
-                "ram": "80 KB",
-                "clock": "80/160 MHz"
-            },
-            "Arduino Due": {
-                "cpu": "AT91SAM3X8E",
-                "flash": "512 KB",
-                "ram": "96 KB",
-                "clock": "84 MHz"
-            }
-        }
+    def update_board_info(self, board_type=None, board=None):
+        """Update board information based on selected board.
 
-        # Get specs for the board or use defaults
-        specs = board_specs.get(board_type, {
-            "cpu": "Unknown",
-            "flash": "Unknown",
-            "ram": "Unknown",
-            "clock": "Unknown"
-        })
+        This method now dynamically extracts board specifications from the Board
+        object instead of using a hardcoded dictionary. This allows it to work
+        with any board from the Arduino ecosystem.
+
+        Args:
+            board_type: Legacy parameter - board name (kept for backward compatibility)
+            board: Board object from arduino_ide.models.board (preferred)
+        """
+        # Default values
+        cpu = "Unknown"
+        flash = "Unknown"
+        ram = "Unknown"
+        clock = "Unknown"
+
+        # If we have a Board object, extract specs from it
+        if board and hasattr(board, 'specs'):
+            specs = board.specs
+            cpu = specs.cpu if specs.cpu else "Unknown"
+            flash = specs.flash if specs.flash else "Unknown"
+            ram = specs.ram if specs.ram else "Unknown"
+            clock = specs.clock if specs.clock else "Unknown"
+        elif board_type:
+            # Legacy: Try to look up board by name (for backward compatibility)
+            # This is a fallback and won't work for all boards
+            # The UI should pass Board objects instead
+            pass
 
         # Update labels
-        self.cpu_label.setText(specs["cpu"])
-        self.flash_label.setText(specs["flash"])
-        self.ram_label.setText(specs["ram"])
-        self.clock_label.setText(specs["clock"])
+        self.cpu_label.setText(cpu)
+        self.flash_label.setText(flash)
+        self.ram_label.setText(ram)
+        self.clock_label.setText(clock)
 
     def set_port(self, port):
         """Set connected port"""

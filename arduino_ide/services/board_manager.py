@@ -46,11 +46,14 @@ class BoardManager(QObject):
     # Arduino Board Package Index URL
     PACKAGE_INDEX_URL = "https://downloads.arduino.cc/packages/package_index.json"
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, cli_runner=None):
         if HAS_QT:
             super().__init__(parent)
         else:
             super().__init__()
+
+        # CLI runner for arduino-cli integration
+        self.cli_runner = cli_runner
 
         # Initialize paths
         self.base_dir = Path.home() / ".arduino-ide-modern"
@@ -500,3 +503,196 @@ class BoardManager(QObject):
         for board in self.get_all_boards():
             architectures.add(board.architecture)
         return sorted(list(architectures))
+
+    # ------------------------------------------------------------------
+    # Arduino CLI Integration (Generalized Board Support)
+    # ------------------------------------------------------------------
+    def get_boards_from_cli(self) -> List[Board]:
+        """Get all boards from arduino-cli (installed platforms).
+
+        This method uses arduino-cli to dynamically discover boards from all
+        installed platforms, providing support for the entire Arduino ecosystem
+        without hardcoding.
+
+        Returns:
+            List of Board objects from installed platforms
+
+        Raises:
+            RuntimeError: If cli_runner is not configured or command fails
+        """
+        if not self.cli_runner:
+            raise RuntimeError("CLI runner not configured. Cannot fetch boards from arduino-cli.")
+
+        try:
+            boards_data = self.cli_runner.list_boards()
+            boards = []
+
+            for board_data in boards_data:
+                # Parse FQBN to extract architecture and package
+                fqbn = board_data.get("fqbn", "")
+                name = board_data.get("name", "Unknown Board")
+                platform = board_data.get("platform", {})
+
+                # Extract package and architecture from FQBN
+                # FQBN format: package:architecture:board_id
+                fqbn_parts = fqbn.split(":")
+                if len(fqbn_parts) >= 3:
+                    package_name = fqbn_parts[0]
+                    architecture = fqbn_parts[1]
+                else:
+                    package_name = platform.get("id", "").split(":")[0] if platform else "unknown"
+                    architecture = "unknown"
+
+                # Create Board object with minimal specs
+                # Full specs would require parsing boards.txt, which arduino-cli already does
+                board = Board(
+                    name=name,
+                    fqbn=fqbn,
+                    architecture=architecture,
+                    package_name=package_name,
+                    specs=BoardSpecs(),  # Use default specs; arduino-cli handles the details
+                    description=f"Board from {platform.get('name', 'platform')}" if platform else ""
+                )
+
+                boards.append(board)
+
+            return boards
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to get boards from arduino-cli: {e}")
+
+    def get_platforms_from_cli(self) -> List[Dict[str, Any]]:
+        """Get installed platforms from arduino-cli.
+
+        Returns:
+            List of platform dictionaries
+
+        Raises:
+            RuntimeError: If cli_runner is not configured or command fails
+        """
+        if not self.cli_runner:
+            raise RuntimeError("CLI runner not configured. Cannot fetch platforms from arduino-cli.")
+
+        try:
+            return self.cli_runner.list_platforms()
+        except Exception as e:
+            raise RuntimeError(f"Failed to get platforms from arduino-cli: {e}")
+
+    def search_platforms_via_cli(self, query: str = "") -> List[Dict[str, Any]]:
+        """Search for available platforms using arduino-cli.
+
+        Args:
+            query: Optional search query
+
+        Returns:
+            List of platform dictionaries
+
+        Raises:
+            RuntimeError: If cli_runner is not configured or command fails
+        """
+        if not self.cli_runner:
+            raise RuntimeError("CLI runner not configured. Cannot search platforms via arduino-cli.")
+
+        try:
+            return self.cli_runner.search_platforms(query)
+        except Exception as e:
+            raise RuntimeError(f"Failed to search platforms via arduino-cli: {e}")
+
+    def install_platform_via_cli(self, platform_id: str) -> bool:
+        """Install a platform using arduino-cli.
+
+        Args:
+            platform_id: Platform identifier (e.g., "arduino:avr", "esp32:esp32")
+
+        Returns:
+            True if installation succeeded, False otherwise
+        """
+        if not self.cli_runner:
+            self.status_message.emit("CLI runner not configured")
+            return False
+
+        self.status_message.emit(f"Installing platform {platform_id}...")
+
+        try:
+            success = self.cli_runner.install_platform(platform_id)
+            if success:
+                self.status_message.emit(f"Platform {platform_id} installed successfully")
+                self.package_installed.emit(platform_id, "latest")
+            else:
+                self.status_message.emit(f"Failed to install platform {platform_id}")
+            return success
+        except Exception as e:
+            self.status_message.emit(f"Error installing platform: {e}")
+            return False
+
+    def uninstall_platform_via_cli(self, platform_id: str) -> bool:
+        """Uninstall a platform using arduino-cli.
+
+        Args:
+            platform_id: Platform identifier (e.g., "arduino:avr", "esp32:esp32")
+
+        Returns:
+            True if uninstallation succeeded, False otherwise
+        """
+        if not self.cli_runner:
+            self.status_message.emit("CLI runner not configured")
+            return False
+
+        self.status_message.emit(f"Uninstalling platform {platform_id}...")
+
+        try:
+            success = self.cli_runner.uninstall_platform(platform_id)
+            if success:
+                self.status_message.emit(f"Platform {platform_id} uninstalled successfully")
+                self.package_uninstalled.emit(platform_id)
+            else:
+                self.status_message.emit(f"Failed to uninstall platform {platform_id}")
+            return success
+        except Exception as e:
+            self.status_message.emit(f"Error uninstalling platform: {e}")
+            return False
+
+    def update_cli_index(self) -> bool:
+        """Update the arduino-cli platform index.
+
+        Returns:
+            True if update succeeded, False otherwise
+        """
+        if not self.cli_runner:
+            self.status_message.emit("CLI runner not configured")
+            return False
+
+        self.status_message.emit("Updating arduino-cli platform index...")
+
+        try:
+            success = self.cli_runner.update_platform_index()
+            if success:
+                self.status_message.emit("Platform index updated successfully")
+                self.index_updated.emit()
+            else:
+                self.status_message.emit("Failed to update platform index")
+            return success
+        except Exception as e:
+            self.status_message.emit(f"Error updating platform index: {e}")
+            return False
+
+    def get_board_details_from_cli(self, fqbn: str) -> Optional[Dict[str, Any]]:
+        """Get detailed board information from arduino-cli.
+
+        Args:
+            fqbn: Fully Qualified Board Name
+
+        Returns:
+            Dictionary with board details, or None if not found
+
+        Raises:
+            RuntimeError: If cli_runner is not configured
+        """
+        if not self.cli_runner:
+            raise RuntimeError("CLI runner not configured. Cannot get board details from arduino-cli.")
+
+        try:
+            return self.cli_runner.get_board_details(fqbn)
+        except Exception as e:
+            print(f"Failed to get board details for {fqbn}: {e}")
+            return None
