@@ -405,6 +405,14 @@ class ArduinoCLI:
             '-c',  # Compile only, don't link
             '-g',  # Debug info
             '-Os',  # Optimize for size
+            '-flto',  # Enable link time optimization like the official IDE
+            '-fno-fat-lto-objects',  # Match Arduino's LTO configuration
+            '-fuse-linker-plugin',  # Required to make -flto effective with avr-gcc
+            '-ffunction-sections',  # Place each function in its own section
+            '-fdata-sections',  # Place each data item in its own section
+            '-fno-exceptions',  # Match Arduino's C++ flags
+            '-fno-threadsafe-statics',  # Reduce static initialization overhead
+            '-std=gnu++11',  # Use the same C++ dialect as the official toolchain
             '-ffunction-sections',  # Place each function in its own section
             '-fdata-sections',  # Place each data item in its own section
             '-w',  # Suppress warnings
@@ -486,6 +494,9 @@ class ArduinoCLI:
                 str(toolchain.get_avr_gcc_path()),
                 '-c',
                 '-g',
+                '-flto',
+                '-fno-fat-lto-objects',
+                '-fuse-linker-plugin',
             ]
 
             # Assembly files need different flags
@@ -499,6 +510,16 @@ class ArduinoCLI:
                     '-ffunction-sections',
                     '-fdata-sections',
                 ])
+
+            # Apply language-specific flags
+            if core_source.suffix.lower() in ('.cpp', '.cxx', '.cc'):
+                core_compile_flags.extend([
+                    '-fno-exceptions',
+                    '-fno-threadsafe-statics',
+                    '-std=gnu++11',
+                ])
+            elif core_source.suffix.lower() == '.c':
+                core_compile_flags.append('-std=gnu11')
 
             core_compile_flags.append('-w')  # Suppress warnings
             core_compile_flags.append(f'-mmcu={mcu}')
@@ -539,6 +560,8 @@ class ArduinoCLI:
         link_flags = [
             str(toolchain.get_avr_gcc_path()),
             '-Os',
+            '-flto',
+            '-fuse-linker-plugin',
             f'-mmcu={mcu}',
             '-Wl,--gc-sections',
         ]
