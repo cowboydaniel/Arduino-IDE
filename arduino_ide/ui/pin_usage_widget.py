@@ -20,6 +20,7 @@ class PinUsageWidget(QWidget):
         super().__init__(parent)
         self.pins = {}  # Dictionary to store pin information
         self.current_board = None  # Current board (Board object)
+        self.current_pin_info = {}  # Store parsed pin info for conflict detection
         self.init_ui()
 
     def init_ui(self):
@@ -224,6 +225,9 @@ class PinUsageWidget(QWidget):
         # Parse the code
         pin_info = self.parse_arduino_code(code_text)
 
+        # Store pin_info for conflict detection
+        self.current_pin_info = pin_info
+
         # Check for conflicts (same pin used in different modes)
         conflicts = self.detect_conflicts(pin_info) if pin_info else set()
 
@@ -360,8 +364,15 @@ class PinUsageWidget(QWidget):
             pinMode_pins[resolved_pin] = mode
 
             if resolved_pin not in pin_info:
-                pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': var_name or symbol}
+                pin_info[resolved_pin] = {
+                    'modes': [],
+                    'descriptions': [],
+                    'var_name': var_name or symbol,
+                    'pinMode_declarations': []  # Track all pinMode calls separately
+                }
 
+            # Store this pinMode declaration
+            pin_info[resolved_pin]['pinMode_declarations'].append(mode)
             pin_info[resolved_pin]['modes'].append(mode)
 
             if comment and comment not in pin_info[resolved_pin]['descriptions']:
@@ -391,7 +402,12 @@ class PinUsageWidget(QWidget):
 
                 # This pin is used without pinMode - infer mode from usage
                 if resolved_pin not in pin_info:
-                    pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': var_name or symbol}
+                    pin_info[resolved_pin] = {
+                        'modes': [],
+                        'descriptions': [],
+                        'var_name': var_name or symbol,
+                        'pinMode_declarations': []  # No pinMode declarations for this pin
+                    }
 
                 pin_info[resolved_pin]['modes'].append(mode_type)
 
@@ -442,11 +458,14 @@ class PinUsageWidget(QWidget):
     def detect_conflicts(self, pin_info):
         """Detect pins with conflicting modes
 
-        Real conflicts are only when ANALOG mode is mixed with digital modes.
-        Digital modes (OUTPUT, INPUT, INPUT_PULLUP, PWM) are all compatible:
-        - Reading from OUTPUT pins is valid (e.g., verifying pin state)
-        - PWM is just OUTPUT with analogWrite()
-        - INPUT and INPUT_PULLUP are compatible
+        Real conflicts:
+        1. Contradictory pinMode() declarations (e.g., pinMode(13, OUTPUT) AND pinMode(13, INPUT))
+        2. Board-specific restrictions (e.g., ESP32 GPIO34-39 are input-only)
+
+        NOT conflicts:
+        - OUTPUT + INPUT without pinMode declarations (reading OUTPUT pins is valid)
+        - ANALOG + digital on AVR/STM32 (analog pins can do both)
+        - Multiple modes inferred from usage (digitalWrite + digitalRead)
 
         Returns:
             Set of pin names with conflicts
@@ -454,17 +473,77 @@ class PinUsageWidget(QWidget):
         conflicts = set()
 
         for pin, info in pin_info.items():
-            modes = set(info['modes'])
+            modes = info['modes']
 
-            # Only real conflict: ANALOG mode mixed with digital modes
-            digital_modes = {'OUTPUT', 'INPUT', 'INPUT_PULLUP', 'PWM'}
-            has_analog = 'ANALOG' in modes
-            has_digital = bool(modes & digital_modes)
+            # Check for contradictory pinMode declarations
+            # Look for explicit pinMode() calls with different modes
+            pinMode_modes = self._get_pinMode_declarations(pin)
+            if len(pinMode_modes) > 1:
+                # Multiple different pinMode declarations for same pin
+                unique_pinMode = set(pinMode_modes)
+                # INPUT and INPUT_PULLUP are compatible
+                if unique_pinMode not in [{'INPUT', 'INPUT_PULLUP'}, {'INPUT'}, {'INPUT_PULLUP'}]:
+                    conflicts.add(pin)
+                    print(f"[CONFLICT] {pin}: Contradictory pinMode declarations: {pinMode_modes}")
 
-            if has_analog and has_digital:
+            # Check board-specific restrictions
+            board_conflict = self._check_board_restrictions(pin, modes)
+            if board_conflict:
                 conflicts.add(pin)
+                print(f"[CONFLICT] {pin}: {board_conflict}")
 
         return conflicts
+
+    def _get_pinMode_declarations(self, pin):
+        """Get all pinMode mode declarations for a specific pin from stored parse data"""
+        if not hasattr(self, 'current_pin_info') or not self.current_pin_info:
+            return []
+
+        pin_data = self.current_pin_info.get(pin, {})
+        return pin_data.get('pinMode_declarations', [])
+
+    def _check_board_restrictions(self, pin, modes):
+        """Check board-specific pin restrictions
+
+        Returns:
+            String describing the conflict, or None if no conflict
+        """
+        if not self.current_board:
+            return None
+
+        architecture = self.current_board.architecture.lower()
+        pin_num = self._extract_pin_number(pin)
+
+        if pin_num is None:
+            return None
+
+        # ESP32-specific restrictions
+        if architecture == "esp32":
+            # GPIO 34-39 are input-only
+            if pin_num in [34, 35, 36, 37, 38, 39]:
+                output_modes = {'OUTPUT', 'PWM'}
+                if any(mode in output_modes for mode in modes):
+                    return f"GPIO{pin_num} is input-only on ESP32"
+
+            # GPIO 6-11 are connected to SPI flash (usually can't be used)
+            if pin_num in [6, 7, 8, 9, 10, 11]:
+                return f"GPIO{pin_num} is connected to SPI flash on ESP32"
+
+        # ESP8266-specific restrictions
+        elif architecture == "esp8266":
+            # GPIO 6-11 are connected to SPI flash
+            if pin_num in [6, 7, 8, 9, 10, 11]:
+                return f"GPIO{pin_num} is connected to SPI flash on ESP8266"
+
+        return None
+
+    def _extract_pin_number(self, pin_name):
+        """Extract numeric pin number from pin name (D13 -> 13, A0 -> 0)"""
+        import re
+        match = re.search(r'(\d+)', pin_name)
+        if match:
+            return int(match.group(1))
+        return None
 
     def pin_sort_key(self, pin_name):
         """Generate sort key for pin names
