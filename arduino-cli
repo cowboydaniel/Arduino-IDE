@@ -373,7 +373,12 @@ class ArduinoCLI:
         return prototypes
 
     def compile_sketch(self, fqbn: str, sketch: str, build_path: Optional[str] = None,
-                       config: Optional[str] = None) -> int:
+                       build_cache_path: Optional[str] = None, config: Optional[str] = None,
+                       verbose: bool = False, export_binaries: bool = False,
+                       warnings: str = 'none', optimize_for_debug: bool = False,
+                       build_properties: Optional[List[str]] = None, libraries: Optional[str] = None,
+                       library_paths: Optional[List[str]] = None, clean: bool = False,
+                       vid_pid: Optional[str] = None) -> int:
         """Compile a sketch for the requested board using avr-gcc."""
         # Import managers
         from arduino_ide.services.toolchain_manager import ToolchainManager
@@ -423,11 +428,23 @@ class ArduinoCLI:
             print("✗ Failed to install Arduino core", file=sys.stderr)
             return 1
 
-        print("Generating function prototypes...", flush=True)
-        print("Performing static analysis...", flush=True)
+        if verbose:
+            print("Generating function prototypes...", flush=True)
+            print("Performing static analysis...", flush=True)
 
         # Prepare build directory
         build_dir = Path(build_path).expanduser().resolve() if build_path else sketch_file.parent / "build"
+
+        # Handle --clean flag
+        if clean and build_dir.exists():
+            if verbose:
+                print(f"Cleaning build directory: {build_dir}", flush=True)
+            import shutil
+            try:
+                shutil.rmtree(build_dir)
+            except Exception as exc:
+                print(f"⚠️  Warning: Failed to clean build directory: {exc}", flush=True)
+
         try:
             build_dir.mkdir(parents=True, exist_ok=True)
         except Exception as exc:
@@ -467,14 +484,33 @@ class ArduinoCLI:
             # Try usr/lib location
             specs_dir = toolchain.avr_dir / 'usr' / 'lib' / 'gcc' / 'avr' / '7.3.0' / 'device-specs'
 
+        # Determine optimization level based on flags
+        if optimize_for_debug:
+            opt_level = '-Og'  # Optimize for debugging
+        else:
+            opt_level = '-Os'  # Optimize for size (default)
+
+        # Determine warning flags based on --warnings option
+        warning_flags = []
+        if warnings == 'none':
+            warning_flags = ['-w']  # Suppress all warnings
+        elif warnings == 'default':
+            warning_flags = ['-Wall']  # Enable standard warnings
+        elif warnings == 'more':
+            warning_flags = ['-Wall', '-Wextra']  # Enable more warnings
+        elif warnings == 'all':
+            warning_flags = ['-Wall', '-Wextra', '-Wpedantic']  # Enable all warnings
+
         # Compilation flags for Arduino sketch (treated as C++)
         # Matches official Arduino AVR core platform.txt compiler.cpp.flags
         compile_flags = [
             str(toolchain.get_avr_gcc_path()),
             '-c',  # Compile only, don't link
             '-g',  # Debug info
-            '-Os',  # Optimize for size
-            '-w',  # Suppress warnings
+            opt_level,  # Optimization level
+        ]
+        compile_flags.extend(warning_flags)
+        compile_flags.extend([
             '-std=gnu++11',  # Use the same C++ dialect as the official toolchain
             '-fpermissive',  # Allow non-conforming code
             '-fno-exceptions',  # Disable C++ exceptions
@@ -485,7 +521,7 @@ class ArduinoCLI:
             '-MMD',  # Generate dependency files
             '-flto',  # Enable link time optimization (C++ uses -flto without -fno-fat-lto-objects)
             f'-mmcu={mcu}',
-        ]
+        ])
 
         # Add specs directory and bin directory for finding binutils
         if specs_dir.exists():
@@ -534,7 +570,19 @@ class ArduinoCLI:
             env = os.environ.copy()
             env['PATH'] = str(bin_dir) + os.pathsep + env.get('PATH', '')
 
+            # Print verbose output
+            if verbose:
+                print(f"Compiling sketch: {cpp_file}", flush=True)
+                print(' '.join(str(f) for f in compile_flags), flush=True)
+
             result = subprocess.run(compile_flags, capture_output=True, text=True, timeout=30, env=env)
+
+            # Print verbose output from compiler
+            if verbose and result.stdout:
+                print(result.stdout, flush=True)
+            if verbose and result.stderr:
+                print(result.stderr, file=sys.stderr, flush=True)
+
             if result.returncode != 0:
                 print(f"✗ Compilation failed:\n{result.stderr}", file=sys.stderr)
                 return result.returncode
@@ -545,127 +593,194 @@ class ArduinoCLI:
             print(f"✗ Compilation error: {exc}", file=sys.stderr)
             return 1
 
-        # Compile all Arduino core source files
-        core_sources = core_manager.get_core_sources()
-        print(f"Compiling {len(core_sources)} core source files...", flush=True)
+        # Handle build-cache-path for caching core.a
+        cache_dir = Path(build_cache_path).expanduser().resolve() if build_cache_path else None
+        cached_core_archive = cache_dir / 'core.a' if cache_dir else None
+        use_cached_core = False
 
-        for core_source in core_sources:
-            # Use full filename (with extension) to avoid collisions between .c and .S files with same name
-            # e.g., wiring_pulse.c → wiring_pulse.c.o, wiring_pulse.S → wiring_pulse.S.o
-            core_obj_file = build_dir / f"{core_source.name}.o"
-            core_obj_files.append(core_obj_file)
-
-            # Determine if this is an assembly file
-            is_assembly = core_source.suffix == '.S'
-
-            core_compile_flags = [
-                str(toolchain.get_avr_gcc_path()),
-                '-c',
-                '-g',
-            ]
-
-            # Assembly files need different flags
-            if is_assembly:
-                core_compile_flags.extend([
-                    '-x', 'assembler-with-cpp',  # Treat as assembly with C preprocessor
-                ])
-            else:
-                core_compile_flags.extend([
-                    '-Os',  # Optimize for size (not for assembly)
-                    '-ffunction-sections',
-                    '-fdata-sections',
-                    '-MMD',  # Generate dependency files
-                ])
-
-            # Apply language-specific flags
-            if core_source.suffix.lower() in ('.cpp', '.cxx', '.cc'):
-                core_compile_flags.extend([
-                    '-std=gnu++11',
-                    '-fpermissive',
-                    '-fno-exceptions',
-                    '-ffunction-sections',
-                    '-fdata-sections',
-                    '-fno-threadsafe-statics',
-                    '-Wno-error=narrowing',
-                    '-MMD',
-                    '-flto',  # LTO for C++ without -fno-fat-lto-objects
-                ])
-            elif core_source.suffix.lower() == '.c':
-                core_compile_flags.extend([
-                    '-std=gnu11',
-                    '-flto',  # LTO for C
-                    '-fno-fat-lto-objects',  # C-specific LTO flag
-                ])
-
-            core_compile_flags.append('-w')  # Suppress warnings
-            core_compile_flags.append(f'-mmcu={mcu}')
-
-            # Add same -B flags
-            if specs_dir.exists():
-                core_compile_flags.extend(['-B', str(specs_dir.parent.parent.parent)])
-            if avr_binutils.exists():
-                core_compile_flags.extend(['-B', str(avr_binutils)])
-
-            core_compile_flags.extend([
-                f'-DF_CPU={f_cpu}',
-                '-DARDUINO=10819',
-                '-DARDUINO_AVR_UNO',
-                '-DARDUINO_ARCH_AVR',
-            ])
-
-            if avr_include.exists():
-                core_compile_flags.extend(['-isystem', str(avr_include)])
-
-            core_compile_flags.extend([
-                '-I' + str(core_path),
-                '-I' + str(variant_path),
-                str(core_source),
-                '-o', str(core_obj_file)
-            ])
-
+        # Check if we can use cached core.a
+        if cached_core_archive and cached_core_archive.exists() and not clean:
+            if verbose:
+                print(f"Using cached core from: {cached_core_archive}", flush=True)
+            use_cached_core = True
+            # Copy cached core to build directory
+            core_archive = build_dir / 'core.a'
+            import shutil
             try:
-                result = subprocess.run(core_compile_flags, capture_output=True, text=True, timeout=30, env=env)
-                if result.returncode != 0:
-                    print(f"✗ Core compilation failed for {core_source.name}:\n{result.stderr}", file=sys.stderr)
-                    return result.returncode
+                shutil.copy2(cached_core_archive, core_archive)
             except Exception as exc:
-                print(f"✗ Core compilation error for {core_source.name}: {exc}", file=sys.stderr)
-                return 1
+                if verbose:
+                    print(f"⚠️  Warning: Failed to use cached core: {exc}", flush=True)
+                use_cached_core = False
 
-        # Create static library archive from core object files
-        # This is critical - the official Arduino IDE creates core.a and links against it
-        # Linking against an archive (.a) only includes needed object files
-        # Linking against individual .o files includes ALL of them (causing bloat)
+        # Compile all Arduino core source files (if not using cached version)
+        core_obj_files = []  # Will hold all core object files
         core_archive = build_dir / 'core.a'
 
-        # Use avr-ar to create the archive
-        ar_cmd = [
-            str(toolchain.get_avr_ar_path()),
-            'rcs',  # r=insert/replace, c=create, s=index
-            str(core_archive)
-        ]
-        ar_cmd.extend([str(obj) for obj in core_obj_files])
+        if not use_cached_core:
+            core_sources = core_manager.get_core_sources()
+            if verbose:
+                print(f"Compiling {len(core_sources)} core source files...", flush=True)
+            else:
+                print(f"Compiling {len(core_sources)} core source files...", flush=True)
 
-        try:
-            result = subprocess.run(ar_cmd, capture_output=True, text=True, timeout=30, env=env)
-            if result.returncode != 0:
-                print(f"✗ Archive creation failed:\n{result.stderr}", file=sys.stderr)
-                return result.returncode
-        except Exception as exc:
-            print(f"✗ Archive creation error: {exc}", file=sys.stderr)
-            return 1
+            for core_source in core_sources:
+                # Use full filename (with extension) to avoid collisions between .c and .S files with same name
+                # e.g., wiring_pulse.c → wiring_pulse.c.o, wiring_pulse.S → wiring_pulse.S.o
+                core_obj_file = build_dir / f"{core_source.name}.o"
+                core_obj_files.append(core_obj_file)
+
+                # Determine if this is an assembly file
+                is_assembly = core_source.suffix == '.S'
+
+                core_compile_flags = [
+                    str(toolchain.get_avr_gcc_path()),
+                    '-c',
+                    '-g',
+                ]
+
+                # Assembly files need different flags
+                if is_assembly:
+                    core_compile_flags.extend([
+                        '-x', 'assembler-with-cpp',  # Treat as assembly with C preprocessor
+                    ])
+                else:
+                    # Use optimization level from compile flags
+                    core_compile_flags.append(opt_level)
+                    core_compile_flags.extend([
+                        '-ffunction-sections',
+                        '-fdata-sections',
+                        '-MMD',  # Generate dependency files
+                    ])
+
+                # Apply language-specific flags
+                if core_source.suffix.lower() in ('.cpp', '.cxx', '.cc'):
+                    core_compile_flags.extend([
+                        '-std=gnu++11',
+                        '-fpermissive',
+                        '-fno-exceptions',
+                        '-ffunction-sections',
+                        '-fdata-sections',
+                        '-fno-threadsafe-statics',
+                        '-Wno-error=narrowing',
+                        '-MMD',
+                        '-flto',  # LTO for C++ without -fno-fat-lto-objects
+                    ])
+                elif core_source.suffix.lower() == '.c':
+                    core_compile_flags.extend([
+                        '-std=gnu11',
+                        '-flto',  # LTO for C
+                        '-fno-fat-lto-objects',  # C-specific LTO flag
+                    ])
+
+                # Respect warnings flag for core compilation too
+                core_compile_flags.extend(warning_flags)
+                core_compile_flags.append(f'-mmcu={mcu}')
+
+                # Add same -B flags
+                if specs_dir.exists():
+                    core_compile_flags.extend(['-B', str(specs_dir.parent.parent.parent)])
+                if avr_binutils.exists():
+                    core_compile_flags.extend(['-B', str(avr_binutils)])
+
+                core_compile_flags.extend([
+                    f'-DF_CPU={f_cpu}',
+                    '-DARDUINO=10819',
+                    '-DARDUINO_AVR_UNO',
+                    '-DARDUINO_ARCH_AVR',
+                ])
+
+                if avr_include.exists():
+                    core_compile_flags.extend(['-isystem', str(avr_include)])
+
+                core_compile_flags.extend([
+                    '-I' + str(core_path),
+                    '-I' + str(variant_path),
+                    str(core_source),
+                    '-o', str(core_obj_file)
+                ])
+
+                if verbose:
+                    print(f"Compiling core: {core_source.name}", flush=True)
+                    print(' '.join(str(f) for f in core_compile_flags), flush=True)
+
+                try:
+                    result = subprocess.run(core_compile_flags, capture_output=True, text=True, timeout=30, env=env)
+
+                    if verbose and result.stdout:
+                        print(result.stdout, flush=True)
+                    if verbose and result.stderr:
+                        print(result.stderr, file=sys.stderr, flush=True)
+
+                    if result.returncode != 0:
+                        print(f"✗ Core compilation failed for {core_source.name}:\n{result.stderr}", file=sys.stderr)
+                        return result.returncode
+                except Exception as exc:
+                    print(f"✗ Core compilation error for {core_source.name}: {exc}", file=sys.stderr)
+                    return 1
+
+            # Create static library archive from core object files
+            # This is critical - the official Arduino IDE creates core.a and links against it
+            # Linking against an archive (.a) only includes needed object files
+            # Linking against individual .o files includes ALL of them (causing bloat)
+
+            if verbose:
+                print(f"Creating core archive...", flush=True)
+
+            # Use avr-ar to create the archive
+            ar_cmd = [
+                str(toolchain.get_avr_ar_path()),
+                'rcs',  # r=insert/replace, c=create, s=index
+                str(core_archive)
+            ]
+            ar_cmd.extend([str(obj) for obj in core_obj_files])
+
+            if verbose:
+                print(' '.join(str(c) for c in ar_cmd), flush=True)
+
+            try:
+                result = subprocess.run(ar_cmd, capture_output=True, text=True, timeout=30, env=env)
+
+                if verbose and result.stdout:
+                    print(result.stdout, flush=True)
+                if verbose and result.stderr:
+                    print(result.stderr, file=sys.stderr, flush=True)
+
+                if result.returncode != 0:
+                    print(f"✗ Archive creation failed:\n{result.stderr}", file=sys.stderr)
+                    return result.returncode
+            except Exception as exc:
+                print(f"✗ Archive creation error: {exc}", file=sys.stderr)
+                return 1
+
+            # Cache the core archive if build-cache-path was specified
+            if cache_dir:
+                try:
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    import shutil
+                    shutil.copy2(core_archive, cached_core_archive)
+                    if verbose:
+                        print(f"Cached core to: {cached_core_archive}", flush=True)
+                except Exception as exc:
+                    if verbose:
+                        print(f"⚠️  Warning: Failed to cache core: {exc}", flush=True)
 
         # Link - matches official Arduino AVR core platform.txt compiler.c.elf.flags
+        if verbose:
+            print("Linking...", flush=True)
+
         link_flags = [
             str(toolchain.get_avr_gcc_path()),
-            '-w',  # Suppress warnings
-            '-Os',  # Optimize for size
+        ]
+        link_flags.extend(warning_flags)  # Respect warning flags during linking
+        link_flags.extend([
+            opt_level,  # Use same optimization level as compilation
             '-g',  # Include debug info
             '-flto',  # Link time optimization
             '-fuse-linker-plugin',  # Required for LTO with avr-gcc
             f'-mmcu={mcu}',
             '-Wl,--gc-sections',  # Garbage collect unused sections
-        ]
+        ])
 
         # Add same -B flags for linking
         if specs_dir.exists():
@@ -697,8 +812,17 @@ class ArduinoCLI:
         # Add math library (-lm must come after object files/archives)
         link_flags.append('-lm')
 
+        if verbose:
+            print(' '.join(str(f) for f in link_flags), flush=True)
+
         try:
             result = subprocess.run(link_flags, capture_output=True, text=True, timeout=30, env=env)
+
+            if verbose and result.stdout:
+                print(result.stdout, flush=True)
+            if verbose and result.stderr:
+                print(result.stderr, file=sys.stderr, flush=True)
+
             if result.returncode != 0:
                 print(f"✗ Linking failed:\n{result.stderr}", file=sys.stderr)
                 return result.returncode
@@ -707,6 +831,9 @@ class ArduinoCLI:
             return 1
 
         # Create hex file
+        if verbose:
+            print("Creating hex file...", flush=True)
+
         objcopy_flags = [
             str(toolchain.get_avr_objcopy_path()),
             '-O', 'ihex',
@@ -715,8 +842,17 @@ class ArduinoCLI:
             str(hex_file)
         ]
 
+        if verbose:
+            print(' '.join(str(f) for f in objcopy_flags), flush=True)
+
         try:
             result = subprocess.run(objcopy_flags, capture_output=True, text=True, timeout=30)
+
+            if verbose and result.stdout:
+                print(result.stdout, flush=True)
+            if verbose and result.stderr:
+                print(result.stderr, file=sys.stderr, flush=True)
+
             if result.returncode != 0:
                 print(f"✗ objcopy failed:\n{result.stderr}", file=sys.stderr)
                 return result.returncode
@@ -762,6 +898,25 @@ class ArduinoCLI:
 
             print(f"Sketch uses {flash_size} bytes ({prog_percent}%) of program storage space. Maximum is {flash_max} bytes.", flush=True)
             print(f"Global variables use {ram_size} bytes ({ram_percent}%) of dynamic memory, leaving {ram_remaining} bytes for local variables. Maximum is {ram_max} bytes.", flush=True)
+
+            # Export binaries to sketch folder if requested
+            if export_binaries:
+                import shutil
+                try:
+                    # Export to sketch directory
+                    export_hex = sketch_file.parent / f"{sketch_file.stem}.hex"
+                    export_elf = sketch_file.parent / f"{sketch_file.stem}.elf"
+
+                    shutil.copy2(hex_file, export_hex)
+                    shutil.copy2(elf_file, export_elf)
+
+                    if verbose:
+                        print(f"Exported binaries to:", flush=True)
+                        print(f"  {export_hex}", flush=True)
+                        print(f"  {export_elf}", flush=True)
+                except Exception as exc:
+                    print(f"⚠️  Warning: Failed to export binaries: {exc}", flush=True)
+
             print("✔ Compilation successful.", flush=True)
 
         except Exception as exc:
@@ -860,7 +1015,17 @@ def main():
     compile_parser = subparsers.add_parser('compile', help='Compile sketch')
     compile_parser.add_argument('-b', '--fqbn', required=True, help='Fully qualified board name')
     compile_parser.add_argument('--build-path', help='Directory to place build artifacts')
+    compile_parser.add_argument('--build-cache-path', help='Builds of core.a are saved into this path to be cached and reused')
     compile_parser.add_argument('--config', help='Build configuration name')
+    compile_parser.add_argument('-v', '--verbose', action='store_true', help='Print the logs on the standard output')
+    compile_parser.add_argument('-e', '--export-binaries', action='store_true', help='If set, built binaries will be exported to the sketch folder')
+    compile_parser.add_argument('--warnings', choices=['none', 'default', 'more', 'all'], default='none', help='Optional, tells gcc which warning level to use')
+    compile_parser.add_argument('--optimize-for-debug', action='store_true', help='Optional, optimize compile output for debugging')
+    compile_parser.add_argument('--build-property', action='append', help='Override a build property with a custom value')
+    compile_parser.add_argument('--libraries', help='Comma-separated list of custom libraries directories')
+    compile_parser.add_argument('--library', action='append', help='Path to a custom library (can be used multiple times)')
+    compile_parser.add_argument('--clean', action='store_true', help='Optional, cleanup the build folder and do not use any cached build')
+    compile_parser.add_argument('--vid-pid', help='When specified, VID/PID specific build properties are used')
     compile_parser.add_argument('sketch', help='Path to sketch (file or directory)')
 
     # Upload command
@@ -934,7 +1099,22 @@ def main():
                 return cli.board_search(args.query)
 
         elif args.command == 'compile':
-            return cli.compile_sketch(args.fqbn, args.sketch, build_path=args.build_path, config=args.config)
+            return cli.compile_sketch(
+                args.fqbn,
+                args.sketch,
+                build_path=args.build_path,
+                build_cache_path=args.build_cache_path,
+                config=args.config,
+                verbose=args.verbose,
+                export_binaries=args.export_binaries,
+                warnings=args.warnings,
+                optimize_for_debug=args.optimize_for_debug,
+                build_properties=args.build_property,
+                libraries=args.libraries,
+                library_paths=args.library,
+                clean=args.clean,
+                vid_pid=args.vid_pid
+            )
 
         elif args.command == 'upload':
             return cli.upload_sketch(args.fqbn, args.port, args.sketch, build_path=args.build_path, verify=args.verify)

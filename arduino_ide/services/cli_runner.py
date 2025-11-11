@@ -36,14 +36,41 @@ class ArduinoCliService(QObject):
         return self._process is not None and self._process.state() != QProcess.NotRunning
 
     def run_compile(self, sketch_path: str, fqbn: str, *, build_path: Optional[str] = None,
-                    config: Optional[str] = None) -> None:
-        """Compile ``sketch_path`` for ``fqbn`` asynchronously."""
+                    build_cache_path: Optional[str] = None, config: Optional[str] = None,
+                    verbose: bool = False, export_binaries: bool = False,
+                    warnings: str = 'none', optimize_for_debug: bool = False) -> None:
+        """Compile ``sketch_path`` for ``fqbn`` asynchronously.
 
-        args: List[str] = ["compile", "-b", fqbn, sketch_path]
+        Args:
+            sketch_path: Path to the sketch file or directory
+            fqbn: Fully Qualified Board Name
+            build_path: Optional path for build artifacts
+            build_cache_path: Optional path for caching core.a
+            config: Build configuration name (Release/Debug)
+            verbose: Print detailed compilation logs
+            export_binaries: Export compiled binaries to sketch folder
+            warnings: Warning level (none/default/more/all)
+            optimize_for_debug: Optimize for debugging instead of size
+        """
+
+        args: List[str] = ["compile", "-b", fqbn]
+
         if build_path:
             args.extend(["--build-path", build_path])
+        if build_cache_path:
+            args.extend(["--build-cache-path", build_cache_path])
         if config:
             args.extend(["--config", config])
+        if verbose:
+            args.append("-v")
+        if export_binaries:
+            args.append("-e")
+        if warnings != 'none':
+            args.extend(["--warnings", warnings])
+        if optimize_for_debug:
+            args.append("--optimize-for-debug")
+
+        args.append(sketch_path)
         self._start_process(args)
 
     def run_upload(self, sketch_path: str, fqbn: str, port: str, *, build_path: Optional[str] = None,
