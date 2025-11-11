@@ -94,13 +94,16 @@ class PinUsageWidget(QWidget):
             description: Optional description (e.g., "sensor", "LED")
             conflict: Whether this pin has a conflict
         """
-        # Remove empty state if present
-        layout_count = self.pin_layout.count()
-        if layout_count == 2:  # Header + empty state + stretch
-            item = self.pin_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-                print(f"[ADD_PIN DEBUG] Removed empty state for first pin {pin_name}")
+        # Remove empty state if present (check if first widget is a QLabel, not a QFrame)
+        if self.pin_layout.count() > 1:
+            first_item = self.pin_layout.itemAt(0)
+            if first_item and first_item.widget():
+                # Empty state is a QLabel, pin items are QFrame
+                widget = first_item.widget()
+                if isinstance(widget, QLabel):
+                    self.pin_layout.takeAt(0)
+                    widget.deleteLater()
+                    print(f"[ADD_PIN DEBUG] Removed empty state label for first pin {pin_name}")
 
         # Determine icon based on status
         if conflict:
