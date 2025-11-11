@@ -476,8 +476,8 @@ class PinUsageWidget(QWidget):
             'PIN', 'RELAY', 'LED', 'BUTTON', 'SWITCH', 'SENSOR', 'MOTOR',
             'SERVO', 'LIGHT', 'LAMP', 'BUZZER', 'SPEAKER', 'INPUT', 'OUTPUT',
             'PWM', 'ANALOG', 'DIGITAL', 'TX', 'RX', 'SDA', 'SCL', 'MOSI', 'MISO',
-            'SCK', 'CS', 'SS', 'ENABLE', 'TRIGGER', 'ECHO', 'ROUTE', 'TURNOUT',
-            'SIGNAL', 'CROSSING'
+            'SCK', 'CS', 'SS', 'ENABLE', 'TRIGGER', 'ECHO', 'TURNOUT',
+            'SIGNAL', 'CROSSING', 'VALVE', 'SOLENOID', 'HEATER', 'FAN', 'PUMP'
         ]
 
         # Keywords that indicate NOT a pin (configuration values, thresholds, etc.)
@@ -486,7 +486,8 @@ class PinUsageWidget(QWidget):
             'SIZE', 'LENGTH', 'WIDTH', 'HEIGHT', 'SAMPLES', 'RATE', 'SPEED',
             'BAUD', 'FREQUENCY', 'PERIOD', 'HYSTERESIS', 'OFFSET', 'MULTIPLIER',
             'DIVISOR', 'MINIMUM', 'MAXIMUM', 'MIN', 'MAX', 'LIMIT', 'RANGE',
-            'DEBOUNCE_TIME', 'CALIBRATION', 'FILTER'
+            'DEBOUNCE_TIME', 'CALIBRATION', 'FILTER', 'ROUTE', 'STATE', 'MODE',
+            'STATUS', 'FLAG', 'ACTIVE', 'INACTIVE', 'CONFIG', 'SETTING'
         ]
 
         likely_pins = {}
