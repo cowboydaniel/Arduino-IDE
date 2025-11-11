@@ -937,6 +937,11 @@ void loop() {
                 if not is_background:
                     self.status_bar.set_status("Ready")
         else:
+            # For background compiles, ALWAYS try to parse memory even with errors
+            # This allows the memory monitor to update even when code has compilation errors
+            if is_background and operation == "compile":
+                self._parse_and_update_memory_usage(self._compilation_output)
+
             # Only show error dialogs and messages for non-background compiles
             if not is_background:
                 detail = self._last_cli_error.strip() or "Check the console for details."
@@ -956,7 +961,7 @@ void loop() {
                 self._open_monitor_after_upload = False
                 QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
             else:
-                # Background compile failed - silently ignore
+                # Background compile failed - silently ignore errors
                 # Cancel upload if this was a background compile before upload
                 self._upload_after_compile = False
                 self._open_monitor_after_upload = False
