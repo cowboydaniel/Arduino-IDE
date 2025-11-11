@@ -78,6 +78,13 @@ class BoardManager(QObject):
         self._load_board_index()
         self._initialize_default_boards()
 
+    def _emit_signal(self, signal_name: str, *args):
+        """Safely emit a signal if it exists and Qt is available"""
+        if HAS_QT and hasattr(self, signal_name):
+            signal = getattr(self, signal_name)
+            if signal is not None:
+                signal.emit(*args)
+
     def _load_package_urls(self):
         """Load custom package URLs"""
         if self.urls_file.exists():
@@ -179,13 +186,13 @@ class BoardManager(QObject):
 
     def update_index(self, force: bool = False) -> bool:
         """Update board package index from Arduino servers"""
-        self.status_message.emit("Updating board package index...")
+        self._emit_signal('status_message',"Updating board package index...")
 
         # Check if update is needed
         if not force and self.index_file.exists():
             age = datetime.now() - datetime.fromtimestamp(self.index_file.stat().st_mtime)
             if age.total_seconds() < 3600:  # Less than 1 hour old
-                self.status_message.emit("Board index is up to date")
+                self._emit_signal('status_message',"Board index is up to date")
                 return True
 
         try:
@@ -221,12 +228,12 @@ class BoardManager(QObject):
             # Reload index
             self._load_board_index()
 
-            self.status_message.emit("Board package index updated successfully")
-            self.index_updated.emit()
+            self._emit_signal('status_message',"Board package index updated successfully")
+            self._emit_signal('index_updated')
             return True
 
         except Exception as e:
-            self.status_message.emit(f"Error updating index: {str(e)}")
+            self._emit_signal('status_message',f"Error updating index: {str(e)}")
             return False
 
     def get_package(self, name: str) -> Optional[BoardPackage]:
@@ -282,7 +289,7 @@ class BoardManager(QObject):
         """Install a board package"""
         package = self.get_package(name)
         if not package:
-            self.status_message.emit(f"Package '{name}' not found")
+            self._emit_signal('status_message',f"Package '{name}' not found")
             return False
 
         # Determine version to install
@@ -290,23 +297,23 @@ class BoardManager(QObject):
             version = package.latest_version
 
         if not version:
-            self.status_message.emit(f"No version found for '{name}'")
+            self._emit_signal('status_message',f"No version found for '{name}'")
             return False
 
         pkg_version = package.get_version(version)
         if not pkg_version:
-            self.status_message.emit(f"Version '{version}' not found for '{name}'")
+            self._emit_signal('status_message',f"Version '{version}' not found for '{name}'")
             return False
 
-        self.status_message.emit(f"Installing {name} v{version}...")
+        self._emit_signal('status_message',f"Installing {name} v{version}...")
 
         try:
             # Download package
-            self.status_message.emit(f"Downloading {name}...")
+            self._emit_signal('status_message',f"Downloading {name}...")
             response = requests.get(pkg_version.url, timeout=120, stream=True)
 
             if response.status_code != 200:
-                self.status_message.emit(f"Failed to download: HTTP {response.status_code}")
+                self._emit_signal('status_message',f"Failed to download: HTTP {response.status_code}")
                 return False
 
             # Save to temp file
@@ -321,12 +328,12 @@ class BoardManager(QObject):
 
                     if total_size > 0:
                         progress = int((downloaded / total_size) * 100)
-                        self.progress_changed.emit(progress)
+                        self._emit_signal('progress_changed',progress)
 
                 tmp_path = tmp_file.name
 
             # Extract package
-            self.status_message.emit(f"Extracting {name}...")
+            self._emit_signal('status_message',f"Extracting {name}...")
             install_path = self.packages_dir / name / version
 
             # Remove existing installation
@@ -353,18 +360,18 @@ class BoardManager(QObject):
             # Update package object
             package.installed_version = version
 
-            self.status_message.emit(f"Successfully installed {name} v{version}")
-            self.package_installed.emit(name, version)
+            self._emit_signal('status_message',f"Successfully installed {name} v{version}")
+            self._emit_signal('package_installed',name, version)
             return True
 
         except Exception as e:
-            self.status_message.emit(f"Error installing {name}: {str(e)}")
+            self._emit_signal('status_message',f"Error installing {name}: {str(e)}")
             return False
 
     def uninstall_package(self, name: str) -> bool:
         """Uninstall a board package"""
         if name not in self.installed_packages:
-            self.status_message.emit(f"Package '{name}' is not installed")
+            self._emit_signal('status_message',f"Package '{name}' is not installed")
             return False
 
         version = self.installed_packages[name]
@@ -387,12 +394,12 @@ class BoardManager(QObject):
             if package:
                 package.installed_version = None
 
-            self.status_message.emit(f"Successfully uninstalled {name}")
-            self.package_uninstalled.emit(name)
+            self._emit_signal('status_message',f"Successfully uninstalled {name}")
+            self._emit_signal('package_uninstalled',name)
             return True
 
         except Exception as e:
-            self.status_message.emit(f"Error uninstalling {name}: {str(e)}")
+            self._emit_signal('status_message',f"Error uninstalling {name}: {str(e)}")
             return False
 
     def update_package(self, name: str, version: Optional[str] = None) -> bool:
@@ -403,19 +410,19 @@ class BoardManager(QObject):
 
         old_version = package.installed_version
         if not old_version:
-            self.status_message.emit(f"Package '{name}' is not installed")
+            self._emit_signal('status_message',f"Package '{name}' is not installed")
             return False
 
         if not version:
             version = package.latest_version
 
         if old_version == version:
-            self.status_message.emit(f"Package '{name}' is already up to date")
+            self._emit_signal('status_message',f"Package '{name}' is already up to date")
             return False
 
         # Install new version
         if self.install_package(name, version):
-            self.package_updated.emit(name, old_version, version)
+            self._emit_signal('package_updated',name, old_version, version)
             return True
 
         return False
@@ -425,7 +432,7 @@ class BoardManager(QObject):
         # Check if URL already exists
         for pkg_url in self.board_index.package_urls:
             if pkg_url.url == url:
-                self.status_message.emit("URL already exists")
+                self._emit_signal('status_message',"URL already exists")
                 return False
 
         # Add new URL
@@ -433,7 +440,7 @@ class BoardManager(QObject):
         self.board_index.package_urls.append(new_url)
         self._save_package_urls()
 
-        self.status_message.emit(f"Added package URL: {name}")
+        self._emit_signal('status_message',f"Added package URL: {name}")
         return True
 
     def remove_package_url(self, url: str) -> bool:
@@ -442,7 +449,7 @@ class BoardManager(QObject):
             if pkg_url.url == url:
                 self.board_index.package_urls.remove(pkg_url)
                 self._save_package_urls()
-                self.status_message.emit("Package URL removed")
+                self._emit_signal('status_message',"Package URL removed")
                 return True
 
         return False
@@ -613,21 +620,21 @@ class BoardManager(QObject):
             True if installation succeeded, False otherwise
         """
         if not self.cli_runner:
-            self.status_message.emit("CLI runner not configured")
+            self._emit_signal('status_message',"CLI runner not configured")
             return False
 
-        self.status_message.emit(f"Installing platform {platform_id}...")
+        self._emit_signal('status_message',f"Installing platform {platform_id}...")
 
         try:
             success = self.cli_runner.install_platform(platform_id)
             if success:
-                self.status_message.emit(f"Platform {platform_id} installed successfully")
-                self.package_installed.emit(platform_id, "latest")
+                self._emit_signal('status_message',f"Platform {platform_id} installed successfully")
+                self._emit_signal('package_installed',platform_id, "latest")
             else:
-                self.status_message.emit(f"Failed to install platform {platform_id}")
+                self._emit_signal('status_message',f"Failed to install platform {platform_id}")
             return success
         except Exception as e:
-            self.status_message.emit(f"Error installing platform: {e}")
+            self._emit_signal('status_message',f"Error installing platform: {e}")
             return False
 
     def uninstall_platform_via_cli(self, platform_id: str) -> bool:
@@ -640,21 +647,21 @@ class BoardManager(QObject):
             True if uninstallation succeeded, False otherwise
         """
         if not self.cli_runner:
-            self.status_message.emit("CLI runner not configured")
+            self._emit_signal('status_message',"CLI runner not configured")
             return False
 
-        self.status_message.emit(f"Uninstalling platform {platform_id}...")
+        self._emit_signal('status_message',f"Uninstalling platform {platform_id}...")
 
         try:
             success = self.cli_runner.uninstall_platform(platform_id)
             if success:
-                self.status_message.emit(f"Platform {platform_id} uninstalled successfully")
-                self.package_uninstalled.emit(platform_id)
+                self._emit_signal('status_message',f"Platform {platform_id} uninstalled successfully")
+                self._emit_signal('package_uninstalled',platform_id)
             else:
-                self.status_message.emit(f"Failed to uninstall platform {platform_id}")
+                self._emit_signal('status_message',f"Failed to uninstall platform {platform_id}")
             return success
         except Exception as e:
-            self.status_message.emit(f"Error uninstalling platform: {e}")
+            self._emit_signal('status_message',f"Error uninstalling platform: {e}")
             return False
 
     def update_cli_index(self) -> bool:
@@ -664,21 +671,21 @@ class BoardManager(QObject):
             True if update succeeded, False otherwise
         """
         if not self.cli_runner:
-            self.status_message.emit("CLI runner not configured")
+            self._emit_signal('status_message',"CLI runner not configured")
             return False
 
-        self.status_message.emit("Updating arduino-cli platform index...")
+        self._emit_signal('status_message',"Updating arduino-cli platform index...")
 
         try:
             success = self.cli_runner.update_platform_index()
             if success:
-                self.status_message.emit("Platform index updated successfully")
-                self.index_updated.emit()
+                self._emit_signal('status_message',"Platform index updated successfully")
+                self._emit_signal('index_updated')
             else:
-                self.status_message.emit("Failed to update platform index")
+                self._emit_signal('status_message',"Failed to update platform index")
             return success
         except Exception as e:
-            self.status_message.emit(f"Error updating platform index: {e}")
+            self._emit_signal('status_message',f"Error updating platform index: {e}")
             return False
 
     def get_board_details_from_cli(self, fqbn: str) -> Optional[Dict[str, Any]]:
