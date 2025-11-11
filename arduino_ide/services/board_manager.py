@@ -550,7 +550,12 @@ class BoardManager(QObject):
                     fqbn=fqbn,
                     architecture=architecture,
                     package_name=package_name,
-                    specs=BoardSpecs(),  # Use default specs; arduino-cli handles the details
+                    specs=BoardSpecs(
+                        cpu="Unknown",
+                        clock="Unknown",
+                        flash="Unknown",
+                        ram="Unknown"
+                    ),
                     description=f"Board from {platform.get('name', 'platform')}" if platform else ""
                 )
 
