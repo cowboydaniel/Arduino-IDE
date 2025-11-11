@@ -405,6 +405,8 @@ class ArduinoCLI:
             '-c',  # Compile only, don't link
             '-g',  # Debug info
             '-Os',  # Optimize for size
+            '-ffunction-sections',  # Place each function in its own section
+            '-fdata-sections',  # Place each data item in its own section
             '-w',  # Suppress warnings
             f'-mmcu={mcu}',
         ]
@@ -494,6 +496,8 @@ class ArduinoCLI:
             else:
                 core_compile_flags.extend([
                     '-Os',  # Optimize for size (not for assembly)
+                    '-ffunction-sections',
+                    '-fdata-sections',
                 ])
 
             core_compile_flags.append('-w')  # Suppress warnings
@@ -536,6 +540,7 @@ class ArduinoCLI:
             str(toolchain.get_avr_gcc_path()),
             '-Os',
             f'-mmcu={mcu}',
+            '-Wl,--gc-sections',
         ]
 
         # Add same -B flags for linking
