@@ -27,7 +27,7 @@ except ImportError:
 
 from ..models import (
     Board, BoardPackage, BoardIndex, BoardPackageVersion,
-    BoardPackageURL, BoardStatus, BoardCategory, BoardSpecs, DEFAULT_BOARDS
+    BoardPackageURL, BoardStatus, BoardCategory, BoardSpecs
 )
 
 
@@ -76,7 +76,6 @@ class BoardManager(QObject):
         self._load_package_urls()
         self._load_installed_packages()
         self._load_board_index()
-        self._initialize_default_boards()
 
     def _emit_signal(self, signal_name: str, *args):
         """Safely emit a signal if it exists and Qt is available"""
@@ -167,22 +166,6 @@ class BoardManager(QObject):
                 )
             except Exception as e:
                 print(f"Error loading board index: {e}")
-
-    def _initialize_default_boards(self):
-        """Initialize with default Arduino boards"""
-        # Check if we have any packages
-        if not self.board_index.packages:
-            # Create a default Arduino AVR package
-            default_package = BoardPackage(
-                name="Arduino AVR Boards",
-                maintainer="Arduino",
-                category=BoardCategory.OFFICIAL,
-                url="https://arduino.cc",
-                boards=DEFAULT_BOARDS,
-                latest_version="1.8.6",
-            )
-
-            self.board_index.packages.append(default_package)
 
     def update_index(self, force: bool = False) -> bool:
         """Update board package index from Arduino servers"""
