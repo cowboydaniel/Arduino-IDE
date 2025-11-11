@@ -26,7 +26,6 @@ from .board import (
     BoardStatus,
     BoardCategory,
     BoardIndex,
-    DEFAULT_BOARDS,
 )
 
 from .package import (
@@ -60,7 +59,6 @@ __all__ = [
     "BoardStatus",
     "BoardCategory",
     "BoardIndex",
-    "DEFAULT_BOARDS",
     # Package models
     "ProjectConfig",
     "ProjectBoard",
