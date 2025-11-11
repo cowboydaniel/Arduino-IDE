@@ -211,9 +211,16 @@ class MainWindow(QMainWindow):
         self._last_selected_port = None
         self._compilation_output = ""  # Store compilation output for parsing
         self._upload_after_compile = False  # Flag to trigger upload after successful compilation
+        self._is_background_compile = False  # Flag to distinguish background vs user-initiated compile
 
         # Current build configuration
         self.build_config = "Release"
+
+        # Background compilation timer for real-time memory updates
+        self._background_compile_timer = QTimer(self)
+        self._background_compile_timer.setSingleShot(True)
+        self._background_compile_timer.timeout.connect(self._do_background_compile)
+        self._background_compile_delay = 3000  # 3 seconds after user stops typing
 
         self.init_ui()
         self.create_menus()
@@ -630,6 +637,7 @@ class MainWindow(QMainWindow):
         # Connect editor changes to pin usage update and status display
         editor_container.editor.textChanged.connect(self.update_pin_usage)
         editor_container.editor.textChanged.connect(self.update_status_display)
+        editor_container.editor.textChanged.connect(self._on_code_changed)
 
         # Connect cursor position changes to status bar
         editor_container.editor.cursorPositionChanged.connect(self.update_cursor_position)
@@ -881,7 +889,9 @@ void loop() {
             self.console_panel.append_output(line, color=color)
 
     def _handle_cli_output(self, text):
-        self._append_console_stream(text)
+        # Only show output for non-background compiles
+        if not self._is_background_compile:
+            self._append_console_stream(text)
         # Store compilation output for parsing memory usage
         if self._cli_current_operation == "compile":
             self._compilation_output += text
@@ -890,19 +900,26 @@ void loop() {
         if not text:
             return
         self._last_cli_error += text
-        self._append_console_stream(text, color="#F48771")
+        # Only show errors for non-background compiles
+        if not self._is_background_compile:
+            self._append_console_stream(text, color="#F48771")
 
     def _handle_cli_finished(self, exit_code):
         operation = self._cli_current_operation
+        is_background = self._is_background_compile
         self._cli_current_operation = None
+        self._is_background_compile = False
 
         if exit_code == 0:
             if operation == "compile":
-                self.console_panel.append_output("✔ Compilation completed successfully.", color="#6A9955")
-                self.status_bar.set_status("Compilation Succeeded")
-
-                # Parse and update memory usage from compilation output
+                # Always parse and update memory usage on successful compile
                 self._parse_and_update_memory_usage(self._compilation_output)
+
+                # Only show messages and handle UI for non-background compiles
+                if not is_background:
+                    self.console_panel.append_output("✔ Compilation completed successfully.", color="#6A9955")
+                    self.status_bar.set_status("Compilation Succeeded")
+                    QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
                 # If this was a compile before upload, trigger the upload now
                 if self._upload_after_compile:
@@ -914,27 +931,40 @@ void loop() {
                 self.status_bar.set_status("Upload Succeeded")
                 if self._open_monitor_after_upload:
                     self.toggle_serial_monitor()
+                self._open_monitor_after_upload = False
+                QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
             else:
-                self.status_bar.set_status("Ready")
-            self._open_monitor_after_upload = False
-            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+                if not is_background:
+                    self.status_bar.set_status("Ready")
         else:
-            detail = self._last_cli_error.strip() or "Check the console for details."
-            if operation == "compile":
-                self.console_panel.append_output("✗ Compilation failed.", color="#F48771")
-                self.status_bar.set_status("Compilation Failed")
-                QMessageBox.critical(self, "Compilation Failed", detail)
-                # Cancel upload if compilation failed
-                self._upload_after_compile = False
-            elif operation == "upload":
-                self.console_panel.append_output("✗ Upload failed.", color="#F48771")
-                self.status_bar.set_status("Upload Failed")
-                QMessageBox.critical(self, "Upload Failed", detail)
+            # For background compiles, ALWAYS try to parse memory even with errors
+            # This allows the memory monitor to update even when code has compilation errors
+            if is_background and operation == "compile":
+                self._parse_and_update_memory_usage(self._compilation_output)
+
+            # Only show error dialogs and messages for non-background compiles
+            if not is_background:
+                detail = self._last_cli_error.strip() or "Check the console for details."
+                if operation == "compile":
+                    self.console_panel.append_output("✗ Compilation failed.", color="#F48771")
+                    self.status_bar.set_status("Compilation Failed")
+                    QMessageBox.critical(self, "Compilation Failed", detail)
+                    # Cancel upload if compilation failed
+                    self._upload_after_compile = False
+                elif operation == "upload":
+                    self.console_panel.append_output("✗ Upload failed.", color="#F48771")
+                    self.status_bar.set_status("Upload Failed")
+                    QMessageBox.critical(self, "Upload Failed", detail)
+                else:
+                    self.status_bar.set_status("Error")
+                    QMessageBox.critical(self, "Command Failed", detail)
+                self._open_monitor_after_upload = False
+                QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
             else:
-                self.status_bar.set_status("Error")
-                QMessageBox.critical(self, "Command Failed", detail)
-            self._open_monitor_after_upload = False
-            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+                # Background compile failed - silently ignore errors
+                # Cancel upload if this was a background compile before upload
+                self._upload_after_compile = False
+                self._open_monitor_after_upload = False
 
         # Clear compilation output buffer
         self._compilation_output = ""
@@ -971,11 +1001,75 @@ void loop() {
                 flash_used, flash_max, ram_used, ram_max
             )
 
-            # Log to console
-            self.console_panel.append_output(
-                f"✓ Memory updated: Flash {flash_used}/{flash_max} bytes, RAM {ram_used}/{ram_max} bytes",
-                color="#6A9955"
-            )
+            # Log to console (only for non-background compiles)
+            if not self._is_background_compile:
+                self.console_panel.append_output(
+                    f"✓ Memory updated: Flash {flash_used}/{flash_max} bytes, RAM {ram_used}/{ram_max} bytes",
+                    color="#6A9955"
+                )
+
+    def _on_code_changed(self):
+        """Called when code changes - restart background compile timer"""
+        # Cancel any pending background compile
+        if self._background_compile_timer.isActive():
+            self._background_compile_timer.stop()
+
+        # Don't start background compile if CLI is already running
+        if self.cli_service.is_running():
+            return
+
+        # Schedule a new background compile after delay
+        self._background_compile_timer.start(self._background_compile_delay)
+
+    def _do_background_compile(self):
+        """Perform a silent background compilation to update memory usage"""
+        # Don't run if CLI is busy
+        if self.cli_service.is_running():
+            return
+
+        current_widget = self.editor_tabs.currentWidget()
+        if not current_widget or not hasattr(current_widget, "editor"):
+            return
+
+        # Need a saved file to compile
+        if not getattr(current_widget, "file_path", None):
+            # For unsaved files, we can't compile - just use estimates
+            return
+
+        sketch_path = Path(current_widget.file_path)
+        if not sketch_path.exists():
+            return
+
+        board = self._get_selected_board()
+        if not board:
+            return
+
+        # Save current content to a temporary file for compilation
+        # (don't force save if user doesn't want to)
+        temp_content = current_widget.editor.toPlainText()
+        try:
+            # Write to temp file for compilation
+            import tempfile
+            temp_dir = Path(tempfile.gettempdir()) / "arduino-ide-bg-compile"
+            temp_dir.mkdir(exist_ok=True)
+            temp_sketch = temp_dir / sketch_path.name
+            temp_sketch.write_text(temp_content, encoding="utf-8")
+
+            build_config = self.config_selector.currentText() if hasattr(self, "config_selector") else None
+
+            # Mark this as a background compile
+            self._is_background_compile = True
+            self._cli_current_operation = "compile"
+            self._last_cli_error = ""
+            self._compilation_output = ""
+
+            # Run silent compilation
+            self.cli_service.run_compile(str(temp_sketch), board.fqbn, config=build_config)
+
+        except Exception as exc:
+            # Silently ignore any errors in background compile
+            self._is_background_compile = False
+            self._cli_current_operation = None
 
     def _get_selected_board(self):
         board_name = self.board_selector.currentText().strip() if hasattr(self, "board_selector") else ""
