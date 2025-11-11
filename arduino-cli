@@ -234,32 +234,64 @@ class ArduinoCLI:
 
         return 0
 
-    def board_list(self):
+    def board_list(self, format: str = 'text'):
         """List available boards"""
         boards = self.board_manager.get_all_boards()
 
-        if not boards:
-            print("No boards found")
+        if format == 'json':
+            # Output boards in JSON format for arduino-cli compatibility
+            boards_json = []
+            for board in boards:
+                board_dict = {
+                    "name": board.name,
+                    "fqbn": board.fqbn,
+                    "platform": {
+                        "id": f"{board.package_name}:{board.architecture}",
+                        "name": board.package_name
+                    }
+                }
+                boards_json.append(board_dict)
+            print(json.dumps(boards_json, indent=2))
         else:
-            print(f"{'Name':<30} {'FQBN':<40}")
-            print("-" * 75)
-            for board in boards[:30]:  # Show top 30
-                print(f"{board.name:<30} {board.fqbn:<40}")
+            # Text format
+            if not boards:
+                print("No boards found")
+            else:
+                print(f"{'Name':<30} {'FQBN':<40}")
+                print("-" * 75)
+                for board in boards[:30]:  # Show top 30
+                    print(f"{board.name:<30} {board.fqbn:<40}")
 
         return 0
 
-    def board_search(self, query: str):
+    def board_search(self, query: str, format: str = 'text'):
         """Search for boards"""
         boards = self.board_manager.search_boards(query=query)
 
-        if not boards:
-            print(f"No boards found matching '{query}'")
+        if format == 'json':
+            # Output boards in JSON format
+            boards_json = []
+            for board in boards:
+                board_dict = {
+                    "name": board.name,
+                    "fqbn": board.fqbn,
+                    "platform": {
+                        "id": f"{board.package_name}:{board.architecture}",
+                        "name": board.package_name
+                    }
+                }
+                boards_json.append(board_dict)
+            print(json.dumps(boards_json, indent=2))
         else:
-            print(f"\nFound {len(boards)} boards:\n")
-            print(f"{'Name':<30} {'Architecture':<15} {'FQBN':<40}")
-            print("-" * 90)
-            for board in boards[:20]:
-                print(f"{board.name:<30} {board.architecture:<15} {board.fqbn:<40}")
+            # Text format
+            if not boards:
+                print(f"No boards found matching '{query}'")
+            else:
+                print(f"\nFound {len(boards)} boards:\n")
+                print(f"{'Name':<30} {'Architecture':<15} {'FQBN':<40}")
+                print("-" * 90)
+                for board in boards[:20]:
+                    print(f"{board.name:<30} {board.architecture:<15} {board.fqbn:<40}")
 
         return 0
 
@@ -1379,10 +1411,12 @@ def main():
 
     # board list
     board_list_parser = board_subparsers.add_parser('list', help='List boards')
+    board_list_parser.add_argument('--format', choices=['text', 'json'], default='text', help='Output format')
 
     # board search
     board_search_parser = board_subparsers.add_parser('search', help='Search boards')
     board_search_parser.add_argument('query', help='Search query')
+    board_search_parser.add_argument('--format', choices=['text', 'json'], default='text', help='Output format')
 
     # Parse arguments
     args = parser.parse_args()
@@ -1430,10 +1464,10 @@ def main():
 
         elif args.command == 'board':
             if args.board_command == 'list':
-                return cli.board_list()
+                return cli.board_list(format=args.format)
 
             elif args.board_command == 'search':
-                return cli.board_search(args.query)
+                return cli.board_search(args.query, format=args.format)
 
         elif args.command == 'compile':
             return cli.compile_sketch(
