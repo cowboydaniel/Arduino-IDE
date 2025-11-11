@@ -140,8 +140,70 @@ class LibraryManager(QObject):
                     data = json.load(f)
 
                 # Parse libraries
+                # Arduino library index uses FLAT structure: each entry is one version
+                # We need to group entries by library name and aggregate versions
+                libraries_dict = {}  # name -> aggregated library data
+
+                for lib_entry in data.get("libraries", []):
+                    try:
+                        lib_name = lib_entry.get("name", "")
+                        if not lib_name:
+                            continue
+
+                        # If this library hasn't been seen, create entry with versions array
+                        if lib_name not in libraries_dict:
+                            # Create base library entry with versions array
+                            libraries_dict[lib_name] = {
+                                "name": lib_name,
+                                "author": lib_entry.get("author", ""),
+                                "maintainer": lib_entry.get("maintainer", ""),
+                                "sentence": lib_entry.get("sentence", ""),
+                                "paragraph": lib_entry.get("paragraph", ""),
+                                "website": lib_entry.get("website", ""),
+                                "category": lib_entry.get("category", "Uncategorized"),
+                                "architectures": lib_entry.get("architectures", ["*"]),
+                                "types": lib_entry.get("types", []),
+                                "repository": lib_entry.get("repository", ""),
+                                "url": lib_entry.get("website", ""),
+                                "license": lib_entry.get("license", ""),
+                                "versions": []
+                            }
+
+                        # Add this version to the versions array
+                        version_entry = {
+                            "version": lib_entry.get("version", ""),
+                            "url": lib_entry.get("url", ""),
+                            "archiveFileName": lib_entry.get("archiveFileName", ""),
+                            "size": lib_entry.get("size", 0),
+                            "checksum": lib_entry.get("checksum", ""),
+                            "dependencies": lib_entry.get("dependencies", []),
+                            "architectures": lib_entry.get("architectures", ["*"]),
+                        }
+
+                        # Try to parse release date from various possible fields
+                        release_date = None
+                        for date_field in ["releaseDate", "release_date", "date"]:
+                            if date_field in lib_entry:
+                                try:
+                                    release_date = lib_entry[date_field]
+                                    break
+                                except:
+                                    pass
+
+                        if not release_date:
+                            # Use a default date if none provided
+                            release_date = "2000-01-01T00:00:00Z"
+
+                        version_entry["releaseDate"] = release_date
+
+                        libraries_dict[lib_name]["versions"].append(version_entry)
+
+                    except Exception as e:
+                        print(f"Error parsing library entry: {e}")
+
+                # Convert aggregated dict to Library objects
                 libraries = []
-                for lib_data in data.get("libraries", []):
+                for lib_name, lib_data in libraries_dict.items():
                     try:
                         lib = Library.from_arduino_index(lib_data)
 
@@ -152,7 +214,7 @@ class LibraryManager(QObject):
 
                         libraries.append(lib)
                     except Exception as e:
-                        print(f"Error parsing library: {e}")
+                        print(f"Error parsing library {lib_name}: {e}")
 
                 self.library_index.libraries = libraries
                 self.library_index.last_updated = datetime.fromisoformat(
