@@ -576,28 +576,6 @@ class StatusDisplay(QWidget):
         self.ram_bar = MemoryBar("Dynamic Memory (RAM)")
         main_layout.addWidget(self.ram_bar)
 
-        # Board info
-        board_group = QGroupBox("Board Information")
-        board_group.setFont(QFont("Arial", 9, QFont.Bold))
-        board_layout = QVBoxLayout()
-
-        self.board_name_label = QLabel("Board: Arduino Uno")
-        self.board_name_label.setFont(QFont("Consolas", 9))
-        board_layout.addWidget(self.board_name_label)
-
-        board_group.setLayout(board_layout)
-        main_layout.addWidget(board_group)
-
-        # Info note
-        info_label = QLabel(
-            "✓ High-accuracy estimation (99%+ accurate)\n"
-            "Based on actual compiler memory footprint analysis"
-        )
-        info_label.setFont(QFont("Arial", 8))
-        info_label.setStyleSheet("color: #4CAF50; padding: 10px; background: #1e1e1e; border-radius: 5px;")
-        info_label.setWordWrap(True)
-        main_layout.addWidget(info_label)
-
         main_layout.addStretch()
 
         # Initialize with default board
@@ -713,9 +691,6 @@ class StatusDisplay(QWidget):
         self.board_architecture = specs.get(
             "architecture", CodeAnalyzer.detect_architecture(board_name)
         )
-
-        # Update board name display
-        self.board_name_label.setText(f"Board: {board_name}")
 
         # Re-analyze current code with new board specs
         if self.current_code:
