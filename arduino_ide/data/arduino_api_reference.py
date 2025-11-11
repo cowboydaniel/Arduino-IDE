@@ -6,6 +6,66 @@ Provides contextual information about Arduino functions and C++ language feature
 from arduino_ide.data.cpp_reference import CPP_REFERENCE
 
 ARDUINO_API = {
+    "setup": {
+        "title": "setup()",
+        "category": "Arduino Core",
+        "description": "The setup() function is called once when the Arduino starts. Use it to initialize variables, pin modes, libraries, and serial communication.",
+        "syntax": "void setup() {\n  // initialization code\n}",
+        "parameters": [],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Runs only once at startup or after reset",
+            "⚠️  Must be defined in every Arduino sketch"
+        ],
+        "tips": [
+            "💡 Initialize Serial communication here with Serial.begin()",
+            "💡 Set pin modes with pinMode()",
+            "💡 Initialize libraries and hardware",
+            "💡 Initialize variables that need startup values"
+        ],
+        "example": """void setup() {
+  // Initialize serial communication
+  Serial.begin(9600);
+
+  // Set pin modes
+  pinMode(13, OUTPUT);
+  pinMode(2, INPUT_PULLUP);
+
+  // Initialize variables
+  Serial.println("System Ready");
+}"""
+    },
+
+    "loop": {
+        "title": "loop()",
+        "category": "Arduino Core",
+        "description": "The loop() function runs continuously after setup() completes. This is where your main program logic goes.",
+        "syntax": "void loop() {\n  // main code\n}",
+        "parameters": [],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Runs continuously in an infinite loop",
+            "⚠️  Must be defined in every Arduino sketch",
+            "⚠️  Avoid long blocking delays - use millis() instead"
+        ],
+        "tips": [
+            "💡 Runs repeatedly after setup() finishes",
+            "💡 Use millis() for non-blocking timing",
+            "💡 Keep loop() fast for responsive programs",
+            "💡 Put one-time initialization in setup(), not loop()"
+        ],
+        "example": """void loop() {
+  // Read sensor
+  int sensorValue = analogRead(A0);
+
+  // Process data
+  Serial.println(sensorValue);
+
+  // Wait before next reading
+  delay(100);
+}"""
+    },
+
     "Serial.begin": {
         "title": "Serial Configuration",
         "category": "Serial Communication",
@@ -418,6 +478,394 @@ void setup() {
   SPI.begin();
 }
         """.strip()
+    },
+
+    "Serial.print": {
+        "title": "Serial Print",
+        "category": "Serial Communication",
+        "description": "Prints data to serial port without newline",
+        "syntax": "Serial.print(val)\nSerial.print(val, format)",
+        "parameters": [
+            {
+                "name": "val",
+                "type": "any",
+                "description": "Value to print (string, number, etc.)"
+            },
+            {
+                "name": "format",
+                "type": "int",
+                "description": "Format for numbers (DEC, HEX, OCT, BIN)"
+            }
+        ],
+        "common_values": [
+            {"value": "DEC", "description": "Decimal format (default)"},
+            {"value": "HEX", "description": "Hexadecimal format"},
+            {"value": "BIN", "description": "Binary format"},
+        ],
+        "warnings": [
+            "⚠️  Does NOT add newline (use println for that)",
+        ],
+        "tips": [
+            "💡 Use for printing multiple values on one line",
+            "💡 Combine with println for formatted output"
+        ],
+        "example": """Serial.print("Value: ");
+Serial.println(42);
+// Prints: Value: 42"""
+    },
+
+    "Serial.available": {
+        "title": "Serial Available",
+        "category": "Serial Communication",
+        "description": "Returns number of bytes available to read from serial buffer",
+        "syntax": "Serial.available()",
+        "parameters": [],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Returns 0 if no data available",
+        ],
+        "tips": [
+            "💡 Check before reading to avoid blocking",
+            "💡 Use in while loop to read all available data"
+        ],
+        "example": """if (Serial.available() > 0) {
+  char c = Serial.read();
+  Serial.print("Received: ");
+  Serial.println(c);
+}"""
+    },
+
+    "Serial.read": {
+        "title": "Serial Read",
+        "category": "Serial Communication",
+        "description": "Reads one byte from serial buffer",
+        "syntax": "Serial.read()",
+        "parameters": [],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Returns -1 if no data available",
+            "⚠️  Removes byte from buffer",
+        ],
+        "tips": [
+            "💡 Check Serial.available() first",
+            "💡 Cast to char for character data: char c = (char)Serial.read()"
+        ],
+        "example": """if (Serial.available() > 0) {
+  int data = Serial.read();
+  if (data != -1) {
+    Serial.println((char)data);
+  }
+}"""
+    },
+
+    "delayMicroseconds": {
+        "title": "Microsecond Delay",
+        "category": "Time",
+        "description": "Pauses program for specified microseconds",
+        "syntax": "delayMicroseconds(us)",
+        "parameters": [
+            {
+                "name": "us",
+                "type": "unsigned int",
+                "description": "Number of microseconds to pause (max ~16383)"
+            }
+        ],
+        "common_values": [
+            {"value": "1", "description": "1 microsecond"},
+            {"value": "10", "description": "10 microseconds"},
+            {"value": "100", "description": "0.1 milliseconds"},
+        ],
+        "warnings": [
+            "⚠️  Blocking delay (like delay())",
+            "⚠️  Maximum ~16383 microseconds on 16MHz Arduino",
+            "⚠️  Not accurate below ~3 microseconds"
+        ],
+        "tips": [
+            "💡 Use for very short, precise delays",
+            "💡 For longer delays, use delay()"
+        ],
+        "example": """digitalWrite(triggerPin, HIGH);
+delayMicroseconds(10);  // 10μs pulse
+digitalWrite(triggerPin, LOW);"""
+    },
+
+    "micros": {
+        "title": "Microseconds Counter",
+        "category": "Time",
+        "description": "Returns time since program started in microseconds",
+        "syntax": "micros()",
+        "parameters": [],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Overflows after ~70 minutes",
+            "⚠️  Resolution: 4 microseconds on 16MHz Arduino"
+        ],
+        "tips": [
+            "💡 Use for precise timing measurements",
+            "💡 Better precision than millis()"
+        ],
+        "example": """unsigned long start = micros();
+// Do something
+unsigned long duration = micros() - start;
+Serial.println(duration);"""
+    },
+
+    "map": {
+        "title": "Map (Re-map Number)",
+        "category": "Math",
+        "description": "Re-maps a number from one range to another",
+        "syntax": "map(value, fromLow, fromHigh, toLow, toHigh)",
+        "parameters": [
+            {
+                "name": "value",
+                "type": "long",
+                "description": "Number to map"
+            },
+            {
+                "name": "fromLow",
+                "type": "long",
+                "description": "Lower bound of value's current range"
+            },
+            {
+                "name": "fromHigh",
+                "type": "long",
+                "description": "Upper bound of value's current range"
+            },
+            {
+                "name": "toLow",
+                "type": "long",
+                "description": "Lower bound of target range"
+            },
+            {
+                "name": "toHigh",
+                "type": "long",
+                "description": "Upper bound of target range"
+            }
+        ],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Does not constrain values to output range",
+            "⚠️  Uses integer math (may lose precision)"
+        ],
+        "tips": [
+            "💡 Perfect for sensor value conversion",
+            "💡 Use constrain() to limit output range",
+            "💡 Common: map(analogRead(A0), 0, 1023, 0, 255)"
+        ],
+        "example": """int sensorValue = analogRead(A0);
+// Map 0-1023 to 0-255
+int brightness = map(sensorValue, 0, 1023, 0, 255);
+analogWrite(ledPin, brightness);"""
+    },
+
+    "constrain": {
+        "title": "Constrain",
+        "category": "Math",
+        "description": "Constrains a number to be within a range",
+        "syntax": "constrain(x, min, max)",
+        "parameters": [
+            {
+                "name": "x",
+                "type": "any number",
+                "description": "Number to constrain"
+            },
+            {
+                "name": "min",
+                "type": "any number",
+                "description": "Minimum value"
+            },
+            {
+                "name": "max",
+                "type": "any number",
+                "description": "Maximum value"
+            }
+        ],
+        "common_values": [],
+        "warnings": [],
+        "tips": [
+            "💡 Use to prevent values from going out of range",
+            "💡 Useful after calculations that might overflow",
+            "💡 Combine with map() for safe range conversion"
+        ],
+        "example": """int speed = constrain(input, 0, 255);
+// Ensures speed is between 0 and 255
+
+float temp = constrain(reading, -40, 125);"""
+    },
+
+    "random": {
+        "title": "Random Number",
+        "category": "Math",
+        "description": "Generates pseudo-random numbers",
+        "syntax": "random(max)\nrandom(min, max)",
+        "parameters": [
+            {
+                "name": "min",
+                "type": "long",
+                "description": "Lower bound (inclusive, optional, default 0)"
+            },
+            {
+                "name": "max",
+                "type": "long",
+                "description": "Upper bound (exclusive)"
+            }
+        ],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Pseudo-random (predictable sequence)",
+            "⚠️  Max value is exclusive (not included)"
+        ],
+        "tips": [
+            "💡 Use randomSeed() for different sequences",
+            "💡 random(10) returns 0-9",
+            "💡 random(5, 10) returns 5-9"
+        ],
+        "example": """long dice = random(1, 7);  // 1 to 6
+Serial.println(dice);
+
+long value = random(100);  // 0 to 99"""
+    },
+
+    "randomSeed": {
+        "title": "Random Seed",
+        "category": "Math",
+        "description": "Initializes the pseudo-random number generator",
+        "syntax": "randomSeed(seed)",
+        "parameters": [
+            {
+                "name": "seed",
+                "type": "unsigned long",
+                "description": "Seed value (different seeds produce different sequences)"
+            }
+        ],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Same seed produces same random sequence"
+        ],
+        "tips": [
+            "💡 Use analogRead on unconnected pin for random seed",
+            "💡 Call once in setup()",
+            "💡 randomSeed(analogRead(0)) for different sequences each run"
+        ],
+        "example": """void setup() {
+  randomSeed(analogRead(0));
+}
+
+void loop() {
+  long value = random(100);
+  Serial.println(value);
+  delay(1000);
+}"""
+    },
+
+    "tone": {
+        "title": "Tone (Generate Sound)",
+        "category": "Advanced I/O",
+        "description": "Generates a square wave of specified frequency on a pin",
+        "syntax": "tone(pin, frequency)\ntone(pin, frequency, duration)",
+        "parameters": [
+            {
+                "name": "pin",
+                "type": "int",
+                "description": "Pin to output tone"
+            },
+            {
+                "name": "frequency",
+                "type": "unsigned int",
+                "description": "Frequency in hertz"
+            },
+            {
+                "name": "duration",
+                "type": "unsigned long",
+                "description": "Duration in milliseconds (optional)"
+            }
+        ],
+        "common_values": [
+            {"value": "262", "description": "Middle C (C4)"},
+            {"value": "440", "description": "A4 (concert pitch)"},
+            {"value": "1000", "description": "1 kHz beep"}
+        ],
+        "warnings": [
+            "⚠️  Can only generate one tone at a time",
+            "⚠️  Interferes with PWM on pins 3 and 11",
+            "⚠️  Use noTone() to stop"
+        ],
+        "tips": [
+            "💡 Connect speaker/buzzer between pin and ground",
+            "💡 Use duration parameter or noTone() to stop",
+            "💡 Human hearing: ~20 Hz to 20 kHz"
+        ],
+        "example": """tone(8, 1000);     // 1kHz tone on pin 8
+delay(1000);
+noTone(8);         // Stop tone
+
+tone(8, 262, 250); // Middle C for 250ms"""
+    },
+
+    "noTone": {
+        "title": "No Tone",
+        "category": "Advanced I/O",
+        "description": "Stops tone generation on a pin",
+        "syntax": "noTone(pin)",
+        "parameters": [
+            {
+                "name": "pin",
+                "type": "int",
+                "description": "Pin to stop tone output"
+            }
+        ],
+        "common_values": [],
+        "warnings": [],
+        "tips": [
+            "💡 Always call after tone() if no duration specified",
+            "💡 Stops the tone immediately"
+        ],
+        "example": """tone(8, 1000);
+delay(500);
+noTone(8);"""
+    },
+
+    "pulseIn": {
+        "title": "Pulse In",
+        "category": "Advanced I/O",
+        "description": "Reads a pulse (HIGH or LOW) on a pin and returns duration in microseconds",
+        "syntax": "pulseIn(pin, value)\npulseIn(pin, value, timeout)",
+        "parameters": [
+            {
+                "name": "pin",
+                "type": "int",
+                "description": "Pin to read pulse from"
+            },
+            {
+                "name": "value",
+                "type": "int",
+                "description": "Type of pulse to read: HIGH or LOW"
+            },
+            {
+                "name": "timeout",
+                "type": "unsigned long",
+                "description": "Timeout in microseconds (optional, default 1 second)"
+            }
+        ],
+        "common_values": [],
+        "warnings": [
+            "⚠️  Blocking function (waits for pulse)",
+            "⚠️  Returns 0 if timeout occurs"
+        ],
+        "tips": [
+            "💡 Use for ultrasonic sensors (HC-SR04)",
+            "💡 Accurate from 10μs to 3 minutes",
+            "💡 Set shorter timeout to avoid long waits"
+        ],
+        "example": """// Ultrasonic sensor
+digitalWrite(trigPin, LOW);
+delayMicroseconds(2);
+digitalWrite(trigPin, HIGH);
+delayMicroseconds(10);
+digitalWrite(trigPin, LOW);
+
+long duration = pulseIn(echoPin, HIGH);
+long distance = duration * 0.034 / 2;"""
     },
 }
 

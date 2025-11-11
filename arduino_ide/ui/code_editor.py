@@ -25,6 +25,7 @@ from pathlib import Path as PathLib
 sys.path.insert(0, str(PathLib(__file__).parent.parent / "services"))
 from suggestion_analyzer import SuggestionAnalyzer
 from git_diff_utils import calculate_git_changes
+from arduino_ide.data.arduino_api_reference import get_api_info
 
 
 class BreadcrumbBar(QWidget):
@@ -1183,17 +1184,9 @@ class CodeEditor(QPlainTextEdit):
                 method_end += 1
             return text[start:method_end]
 
-        # Return word if it's a known Arduino function (even without '(')
-        # This allows clicking on function names in various contexts
-        arduino_functions = [
-            'pinMode', 'digitalWrite', 'digitalRead',
-            'analogRead', 'analogWrite', 'analogReference',
-            'delay', 'delayMicroseconds', 'millis', 'micros',
-            'attachInterrupt', 'detachInterrupt',
-            'tone', 'noTone', 'pulseIn', 'shiftOut', 'shiftIn'
-        ]
-
-        if word in arduino_functions:
+        # Check if word is in the comprehensive database (Arduino functions, C++ keywords, etc.)
+        # This allows clicking on any documented language element
+        if word and get_api_info(word):
             return word
 
         return None
