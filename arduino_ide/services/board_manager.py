@@ -269,26 +269,57 @@ class BoardManager(QObject):
         return results
 
     def install_package(self, name: str, version: Optional[str] = None) -> bool:
-        """Install a board package"""
-        package = self.get_package(name)
+        """Install a board package/platform.
+
+        Args:
+            name: Can be either package name (e.g., "arduino") or platform ID (e.g., "arduino:avr")
+            version: Specific version to install, or None for latest
+
+        Returns:
+            True if installation succeeded, False otherwise
+        """
+        # Parse platform ID if provided (format: "package:architecture")
+        if ":" in name:
+            parts = name.split(":")
+            package_name = parts[0]
+            architecture = parts[1] if len(parts) > 1 else None
+        else:
+            package_name = name
+            architecture = None
+
+        package = self.get_package(package_name)
         if not package:
-            self._emit_signal('status_message',f"Package '{name}' not found")
+            self._emit_signal('status_message',f"Package '{package_name}' not found")
             return False
 
-        # Determine version to install
-        if not version:
-            version = package.latest_version
+        # Find the specific platform version to install
+        pkg_version = None
+        platform_arch = architecture
 
-        if not version:
-            self._emit_signal('status_message',f"No version found for '{name}'")
-            return False
+        if architecture:
+            # Look for specific architecture in package versions
+            for v in package.versions:
+                # Check if this version has the requested architecture
+                # We'll need to extract architecture info from version data
+                if not version or v.version == version:
+                    pkg_version = v
+                    break
+        else:
+            # No architecture specified, use latest version
+            if not version:
+                version = package.latest_version
 
-        pkg_version = package.get_version(version)
+            if not version:
+                self._emit_signal('status_message',f"No version found for '{package_name}'")
+                return False
+
+            pkg_version = package.get_version(version)
+
         if not pkg_version:
-            self._emit_signal('status_message',f"Version '{version}' not found for '{name}'")
+            self._emit_signal('status_message',f"Version '{version}' not found for '{package_name}'")
             return False
 
-        self._emit_signal('status_message',f"Installing {name} v{version}...")
+        self._emit_signal('status_message',f"Installing {name} v{pkg_version.version}...")
 
         try:
             # Download package
@@ -301,6 +332,9 @@ class BoardManager(QObject):
 
             # Save to temp file
             suffix = '.tar.gz' if pkg_version.url.endswith('.tar.gz') else '.zip'
+            if pkg_version.url.endswith('.tar.bz2'):
+                suffix = '.tar.bz2'
+
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
                 total_size = int(response.headers.get('content-length', 0))
                 downloaded = 0
@@ -317,7 +351,14 @@ class BoardManager(QObject):
 
             # Extract package
             self._emit_signal('status_message',f"Extracting {name}...")
-            install_path = self.packages_dir / name / version
+
+            # Use architecture from version data if not specified in name
+            if not platform_arch and pkg_version.architecture:
+                platform_arch = pkg_version.architecture
+            elif not platform_arch:
+                platform_arch = "unknown"
+
+            install_path = self.packages_dir / package_name / platform_arch / pkg_version.version
 
             # Remove existing installation
             if install_path.exists():
@@ -329,6 +370,9 @@ class BoardManager(QObject):
             if suffix == '.tar.gz':
                 with tarfile.open(tmp_path, 'r:gz') as tar_ref:
                     tar_ref.extractall(install_path)
+            elif suffix == '.tar.bz2':
+                with tarfile.open(tmp_path, 'r:bz2') as tar_ref:
+                    tar_ref.extractall(install_path)
             else:
                 with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
                     zip_ref.extractall(install_path)
@@ -336,15 +380,16 @@ class BoardManager(QObject):
             # Clean up temp file
             os.unlink(tmp_path)
 
-            # Update installed packages
-            self.installed_packages[name] = version
+            # Update installed packages (use full platform ID)
+            platform_id = f"{package_name}:{platform_arch}" if platform_arch != "unknown" else package_name
+            self.installed_packages[platform_id] = pkg_version.version
             self._save_installed_packages()
 
             # Update package object
-            package.installed_version = version
+            package.installed_version = pkg_version.version
 
-            self._emit_signal('status_message',f"Successfully installed {name} v{version}")
-            self._emit_signal('package_installed',name, version)
+            self._emit_signal('status_message',f"Successfully installed {name} v{pkg_version.version}")
+            self._emit_signal('package_installed',name, pkg_version.version)
             return True
 
         except Exception as e:
@@ -352,20 +397,46 @@ class BoardManager(QObject):
             return False
 
     def uninstall_package(self, name: str) -> bool:
-        """Uninstall a board package"""
+        """Uninstall a board package/platform.
+
+        Args:
+            name: Can be either package name (e.g., "arduino") or platform ID (e.g., "arduino:avr")
+
+        Returns:
+            True if uninstallation succeeded, False otherwise
+        """
         if name not in self.installed_packages:
             self._emit_signal('status_message',f"Package '{name}' is not installed")
             return False
 
+        # Parse platform ID if provided
+        if ":" in name:
+            parts = name.split(":")
+            package_name = parts[0]
+            architecture = parts[1] if len(parts) > 1 else None
+        else:
+            package_name = name
+            architecture = None
+
         version = self.installed_packages[name]
-        install_path = self.packages_dir / name / version
 
         try:
+            # Build install path based on structure
+            if architecture:
+                install_path = self.packages_dir / package_name / architecture / version
+            else:
+                install_path = self.packages_dir / package_name / version
+
             if install_path.exists():
                 shutil.rmtree(install_path)
 
-            # Remove version directory if empty
-            pkg_dir = self.packages_dir / name
+            # Remove empty parent directories
+            if architecture:
+                arch_dir = self.packages_dir / package_name / architecture
+                if arch_dir.exists() and not list(arch_dir.iterdir()):
+                    arch_dir.rmdir()
+
+            pkg_dir = self.packages_dir / package_name
             if pkg_dir.exists() and not list(pkg_dir.iterdir()):
                 pkg_dir.rmdir()
 
@@ -373,7 +444,7 @@ class BoardManager(QObject):
             self._save_installed_packages()
 
             # Update package object
-            package = self.get_package(name)
+            package = self.get_package(package_name)
             if package:
                 package.installed_version = None
 
@@ -481,11 +552,8 @@ class BoardManager(QObject):
         return comparison
 
     def get_all_boards(self) -> List[Board]:
-        """Get all available boards"""
-        boards = []
-        for package in self.board_index.packages:
-            boards.extend(package.boards)
-        return boards
+        """Get all boards from installed platforms by parsing boards.txt files"""
+        return self._discover_boards_from_installed_platforms()
 
     def get_architectures(self) -> List[str]:
         """Get all unique architectures"""
@@ -493,6 +561,57 @@ class BoardManager(QObject):
         for board in self.get_all_boards():
             architectures.add(board.architecture)
         return sorted(list(architectures))
+
+    def _discover_boards_from_installed_platforms(self) -> List[Board]:
+        """Discover boards from installed platforms by parsing boards.txt files.
+
+        This implements the Arduino boards platform framework by scanning
+        installed platform packages and parsing their boards.txt files.
+
+        Returns:
+            List of Board objects discovered from installed platforms
+        """
+        from .boards_txt_parser import BoardsTxtParser
+
+        boards = []
+
+        # Scan packages directory for installed platforms
+        # Structure: packages/package_name/architecture/version/boards.txt
+        if not self.packages_dir.exists():
+            return boards
+
+        try:
+            # Iterate through package directories (e.g., arduino, esp32)
+            for package_dir in self.packages_dir.iterdir():
+                if not package_dir.is_dir():
+                    continue
+
+                package_name = package_dir.name
+
+                # Iterate through architecture directories (e.g., avr, esp32)
+                for arch_dir in package_dir.iterdir():
+                    if not arch_dir.is_dir():
+                        continue
+
+                    architecture = arch_dir.name
+
+                    # Iterate through version directories (e.g., 1.8.6)
+                    for version_dir in arch_dir.iterdir():
+                        if not version_dir.is_dir():
+                            continue
+
+                        # Look for boards.txt in this platform
+                        boards_txt = version_dir / "boards.txt"
+                        if boards_txt.exists():
+                            platform_boards = BoardsTxtParser.parse_boards_txt(
+                                boards_txt, package_name, architecture
+                            )
+                            boards.extend(platform_boards)
+
+        except Exception as e:
+            print(f"Error discovering boards from installed platforms: {e}")
+
+        return boards
 
     # ------------------------------------------------------------------
     # Arduino CLI Integration (Generalized Board Support)

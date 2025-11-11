@@ -223,6 +223,17 @@ class ArduinoCLI:
         """Install a board platform"""
         print(f"Installing {platform}...")
 
+        # Ensure package index is available
+        if len(self.board_manager.board_index.packages) == 0:
+            print("No board platforms available.")
+            print("Installing Arduino AVR Boards...")
+            # Try to update index first
+            try:
+                self.board_manager.update_index(force=False)
+            except Exception as e:
+                print(f"✗ Failed to update package index: {e}", file=sys.stderr)
+                return 1
+
         success = self.board_manager.install_package(platform, version)
 
         if success:
