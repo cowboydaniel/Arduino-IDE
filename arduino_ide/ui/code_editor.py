@@ -1173,8 +1173,8 @@ class CodeEditor(QPlainTextEdit):
     def line_number_area_width(self):
         """Calculate width needed for line numbers"""
         digits = len(str(max(1, self.blockCount())))
-        # Extra space for git markers and fold indicators
-        space = 15 + self.fontMetrics().horizontalAdvance('9') * digits
+        # Extra space for git markers, fold indicators, and trailing space after number
+        space = 15 + self.fontMetrics().horizontalAdvance('9' * digits + ' ')
         return space
 
     def update_line_number_area_width(self, _):
