@@ -101,10 +101,14 @@ class ToolchainManager:
         return self.avr_dir / 'bin' / 'avr-objcopy'
 
     def get_avr_ar_path(self) -> Path:
-        """Get path to avr-ar (archiver) executable"""
+        """Get path to avr-gcc-ar (archiver) executable
+
+        Note: We use avr-gcc-ar instead of avr-ar because it's LTO-aware
+        and properly handles LTO object files created with -flto
+        """
         if platform.system() == 'Windows':
-            return self.avr_dir / 'bin' / 'avr-ar.exe'
-        return self.avr_dir / 'bin' / 'avr-ar'
+            return self.avr_dir / 'bin' / 'avr-gcc-ar.exe'
+        return self.avr_dir / 'bin' / 'avr-gcc-ar'
 
     def download_toolchain(self, progress_callback=None) -> bool:
         """Download and install AVR toolchain
