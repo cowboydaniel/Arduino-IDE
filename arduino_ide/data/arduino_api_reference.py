@@ -1,7 +1,9 @@
 """
 Arduino API Reference Database
-Provides contextual information about Arduino functions
+Provides contextual information about Arduino functions and C++ language features
 """
+
+from arduino_ide.data.cpp_reference import CPP_REFERENCE
 
 ARDUINO_API = {
     "Serial.begin": {
@@ -421,19 +423,28 @@ void setup() {
 
 
 def get_api_info(function_name):
-    """Get API information for a function name"""
-    # Direct match
+    """Get API information for a function name or C++ keyword"""
+    # Direct match in Arduino API
     if function_name in ARDUINO_API:
         return ARDUINO_API[function_name]
+
+    # Direct match in C++ reference
+    if function_name in CPP_REFERENCE:
+        return CPP_REFERENCE[function_name]
 
     # Try to match base function (e.g., "Serial.print" matches "Serial.println")
     for key in ARDUINO_API:
         if function_name.startswith(key) or key.startswith(function_name):
             return ARDUINO_API[key]
 
+    # Try partial match in C++ reference (for operators and special cases)
+    for key in CPP_REFERENCE:
+        if function_name.startswith(key) or key.startswith(function_name):
+            return CPP_REFERENCE[key]
+
     return None
 
 
 def get_all_functions():
-    """Get list of all documented functions"""
-    return list(ARDUINO_API.keys())
+    """Get list of all documented functions and C++ keywords"""
+    return list(ARDUINO_API.keys()) + list(CPP_REFERENCE.keys())

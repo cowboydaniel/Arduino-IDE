@@ -147,14 +147,15 @@ class ContextPanel(QWidget):
 
         # Default message
         self.default_message = QLabel(
-            "💡 Click on Arduino functions in your code\n"
-            "to see contextual information here.\n\n"
-            "Try clicking on:\n"
-            "• Serial.begin(9600)\n"
-            "• pinMode(13, OUTPUT)\n"
-            "• digitalWrite()\n"
-            "• analogRead()\n"
-            "• and more..."
+            "💡 Click on code elements to see contextual help\n\n"
+            "Supported:\n"
+            "• Arduino functions (Serial.begin, pinMode, etc.)\n"
+            "• C++ keywords (if, for, while, switch, etc.)\n"
+            "• Data types (int, float, char, bool, etc.)\n"
+            "• Operators (+, -, ==, &&, ||, etc.)\n"
+            "• Control flow (break, continue, return, etc.)\n"
+            "• Preprocessor (#include, #define, etc.)\n"
+            "• And much more!"
         )
         self.default_message.setFont(QFont("Arial", 10))
         self.default_message.setStyleSheet("color: #888; padding: 20px;")
@@ -337,11 +338,13 @@ class ContextPanel(QWidget):
         self.description_label.setText(
             f"No contextual information available for '{word}'.\n\n"
             "This might be:\n"
-            "• A user-defined function\n"
+            "• A user-defined function or variable\n"
             "• A library function not yet documented\n"
-            "• A variable or constant\n\n"
-            "Documentation is available for common Arduino functions like:\n"
-            "Serial.begin, pinMode, digitalWrite, analogRead, etc."
+            "• A custom type or constant\n\n"
+            "Documentation is available for:\n"
+            "• Arduino functions (Serial.begin, pinMode, etc.)\n"
+            "• C++ keywords and types (if, for, int, float, etc.)\n"
+            "• Operators and control flow statements"
         )
         self.description_label.show()
 
