@@ -334,6 +334,22 @@ class ArduinoCLI:
         # Remove multi-line comments
         source_no_comments = re.sub(r'/\*.*?\*/', '', source_no_comments, flags=re.DOTALL)
 
+        # Extract all custom type names (structs, classes, enums, typedefs) defined in the sketch
+        # This prevents generating prototypes for functions using undefined types
+        custom_types = set()
+
+        # Match struct/class/enum definitions
+        type_patterns = [
+            r'^\s*(?:typedef\s+)?struct\s+([a-zA-Z_]\w*)',
+            r'^\s*(?:typedef\s+)?class\s+([a-zA-Z_]\w*)',
+            r'^\s*(?:typedef\s+)?enum\s+([a-zA-Z_]\w*)',
+            r'^\s*typedef\s+.*?\s+([a-zA-Z_]\w*)\s*;',
+        ]
+
+        for pattern in type_patterns:
+            for match in re.finditer(pattern, source_no_comments, re.MULTILINE):
+                custom_types.add(match.group(1))
+
         # Pattern to match function definitions
         # Matches: return_type function_name(parameters) {
         # This pattern captures:
@@ -364,6 +380,16 @@ class ArduinoCLI:
             # Skip if return type contains keywords that indicate this isn't a function
             skip_keywords = ['class', 'struct', 'enum', 'typedef', 'namespace', 'if', 'while', 'for', 'switch']
             if any(keyword in return_type for keyword in skip_keywords):
+                continue
+
+            # Check if the function signature contains any custom types
+            # If it does, skip generating a prototype (let the compiler handle it naturally)
+            full_signature = f"{return_type} {parameters}"
+            uses_custom_type = any(custom_type in full_signature for custom_type in custom_types)
+
+            if uses_custom_type:
+                # Skip generating prototype for functions using custom types
+                # These will be defined in order in the source code
                 continue
 
             # Build the prototype
