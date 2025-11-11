@@ -298,11 +298,14 @@ class PinUsageWidget(QWidget):
 
                 # Try to infer description from variable name if not already set
                 if pin != resolved_pin and not pin_info[resolved_pin]['descriptions']:
-                    # Convert camelCase or snake_case to readable
-                    desc = re.sub(r'([A-Z])', r' \1', pin).strip()
-                    desc = desc.replace('_', ' ').replace('Pin', '').replace('pin', '').strip()
-                    if desc and desc.lower() not in ['led', 'builtin']:
-                        pin_info[resolved_pin]['descriptions'].append(desc.lower())
+                    # Convert snake_case and remove common pin suffixes
+                    desc = pin.replace('_PIN', '').replace('_pin', '').replace('_', ' ')
+                    # Handle camelCase: add space before uppercase letter that follows lowercase
+                    desc = re.sub(r'([a-z])([A-Z])', r'\1 \2', desc)
+                    # Clean up and normalize
+                    desc = desc.replace('  ', ' ').strip().lower()
+                    if desc and desc not in ['led', 'builtin']:
+                        pin_info[resolved_pin]['descriptions'].append(desc)
 
         return pin_info
 
