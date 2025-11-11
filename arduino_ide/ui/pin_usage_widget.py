@@ -277,7 +277,9 @@ class PinUsageWidget(QWidget):
             (r'analogRead\s*\(\s*([A-Z0-9_]+)\s*\)', 'ANALOG'),
         ]
 
-        # First pass: Find pin variable definitions with comments for descriptions
+        # First pass: Find POTENTIAL pin variable definitions with comments for descriptions
+        # We'll only add them to pin_info if they're actually used in pin functions
+        potential_pin_vars = {}  # Map var_name to (pin_num, comment)
         lines = code.split('\n')
         for i, line in enumerate(lines):
             # Look for const/int pin definitions with comments
@@ -310,26 +312,82 @@ class PinUsageWidget(QWidget):
                 comment_match = re.search(r'//\s*(.+)', line)
                 comment = comment_match.group(1) if comment_match else ''
 
-                # Resolve the pin number to standard format (e.g., A0 -> A0, 9 -> D9)
+                # Store as potential pin variable - we'll confirm it later
+                potential_pin_vars[var_name] = (pin_num, comment)
+                print(f"[PIN PARSER DEBUG] Found potential pin variable: {var_name} = {pin_num}")
+
+        # Second pass: Search for pin functions and resolve variable names
+        # Process pinMode() first to establish definitive modes
+        pinMode_pins = {}  # Track pins with explicit pinMode declarations
+        used_vars = set()  # Track which variables are actually used in pin functions
+
+        # First, find all pinMode declarations
+        pinMode_pattern = r'pinMode\s*\(\s*([A-Z0-9_]+)\s*,\s*(\w+)\s*\)'
+        for match in re.finditer(pinMode_pattern, code, re.IGNORECASE):
+            pin = match.group(1)
+            mode = match.group(2).upper()
+
+            # If this is a potential pin variable, confirm it and add to var_to_pin
+            if pin in potential_pin_vars and pin not in var_to_pin:
+                pin_num, comment = potential_pin_vars[pin]
                 resolved_pin = self.resolve_pin_name(pin_num, {})
+                var_to_pin[pin] = resolved_pin
+                used_vars.add(pin)
+                print(f"[PIN PARSER DEBUG] Confirmed pin variable: {pin} -> {resolved_pin}")
 
-                # Build variable to pin mapping
-                var_to_pin[var_name] = resolved_pin
-                print(f"[PIN PARSER DEBUG] Found definition: {var_name} = {pin_num} -> {resolved_pin}")
-
-                # Initialize pin info
+                # Initialize pin info with description
                 if resolved_pin not in pin_info:
-                    pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': var_name}
+                    pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': pin}
                 if comment:
                     pin_info[resolved_pin]['descriptions'].append(comment.strip())
 
-        print(f"[PIN PARSER DEBUG] Variable mapping: {var_to_pin}")
+            # Resolve pin name
+            resolved_pin = self.resolve_pin_name(pin, var_to_pin)
 
-        # Second pass: Search for pin functions and resolve variable names
+            # Validate that resolved pin looks like a real pin
+            if pin not in var_to_pin:
+                if not (resolved_pin.startswith('D') or resolved_pin.startswith('A') or resolved_pin == 'LED_BUILTIN'):
+                    continue
+                if resolved_pin.startswith('D'):
+                    try:
+                        pin_num = int(resolved_pin[1:])
+                        if pin_num > 13:
+                            continue
+                    except ValueError:
+                        continue
+
+            # Store pinMode declaration
+            pinMode_pins[resolved_pin] = mode
+
+            if resolved_pin not in pin_info:
+                pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': pin}
+
+            pin_info[resolved_pin]['modes'].append(mode)
+            print(f"[PIN PARSER DEBUG] pinMode found: {resolved_pin} -> {mode}")
+
+        # Now process other function calls, but don't override pinMode declarations
         for pattern, mode_type in patterns:
+            if mode_type == 'mode':
+                # Skip pinMode since we already processed it
+                continue
+
             matches = re.finditer(pattern, code, re.IGNORECASE)
             for match in matches:
                 pin = match.group(1)
+
+                # If this is a potential pin variable, confirm it and add to var_to_pin
+                if pin in potential_pin_vars and pin not in var_to_pin:
+                    pin_num, comment = potential_pin_vars[pin]
+                    resolved_pin_temp = self.resolve_pin_name(pin_num, {})
+                    var_to_pin[pin] = resolved_pin_temp
+                    used_vars.add(pin)
+                    print(f"[PIN PARSER DEBUG] Confirmed pin variable: {pin} -> {resolved_pin_temp}")
+
+                    # Initialize pin info with description
+                    if resolved_pin_temp not in pin_info:
+                        pin_info[resolved_pin_temp] = {'modes': [], 'descriptions': [], 'var_name': pin}
+                    if comment:
+                        pin_info[resolved_pin_temp]['descriptions'].append(comment.strip())
 
                 # Resolve pin name (handle LED_BUILTIN, variable names, etc.)
                 resolved_pin = self.resolve_pin_name(pin, var_to_pin)
@@ -349,20 +407,18 @@ class PinUsageWidget(QWidget):
                         except ValueError:
                             continue
 
-                if mode_type == 'mode':
-                    # Extract the actual mode from pinMode
-                    mode_match = re.search(r'pinMode\s*\([^,]+,\s*(\w+)\s*\)', match.group(0))
-                    if mode_match:
-                        actual_mode = mode_match.group(1).upper()
-                    else:
-                        actual_mode = 'UNKNOWN'
-                else:
-                    actual_mode = mode_type
+                # Skip if this pin has a pinMode declaration - that's the source of truth
+                if resolved_pin in pinMode_pins:
+                    print(f"[PIN PARSER DEBUG] Skipping {mode_type} for {resolved_pin} - pinMode already declared as {pinMode_pins[resolved_pin]}")
+                    continue
+
+                actual_mode = mode_type
 
                 if resolved_pin not in pin_info:
                     pin_info[resolved_pin] = {'modes': [], 'descriptions': [], 'var_name': pin}
 
                 pin_info[resolved_pin]['modes'].append(actual_mode)
+                print(f"[PIN PARSER DEBUG] Inferred {mode_type} for {resolved_pin}")
 
                 # Try to infer description from variable name if not already set
                 if pin != resolved_pin and not pin_info[resolved_pin]['descriptions']:
@@ -375,6 +431,7 @@ class PinUsageWidget(QWidget):
                     if desc and desc not in ['led', 'builtin']:
                         pin_info[resolved_pin]['descriptions'].append(desc)
 
+        print(f"[PIN PARSER DEBUG] Confirmed variable mapping: {var_to_pin}")
         print(f"[PIN PARSER DEBUG] Final result: {len(pin_info)} pins found")
         for pin, info in pin_info.items():
             print(f"  {pin}: modes={info['modes']}, desc={info['descriptions']}")
