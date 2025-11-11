@@ -392,6 +392,114 @@ class CompletionDatabase:
             CompletionItem('trim()', 'Remove whitespace', 'trim()', 'function'),
         ]
 
+        # Servo library methods
+        self.completions['Servo'] = [
+            CompletionItem('attach()', 'Attach servo to pin', 'attach($0)', 'function'),
+            CompletionItem('detach()', 'Detach servo from pin', 'detach()', 'function'),
+            CompletionItem('write()', 'Write angle to servo (0-180 degrees)', 'write($0)', 'function'),
+            CompletionItem('writeMicroseconds()', 'Write microseconds to servo (544-2400)', 'writeMicroseconds($0)', 'function'),
+            CompletionItem('read()', 'Read current servo angle', 'read()', 'function'),
+            CompletionItem('attached()', 'Check if servo is attached', 'attached()', 'function'),
+        ]
+
+        # SD library methods
+        self.completions['SD'] = [
+            CompletionItem('begin()', 'Initialize SD card', 'begin($0)', 'function'),
+            CompletionItem('open()', 'Open file on SD card', 'open("$0", FILE_READ)', 'function'),
+            CompletionItem('exists()', 'Check if file or directory exists', 'exists("$0")', 'function'),
+            CompletionItem('mkdir()', 'Create directory', 'mkdir("$0")', 'function'),
+            CompletionItem('remove()', 'Delete file', 'remove("$0")', 'function'),
+            CompletionItem('rmdir()', 'Remove directory', 'rmdir("$0")', 'function'),
+        ]
+
+        # File object methods (from SD library)
+        self.completions['File'] = [
+            CompletionItem('available()', 'Get number of bytes available', 'available()', 'function'),
+            CompletionItem('read()', 'Read next byte from file', 'read()', 'function'),
+            CompletionItem('write()', 'Write data to file', 'write($0)', 'function'),
+            CompletionItem('print()', 'Print data to file', 'print($0)', 'function'),
+            CompletionItem('println()', 'Print data with newline to file', 'println($0)', 'function'),
+            CompletionItem('peek()', 'Read byte without advancing', 'peek()', 'function'),
+            CompletionItem('flush()', 'Flush file buffer', 'flush()', 'function'),
+            CompletionItem('close()', 'Close file', 'close()', 'function'),
+            CompletionItem('seek()', 'Seek to position in file', 'seek($0)', 'function'),
+            CompletionItem('position()', 'Get current position in file', 'position()', 'function'),
+            CompletionItem('size()', 'Get file size', 'size()', 'function'),
+            CompletionItem('name()', 'Get file name', 'name()', 'function'),
+            CompletionItem('isDirectory()', 'Check if File is a directory', 'isDirectory()', 'function'),
+            CompletionItem('openNextFile()', 'Open next file in directory', 'openNextFile()', 'function'),
+            CompletionItem('rewindDirectory()', 'Rewind directory to first file', 'rewindDirectory()', 'function'),
+        ]
+
+        # LiquidCrystal library methods
+        self.completions['LiquidCrystal'] = [
+            CompletionItem('begin()', 'Initialize LCD (columns, rows)', 'begin(16, 2)', 'function'),
+            CompletionItem('clear()', 'Clear LCD display', 'clear()', 'function'),
+            CompletionItem('home()', 'Move cursor to home position', 'home()', 'function'),
+            CompletionItem('setCursor()', 'Set cursor position (col, row)', 'setCursor($0, $1)', 'function'),
+            CompletionItem('print()', 'Print text to LCD', 'print($0)', 'function'),
+            CompletionItem('write()', 'Write character to LCD', 'write($0)', 'function'),
+            CompletionItem('display()', 'Turn on LCD display', 'display()', 'function'),
+            CompletionItem('noDisplay()', 'Turn off LCD display', 'noDisplay()', 'function'),
+            CompletionItem('cursor()', 'Show underline cursor', 'cursor()', 'function'),
+            CompletionItem('noCursor()', 'Hide cursor', 'noCursor()', 'function'),
+            CompletionItem('blink()', 'Blink cursor', 'blink()', 'function'),
+            CompletionItem('noBlink()', 'Stop cursor blinking', 'noBlink()', 'function'),
+            CompletionItem('scrollDisplayLeft()', 'Scroll display left', 'scrollDisplayLeft()', 'function'),
+            CompletionItem('scrollDisplayRight()', 'Scroll display right', 'scrollDisplayRight()', 'function'),
+            CompletionItem('leftToRight()', 'Text flows left to right', 'leftToRight()', 'function'),
+            CompletionItem('rightToLeft()', 'Text flows right to left', 'rightToLeft()', 'function'),
+            CompletionItem('autoscroll()', 'Enable autoscroll', 'autoscroll()', 'function'),
+            CompletionItem('noAutoscroll()', 'Disable autoscroll', 'noAutoscroll()', 'function'),
+            CompletionItem('createChar()', 'Create custom character', 'createChar($0, data[])', 'function'),
+        ]
+
+        # Ethernet library methods
+        self.completions['Ethernet'] = [
+            CompletionItem('begin()', 'Initialize Ethernet with MAC', 'begin(mac)', 'function'),
+            CompletionItem('localIP()', 'Get local IP address', 'localIP()', 'function'),
+            CompletionItem('subnetMask()', 'Get subnet mask', 'subnetMask()', 'function'),
+            CompletionItem('gatewayIP()', 'Get gateway IP', 'gatewayIP()', 'function'),
+            CompletionItem('dnsServerIP()', 'Get DNS server IP', 'dnsServerIP()', 'function'),
+            CompletionItem('maintain()', 'Maintain DHCP lease', 'maintain()', 'function'),
+            CompletionItem('linkStatus()', 'Get link status', 'linkStatus()', 'function'),
+            CompletionItem('hardwareStatus()', 'Get hardware status', 'hardwareStatus()', 'function'),
+        ]
+
+        # EthernetClient methods
+        self.completions['EthernetClient'] = [
+            CompletionItem('connect()', 'Connect to server', 'connect(ip, port)', 'function'),
+            CompletionItem('connected()', 'Check if connected', 'connected()', 'function'),
+            CompletionItem('available()', 'Get bytes available to read', 'available()', 'function'),
+            CompletionItem('read()', 'Read incoming byte', 'read()', 'function'),
+            CompletionItem('write()', 'Write data to server', 'write($0)', 'function'),
+            CompletionItem('print()', 'Print data to server', 'print($0)', 'function'),
+            CompletionItem('println()', 'Print data with newline', 'println($0)', 'function'),
+            CompletionItem('flush()', 'Flush outgoing data', 'flush()', 'function'),
+            CompletionItem('stop()', 'Close connection', 'stop()', 'function'),
+        ]
+
+        # WiFi library methods (ESP8266/ESP32)
+        self.completions['WiFi'] = [
+            CompletionItem('begin()', 'Connect to WiFi network', 'begin("ssid", "password")', 'function'),
+            CompletionItem('disconnect()', 'Disconnect from WiFi', 'disconnect()', 'function'),
+            CompletionItem('status()', 'Get connection status', 'status()', 'function'),
+            CompletionItem('localIP()', 'Get local IP address', 'localIP()', 'function'),
+            CompletionItem('SSID()', 'Get current SSID', 'SSID()', 'function'),
+            CompletionItem('RSSI()', 'Get signal strength', 'RSSI()', 'function'),
+            CompletionItem('macAddress()', 'Get MAC address', 'macAddress()', 'function'),
+            CompletionItem('mode()', 'Set WiFi mode', 'mode(WIFI_STA)', 'function'),
+            CompletionItem('scanNetworks()', 'Scan for networks', 'scanNetworks()', 'function'),
+            CompletionItem('softAP()', 'Create access point', 'softAP("ssid", "password")', 'function'),
+            CompletionItem('softAPIP()', 'Get AP IP address', 'softAPIP()', 'function'),
+        ]
+
+        # Stepper library methods
+        self.completions['Stepper'] = [
+            CompletionItem('setSpeed()', 'Set motor speed (RPM)', 'setSpeed($0)', 'function'),
+            CompletionItem('step()', 'Move number of steps', 'step($0)', 'function'),
+        ]
+
         # Global Arduino functions
         self.completions['global'] = [
             # Digital I/O
@@ -418,6 +526,29 @@ class CompletionDatabase:
             CompletionItem('min()', 'Minimum of two values', 'min($0, $1)', 'function'),
             CompletionItem('pow()', 'Raise to power', 'pow($0, $1)', 'function'),
             CompletionItem('sqrt()', 'Square root', 'sqrt($0)', 'function'),
+            CompletionItem('sq()', 'Square a number', 'sq($0)', 'function'),
+
+            # Trigonometry
+            CompletionItem('sin()', 'Sine (radians)', 'sin($0)', 'function'),
+            CompletionItem('cos()', 'Cosine (radians)', 'cos($0)', 'function'),
+            CompletionItem('tan()', 'Tangent (radians)', 'tan($0)', 'function'),
+            CompletionItem('asin()', 'Arc sine (returns radians)', 'asin($0)', 'function'),
+            CompletionItem('acos()', 'Arc cosine (returns radians)', 'acos($0)', 'function'),
+            CompletionItem('atan()', 'Arc tangent (returns radians)', 'atan($0)', 'function'),
+            CompletionItem('atan2()', 'Arc tangent of y/x (returns radians)', 'atan2($0, $1)', 'function'),
+
+            # Angle Conversion
+            CompletionItem('radians()', 'Convert degrees to radians', 'radians($0)', 'function'),
+            CompletionItem('degrees()', 'Convert radians to degrees', 'degrees($0)', 'function'),
+
+            # Advanced Math
+            CompletionItem('exp()', 'Exponential function (e^x)', 'exp($0)', 'function'),
+            CompletionItem('log()', 'Natural logarithm', 'log($0)', 'function'),
+            CompletionItem('log10()', 'Base-10 logarithm', 'log10($0)', 'function'),
+            CompletionItem('ceil()', 'Round up to nearest integer', 'ceil($0)', 'function'),
+            CompletionItem('floor()', 'Round down to nearest integer', 'floor($0)', 'function'),
+            CompletionItem('round()', 'Round to nearest integer', 'round($0)', 'function'),
+            CompletionItem('fmod()', 'Floating-point remainder', 'fmod($0, $1)', 'function'),
 
             # Random
             CompletionItem('random()', 'Generate random number', 'random($0)', 'function'),
@@ -443,7 +574,13 @@ class CompletionDatabase:
             CompletionItem('noTone()', 'Stop tone on pin', 'noTone($0)', 'function'),
             CompletionItem('shiftOut()', 'Shift out data', 'shiftOut($0, clockPin, bitOrder, value)', 'function'),
             CompletionItem('shiftIn()', 'Shift in data', 'shiftIn($0, clockPin, bitOrder)', 'function'),
-            CompletionItem('pulseIn()', 'Measure pulse duration', 'pulseIn($0, state)', 'function'),
+            CompletionItem('pulseIn()', 'Measure pulse duration (microseconds)', 'pulseIn($0, state)', 'function'),
+            CompletionItem('pulseInLong()', 'Measure long pulse duration (microseconds)', 'pulseInLong($0, state)', 'function'),
+
+            # Utility Functions
+            CompletionItem('yield()', 'Pass control to other tasks', 'yield()', 'function'),
+            CompletionItem('sizeof()', 'Get size of variable or type', 'sizeof($0)', 'function'),
+            CompletionItem('digitalPinToInterrupt()', 'Convert pin number to interrupt', 'digitalPinToInterrupt($0)', 'function'),
 
             # Structure snippets
             CompletionItem('setup()', 'Setup function (runs once)', 'void setup() {\n  $0\n}', 'snippet'),
@@ -464,6 +601,28 @@ class CompletionDatabase:
             CompletionItem('interrupt', 'Attach interrupt', 'attachInterrupt(digitalPinToInterrupt($0), ISR_name, RISING);', 'snippet'),
             CompletionItem('pwm', 'PWM output', 'pinMode($0, OUTPUT);\nanalogWrite($0, 128); // 0-255', 'snippet'),
             CompletionItem('servo', 'Servo control pattern', '#include <Servo.h>\nServo myServo;\n\nvoid setup() {\n  myServo.attach($0);\n}\n\nvoid loop() {\n  myServo.write(90);\n}', 'snippet'),
+
+            # LCD patterns
+            CompletionItem('lcd', 'LCD initialization pattern', '#include <LiquidCrystal.h>\nLiquidCrystal lcd(12, 11, 5, 4, 3, 2);\n\nvoid setup() {\n  lcd.begin(16, 2);\n  lcd.print("$0");\n}', 'snippet'),
+            CompletionItem('lcdPrint', 'Print to LCD with cursor', 'lcd.setCursor(0, 0);\nlcd.print("$0");', 'snippet'),
+
+            # SD Card patterns
+            CompletionItem('sdInit', 'Initialize SD card', '#include <SD.h>\nconst int chipSelect = 10;\n\nvoid setup() {\n  Serial.begin(9600);\n  if (!SD.begin(chipSelect)) {\n    Serial.println("SD init failed!");\n    return;\n  }\n  Serial.println("SD initialized");\n}', 'snippet'),
+            CompletionItem('sdWrite', 'Write to SD card file', 'File myFile = SD.open("$0.txt", FILE_WRITE);\nif (myFile) {\n  myFile.println("Data");\n  myFile.close();\n}', 'snippet'),
+            CompletionItem('sdRead', 'Read from SD card file', 'File myFile = SD.open("$0.txt");\nif (myFile) {\n  while (myFile.available()) {\n    Serial.write(myFile.read());\n  }\n  myFile.close();\n}', 'snippet'),
+
+            # Servo patterns
+            CompletionItem('servoSweep', 'Servo sweep pattern', 'for (int pos = 0; pos <= 180; pos++) {\n  myServo.write(pos);\n  delay(15);\n}\nfor (int pos = 180; pos >= 0; pos--) {\n  myServo.write(pos);\n  delay(15);\n}', 'snippet'),
+
+            # WiFi patterns
+            CompletionItem('wifiConnect', 'WiFi connection pattern', '#include <WiFi.h>\nconst char* ssid = "$0";\nconst char* password = "$1";\n\nvoid setup() {\n  Serial.begin(115200);\n  WiFi.begin(ssid, password);\n  while (WiFi.status() != WL_CONNECTED) {\n    delay(500);\n    Serial.print(".");\n  }\n  Serial.println("\\nConnected!");\n  Serial.println(WiFi.localIP());\n}', 'snippet'),
+
+            # Sensor patterns
+            CompletionItem('tempSensor', 'Temperature sensor reading (TMP36)', 'int reading = analogRead($0);\nfloat voltage = reading * 5.0 / 1024.0;\nfloat temperatureC = (voltage - 0.5) * 100.0;', 'snippet'),
+            CompletionItem('ultrasonic', 'Ultrasonic sensor HC-SR04', 'digitalWrite(trigPin, LOW);\ndelayMicroseconds(2);\ndigitalWrite(trigPin, HIGH);\ndelayMicroseconds(10);\ndigitalWrite(trigPin, LOW);\nlong duration = pulseIn(echoPin, HIGH);\nfloat distance = duration * 0.034 / 2;', 'snippet'),
+
+            # State machine pattern
+            CompletionItem('stateMachine', 'Simple state machine', 'enum State { STATE_IDLE, STATE_RUNNING, STATE_STOPPED };\nState currentState = STATE_IDLE;\n\nvoid loop() {\n  switch (currentState) {\n    case STATE_IDLE:\n      // Idle logic\n      break;\n    case STATE_RUNNING:\n      // Running logic\n      break;\n    case STATE_STOPPED:\n      // Stopped logic\n      break;\n  }\n}', 'snippet'),
         ]
 
         # Constants
@@ -516,6 +675,26 @@ class CompletionDatabase:
             CompletionItem('SPI_MODE1', 'SPI mode 1', 'SPI_MODE1', 'constant'),
             CompletionItem('SPI_MODE2', 'SPI mode 2', 'SPI_MODE2', 'constant'),
             CompletionItem('SPI_MODE3', 'SPI mode 3', 'SPI_MODE3', 'constant'),
+
+            # WiFi constants
+            CompletionItem('WL_CONNECTED', 'WiFi connected status', 'WL_CONNECTED', 'constant'),
+            CompletionItem('WL_DISCONNECTED', 'WiFi disconnected status', 'WL_DISCONNECTED', 'constant'),
+            CompletionItem('WL_IDLE_STATUS', 'WiFi idle status', 'WL_IDLE_STATUS', 'constant'),
+            CompletionItem('WL_NO_SSID_AVAIL', 'WiFi SSID not available', 'WL_NO_SSID_AVAIL', 'constant'),
+            CompletionItem('WL_CONNECT_FAILED', 'WiFi connection failed', 'WL_CONNECT_FAILED', 'constant'),
+            CompletionItem('WIFI_STA', 'WiFi station mode', 'WIFI_STA', 'constant'),
+            CompletionItem('WIFI_AP', 'WiFi access point mode', 'WIFI_AP', 'constant'),
+            CompletionItem('WIFI_AP_STA', 'WiFi station + AP mode', 'WIFI_AP_STA', 'constant'),
+
+            # SD Card constants
+            CompletionItem('FILE_READ', 'Open file for reading', 'FILE_READ', 'constant'),
+            CompletionItem('FILE_WRITE', 'Open file for writing', 'FILE_WRITE', 'constant'),
+
+            # Data type size constants
+            CompletionItem('DEC', 'Decimal format', 'DEC', 'constant'),
+            CompletionItem('HEX', 'Hexadecimal format', 'HEX', 'constant'),
+            CompletionItem('OCT', 'Octal format', 'OCT', 'constant'),
+            CompletionItem('BIN', 'Binary format', 'BIN', 'constant'),
         ]
 
     def get_completions(self, context=None):
