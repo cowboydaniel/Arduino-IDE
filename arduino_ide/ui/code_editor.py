@@ -1257,7 +1257,7 @@ class CodeEditor(QPlainTextEdit):
                 # Draw line number
                 number = str(line_num)
                 painter.setPen(QColor("#858585"))  # Gray
-                painter.drawText(15, top, self.line_number_area.width() - 15,
+                painter.drawText(15, top, self.line_number_area_width() - 15,
                                self.fontMetrics().height(),
                                Qt.AlignRight, number + " ")
 
