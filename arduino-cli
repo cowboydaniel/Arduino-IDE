@@ -413,6 +413,8 @@ class ArduinoCLI:
             '-fno-exceptions',  # Match Arduino's C++ flags
             '-fno-threadsafe-statics',  # Reduce static initialization overhead
             '-std=gnu++11',  # Use the same C++ dialect as the official toolchain
+            '-ffunction-sections',  # Place each function in its own section
+            '-fdata-sections',  # Place each data item in its own section
             '-w',  # Suppress warnings
             f'-mmcu={mcu}',
         ]
