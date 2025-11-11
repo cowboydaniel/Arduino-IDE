@@ -11,7 +11,7 @@ import zipfile
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 import requests
 
