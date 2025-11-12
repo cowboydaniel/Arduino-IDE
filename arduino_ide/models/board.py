@@ -283,11 +283,6 @@ class BoardIndex:
             enabled=False
         ),
         BoardPackageURL(
-            name="Arduino SAMD Beta",
-            url="https://downloads.arduino.cc/packages/package_staging_index.json",
-            enabled=False
-        ),
-        BoardPackageURL(
             name="Seeed Studio",
             url="https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json",
             enabled=False
