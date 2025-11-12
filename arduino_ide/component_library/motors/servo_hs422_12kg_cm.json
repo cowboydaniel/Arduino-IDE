@@ -1,8 +1,8 @@
 {
-  "id": "servo_sg90_2kg_cm",
-  "name": "SG90 Micro Servo (2kg-cm torque)",
+  "id": "servo_hs422_12kg_cm",
+  "name": "HS-422 Analog Servo (12kg-cm torque)",
   "component_type": "servo",
-  "description": "Micro servo configured for 2.0 kg\u00b7cm output torque with 0.12s/60\u00b0 @ 4.8V response.",
+  "description": "Standard servo configured for 12.0 kg\u00b7cm output torque with 0.21s/60\u00b0 @ 6.0V response.",
   "width": 60,
   "height": 70,
   "pins": [
@@ -37,13 +37,13 @@
   "metadata": {
     "motor_subtype": "Servo",
     "voltage": "4.8-6.0V",
-    "speed": "0.12s/60\u00b0 @ 4.8V",
-    "torque": "2.0 kg\u00b7cm",
-    "current": "0.65A stall",
+    "speed": "0.21s/60\u00b0 @ 6.0V",
+    "torque": "12.0 kg\u00b7cm",
+    "current": "2.50A stall",
     "control_interface": "PWM (50Hz, 1-2ms pulse)",
     "step_angle": "N/A",
-    "mechanical_dimensions": "22.8 \u00d7 12.2 \u00d7 28.5 mm",
-    "form_factor": "Micro",
-    "weight": "9g"
+    "mechanical_dimensions": "40.6 \u00d7 19.8 \u00d7 36.6 mm",
+    "form_factor": "Standard",
+    "weight": "45g"
   }
 }
