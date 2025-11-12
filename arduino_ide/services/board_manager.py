@@ -431,20 +431,31 @@ class BoardManager(QObject):
         Returns:
             True if uninstallation succeeded, False otherwise
         """
-        if name not in self.installed_packages:
+        # Find the actual installed key - it might be stored with or without architecture
+        installed_key = None
+        if name in self.installed_packages:
+            installed_key = name
+        else:
+            # Check if any installed package matches (handle partial names)
+            for key in self.installed_packages.keys():
+                if key == name or key.startswith(f"{name}:"):
+                    installed_key = key
+                    break
+
+        if not installed_key:
             self._emit_signal('status_message',f"Package '{name}' is not installed")
             return False
 
-        # Parse platform ID if provided
-        if ":" in name:
-            parts = name.split(":")
+        # Parse platform ID from the installed key
+        if ":" in installed_key:
+            parts = installed_key.split(":")
             package_name = parts[0]
             architecture = parts[1] if len(parts) > 1 else None
         else:
-            package_name = name
+            package_name = installed_key
             architecture = None
 
-        version = self.installed_packages[name]
+        version = self.installed_packages[installed_key]
 
         try:
             # Build install path based on structure
@@ -466,7 +477,7 @@ class BoardManager(QObject):
             if pkg_dir.exists() and not list(pkg_dir.iterdir()):
                 pkg_dir.rmdir()
 
-            del self.installed_packages[name]
+            del self.installed_packages[installed_key]
             self._save_installed_packages()
 
             # Update package object
@@ -474,8 +485,8 @@ class BoardManager(QObject):
             if package:
                 package.installed_version = None
 
-            self._emit_signal('status_message',f"Successfully uninstalled {name}")
-            self._emit_signal('package_uninstalled',name)
+            self._emit_signal('status_message',f"Successfully uninstalled {installed_key}")
+            self._emit_signal('package_uninstalled',installed_key)
             return True
 
         except Exception as e:
