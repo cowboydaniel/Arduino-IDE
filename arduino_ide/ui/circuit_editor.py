@@ -8,11 +8,12 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                QGraphicsItem, QGraphicsEllipseItem, QGraphicsLineItem,
                                QGraphicsRectItem, QGraphicsTextItem, QListWidget,
                                QListWidgetItem, QLabel, QMessageBox, QGroupBox,
-                               QScrollArea, QToolBox)
+                               QScrollArea, QToolBox, QMainWindow, QFileDialog)
 from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QLineF, Slot
-from PySide6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPainterPath, QPolygonF
+from PySide6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPainterPath, QPolygonF, QAction, QKeySequence
 import logging
 from typing import Optional, Dict, List
+from pathlib import Path
 
 from arduino_ide.services.circuit_service import (
     CircuitService, ComponentDefinition, ComponentInstance,
@@ -513,3 +514,172 @@ class CircuitEditor(QWidget):
     def load_circuit_from_file(self, file_path: str) -> bool:
         """Load circuit from file"""
         return self.service.load_circuit(file_path)
+
+
+class CircuitDesignerWindow(QMainWindow):
+    """
+    Standalone window for Circuit Designer
+    Can be opened from main IDE or run independently
+    """
+
+    def __init__(self, service: Optional[CircuitService] = None, parent=None):
+        super().__init__(parent)
+
+        self.service = service or CircuitService()
+        self.current_file = None
+
+        self.setWindowTitle("Arduino Circuit Designer")
+        self.resize(1200, 800)
+
+        # Create circuit editor as central widget
+        self.circuit_editor = CircuitEditor(self.service, self)
+        self.setCentralWidget(self.circuit_editor)
+
+        # Connect load/save buttons to file dialogs
+        self.circuit_editor.load_btn.clicked.connect(self._on_load_clicked)
+        self.circuit_editor.save_btn.clicked.connect(self._on_save_clicked)
+
+        # Create menus
+        self._create_menus()
+
+        logger.info("Circuit Designer window initialized")
+
+    def _create_menus(self):
+        """Create menu bar"""
+        menubar = self.menuBar()
+
+        # File Menu
+        file_menu = menubar.addMenu("&File")
+
+        new_action = QAction("&New Circuit", self)
+        new_action.setShortcut(QKeySequence.New)
+        new_action.triggered.connect(self.circuit_editor._on_new_clicked)
+        file_menu.addAction(new_action)
+
+        load_action = QAction("&Open Circuit...", self)
+        load_action.setShortcut(QKeySequence.Open)
+        load_action.triggered.connect(self._on_load_clicked)
+        file_menu.addAction(load_action)
+
+        save_action = QAction("&Save Circuit", self)
+        save_action.setShortcut(QKeySequence.Save)
+        save_action.triggered.connect(self._on_save_clicked)
+        file_menu.addAction(save_action)
+
+        save_as_action = QAction("Save Circuit &As...", self)
+        save_as_action.setShortcut(QKeySequence.SaveAs)
+        save_as_action.triggered.connect(self._on_save_as_clicked)
+        file_menu.addAction(save_as_action)
+
+        file_menu.addSeparator()
+
+        close_action = QAction("&Close", self)
+        close_action.setShortcut(QKeySequence.Close)
+        close_action.triggered.connect(self.close)
+        file_menu.addAction(close_action)
+
+        # Circuit Menu
+        circuit_menu = menubar.addMenu("&Circuit")
+
+        validate_action = QAction("&Validate Circuit", self)
+        validate_action.setShortcut(Qt.CTRL | Qt.Key_V)
+        validate_action.triggered.connect(self.circuit_editor._on_validate_clicked)
+        circuit_menu.addAction(validate_action)
+
+        export_action = QAction("&Export Connections", self)
+        export_action.setShortcut(Qt.CTRL | Qt.Key_E)
+        export_action.triggered.connect(self.circuit_editor._on_export_connections)
+        circuit_menu.addAction(export_action)
+
+        # Help Menu
+        help_menu = menubar.addMenu("&Help")
+
+        about_action = QAction("&About", self)
+        about_action.triggered.connect(self._show_about)
+        help_menu.addAction(about_action)
+
+    @Slot()
+    def _on_load_clicked(self):
+        """Handle load circuit"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Circuit",
+            str(Path.home()),
+            "Circuit Files (*.json);;All Files (*)"
+        )
+
+        if not file_path:
+            return
+
+        if self.circuit_editor.load_circuit_from_file(file_path):
+            self.current_file = file_path
+            self.setWindowTitle(f"Arduino Circuit Designer - {Path(file_path).name}")
+            QMessageBox.information(
+                self,
+                "Circuit Loaded",
+                f"Successfully loaded circuit from {Path(file_path).name}"
+            )
+        else:
+            QMessageBox.critical(
+                self,
+                "Load Failed",
+                f"Failed to load circuit from {Path(file_path).name}"
+            )
+
+    @Slot()
+    def _on_save_clicked(self):
+        """Handle save circuit"""
+        if self.current_file:
+            self._save_to_file(self.current_file)
+        else:
+            self._on_save_as_clicked()
+
+    @Slot()
+    def _on_save_as_clicked(self):
+        """Handle save circuit as"""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Circuit As",
+            str(Path.home() / "circuit.json"),
+            "Circuit Files (*.json);;All Files (*)"
+        )
+
+        if not file_path:
+            return
+
+        self._save_to_file(file_path)
+
+    def _save_to_file(self, file_path: str):
+        """Save circuit to file"""
+        if self.circuit_editor.save_circuit_to_file(file_path):
+            self.current_file = file_path
+            self.setWindowTitle(f"Arduino Circuit Designer - {Path(file_path).name}")
+            QMessageBox.information(
+                self,
+                "Circuit Saved",
+                f"Successfully saved circuit to {Path(file_path).name}"
+            )
+        else:
+            QMessageBox.critical(
+                self,
+                "Save Failed",
+                f"Failed to save circuit to {Path(file_path).name}"
+            )
+
+    def _show_about(self):
+        """Show about dialog"""
+        QMessageBox.about(
+            self,
+            "About Arduino Circuit Designer",
+            """<h3>Arduino Circuit Designer</h3>
+            <p>Visual circuit design tool for Arduino projects</p>
+            <p><b>Features:</b></p>
+            <ul>
+            <li>Drag-and-drop component placement</li>
+            <li>Visual wire connections</li>
+            <li>Circuit validation</li>
+            <li>100+ electronic components</li>
+            <li>Save/load circuits</li>
+            </ul>
+            <p>Part of Arduino IDE Modern</p>"""
+        )
