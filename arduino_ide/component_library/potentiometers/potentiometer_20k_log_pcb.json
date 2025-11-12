@@ -1,0 +1,48 @@
+{
+  "id": "potentiometer_20k_log_pcb",
+  "name": "20k\u03a9 Logarithmic PCB Potentiometer",
+  "component_type": "potentiometer",
+  "description": "20k\u03a9 logarithmic taper potentiometer for pcb mounting. Ideal for sensor calibration tasks with audio taper for natural volume perception and right-angle PCB mount with inline 5mm lead spacing.",
+  "width": 48,
+  "height": 42,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "CW",
+      "pin_type": "analog",
+      "position": [
+        8,
+        36
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "Wiper",
+      "pin_type": "analog",
+      "position": [
+        24,
+        36
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "CCW",
+      "pin_type": "analog",
+      "position": [
+        40,
+        36
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "resistance": "20k\u03a9",
+    "taper": "Logarithmic",
+    "mounting_style": "PCB",
+    "shaft_style": "6mm knurled metal shaft, 15mm length",
+    "tolerance": "\u00b110%",
+    "power_rating": "0.25W",
+    "mechanical_travel": "300\u00b0 \u00b15\u00b0",
+    "mounting_details": "Right-angle PCB mount, 5mm pitch inline leads with anti-rotation tab"
+  }
+}
