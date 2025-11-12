@@ -1,0 +1,56 @@
+{
+  "id": "breadboard_mini_black_premium",
+  "name": "Mini Breadboard (Black, Premium)",
+  "component_type": "breadboard",
+  "description": "Mini Breadboard in black with 170 tie points and terminal strips only (no dedicated power rails).",
+  "width": 180,
+  "height": 90,
+  "pins": [],
+  "metadata": {
+    "manufacturer": "Generic",
+    "series": "Solderless Breadboard",
+    "size": "Mini",
+    "color": "Black",
+    "color_hex": "#1F1F1F",
+    "quality": "Premium",
+    "tie_points": 170,
+    "tie_point_layout": {
+      "terminal_strips": {
+        "rows": 17,
+        "columns": 5,
+        "sections": 2,
+        "total": 170
+      },
+      "power_rail_columns": 0
+    },
+    "power_rails": 0,
+    "rail_configuration": "Terminal strips only (no dedicated power rails)",
+    "dimensions_mm": {
+      "length": 45.5,
+      "width": 35.0,
+      "height": 9.0
+    },
+    "contact_pitch": "2.54mm (0.1\")",
+    "material_shell": "ABS thermoplastic",
+    "material_contacts": "Phosphor bronze",
+    "material_quality": "High-impact ABS enclosure with gold-plated phosphor bronze contacts",
+    "electrical_ratings": {
+      "rated_voltage": "500V AC",
+      "rated_current": "3A per contact",
+      "dielectric_strength": "1500V AC/minute"
+    },
+    "contact_resistance": "<30m\u03a9",
+    "insulation_resistance": ">500M\u03a9 @ 500V DC",
+    "operating_temperature": "-55\u00b0C to +105\u00b0C",
+    "mounting_options": [
+      "Adhesive foam backing",
+      "Modular dovetail alignment slots"
+    ],
+    "certifications": [
+      "RoHS",
+      "REACH"
+    ],
+    "size_notes": "Compact footprint for modules and quick prototyping in tight spaces.",
+    "quality_notes": "Gold-plated contacts for low-loss signals and long service life."
+  }
+}

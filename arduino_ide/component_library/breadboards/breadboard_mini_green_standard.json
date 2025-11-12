@@ -1,34 +1,33 @@
 {
-  "id": "breadboard_half_white_standard",
-  "name": "Half-Size Breadboard (White, Standard)",
+  "id": "breadboard_mini_green_standard",
+  "name": "Mini Breadboard (Green, Standard)",
   "component_type": "breadboard",
-  "description": "Half-Size Breadboard in white with 400 tie points and dual power rails on one side.",
-  "width": 300,
-  "height": 120,
+  "description": "Mini Breadboard in green with 170 tie points and terminal strips only (no dedicated power rails).",
+  "width": 180,
+  "height": 90,
   "pins": [],
   "metadata": {
     "manufacturer": "Generic",
     "series": "Solderless Breadboard",
-    "size": "Half-Size",
-    "color": "White",
-    "color_hex": "#F8F9FA",
+    "size": "Mini",
+    "color": "Green",
+    "color_hex": "#2B9348",
     "quality": "Standard",
-    "tie_points": 400,
+    "tie_points": 170,
     "tie_point_layout": {
       "terminal_strips": {
-        "rows": 30,
+        "rows": 17,
         "columns": 5,
         "sections": 2,
-        "total": 300
+        "total": 170
       },
-      "power_rail_columns": 2,
-      "power_rail_tie_points": 100
+      "power_rail_columns": 0
     },
-    "power_rails": 2,
-    "rail_configuration": "Dual power rails on one side",
+    "power_rails": 0,
+    "rail_configuration": "Terminal strips only (no dedicated power rails)",
     "dimensions_mm": {
-      "length": 82.5,
-      "width": 54.0,
+      "length": 45.5,
+      "width": 35.0,
       "height": 9.0
     },
     "contact_pitch": "2.54mm (0.1\")",
@@ -45,12 +44,12 @@
     "operating_temperature": "-40\u00b0C to +85\u00b0C",
     "mounting_options": [
       "Adhesive foam backing",
-      "M2 mounting holes via adapter plate"
+      "Modular dovetail alignment slots"
     ],
     "certifications": [
       "RoHS"
     ],
-    "size_notes": "Balanced size for single-board projects and Arduino shields.",
+    "size_notes": "Compact footprint for modules and quick prototyping in tight spaces.",
     "quality_notes": "Balanced option for general prototyping and educational use."
   }
 }

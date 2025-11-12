@@ -1,0 +1,58 @@
+{
+  "id": "breadboard_full_red_premium",
+  "name": "Full-Size Breadboard (Red, Premium)",
+  "component_type": "breadboard",
+  "description": "Full-Size Breadboard in red with 830 tie points and dual power rails on both sides.",
+  "width": 460,
+  "height": 160,
+  "pins": [],
+  "metadata": {
+    "manufacturer": "Generic",
+    "series": "Solderless Breadboard",
+    "size": "Full-Size",
+    "color": "Red",
+    "color_hex": "#D62828",
+    "quality": "Premium",
+    "tie_points": 830,
+    "tie_point_layout": {
+      "terminal_strips": {
+        "rows": 63,
+        "columns": 5,
+        "sections": 2,
+        "total": 630
+      },
+      "power_rail_columns": 4,
+      "power_rail_tie_points": 200
+    },
+    "power_rails": 4,
+    "rail_configuration": "Dual power rails on both sides",
+    "dimensions_mm": {
+      "length": 165.0,
+      "width": 55.0,
+      "height": 10.0
+    },
+    "contact_pitch": "2.54mm (0.1\")",
+    "material_shell": "ABS thermoplastic",
+    "material_contacts": "Phosphor bronze",
+    "material_quality": "High-impact ABS enclosure with gold-plated phosphor bronze contacts",
+    "electrical_ratings": {
+      "rated_voltage": "500V AC",
+      "rated_current": "3A per contact",
+      "dielectric_strength": "1500V AC/minute"
+    },
+    "contact_resistance": "<30m\u03a9",
+    "insulation_resistance": ">500M\u03a9 @ 500V DC",
+    "operating_temperature": "-55\u00b0C to +105\u00b0C",
+    "mounting_options": [
+      "Adhesive foam backing",
+      "Countersunk mounting holes (M3)",
+      "Snap-fit alignment keys"
+    ],
+    "certifications": [
+      "RoHS",
+      "REACH"
+    ],
+    "size_notes": "Full-length layout accommodates DIP ICs with separate buses for power distribution.",
+    "quality_notes": "Gold-plated contacts for low-loss signals and long service life."
+  }
+}

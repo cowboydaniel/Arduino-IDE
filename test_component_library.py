@@ -5,6 +5,7 @@ Test script to verify component library loading from JSON files
 
 import sys
 import os
+import json
 from pathlib import Path
 
 # Add parent directory to path
@@ -107,6 +108,44 @@ def main():
             print(f"  Pins: {', '.join([f'{p.label}({p.pin_type.value})' for p in comp.pins])}")
         else:
             print(f"\n✗ NOT FOUND: {test_id}")
+
+    # Verify breadboard coverage for each size tier
+    breadboard_ids = [
+        "breadboard_mini_white_standard",
+        "breadboard_half_white_standard",
+        "breadboard_full_white_standard",
+        "breadboard_large_white_standard"
+    ]
+
+    print("\nBreadboard size tier checks:")
+    for bb_id in breadboard_ids:
+        comp = service.get_component_definition(bb_id)
+        if comp:
+            json_path = (
+                Path(__file__).resolve().parent
+                / "arduino_ide"
+                / "component_library"
+                / "breadboards"
+                / f"{bb_id}.json"
+            )
+            try:
+                with json_path.open("r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                metadata = data.get("metadata", {})
+                tie_points = metadata.get("tie_points", "?")
+                power_rails = metadata.get("power_rails", "?")
+                dimensions = metadata.get("dimensions_mm", {})
+                length = dimensions.get("length", "?")
+                width = dimensions.get("width", "?")
+                print(
+                    "  ✓ {} -> {} tie points, {} power rails, {}mm x {}mm".format(
+                        bb_id, tie_points, power_rails, length, width
+                    )
+                )
+            except FileNotFoundError:
+                print(f"  ✗ Definition file missing on disk: {json_path}")
+        else:
+            print(f"  ✗ Missing breadboard definition: {bb_id}")
 
     print("\n" + "=" * 70)
     print("TEST COMPLETE")
