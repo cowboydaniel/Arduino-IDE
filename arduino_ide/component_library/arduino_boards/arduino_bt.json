@@ -1,9 +1,9 @@
 {
-  "id": "arduino_uno",
-  "name": "Arduino Uno",
+  "id": "arduino_bt",
+  "name": "Arduino BT",
   "component_type": "arduino_board",
-  "description": "Arduino Uno R3 microcontroller board based on ATmega328P",
-  "width": 260,
+  "description": "Arduino Bluetooth board with integrated Bluegiga WT11 module",
+  "width": 280,
   "height": 160,
   "pins": [
     {
@@ -133,6 +133,60 @@
       ]
     },
     {
+      "id": "D14",
+      "label": "D14",
+      "pin_type": "digital",
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "id": "D15",
+      "label": "D15",
+      "pin_type": "digital",
+      "position": [
+        300,
+        0
+      ]
+    },
+    {
+      "id": "D16",
+      "label": "D16",
+      "pin_type": "digital",
+      "position": [
+        320,
+        0
+      ]
+    },
+    {
+      "id": "D17",
+      "label": "D17",
+      "pin_type": "digital",
+      "position": [
+        340,
+        0
+      ]
+    },
+    {
+      "id": "D18",
+      "label": "D18",
+      "pin_type": "digital",
+      "position": [
+        360,
+        0
+      ]
+    },
+    {
+      "id": "D19",
+      "label": "D19",
+      "pin_type": "digital",
+      "position": [
+        380,
+        0
+      ]
+    },
+    {
       "id": "A0",
       "label": "A0",
       "pin_type": "analog",
@@ -223,16 +277,16 @@
       ]
     },
     {
-      "id": "GND1",
-      "label": "GND",
-      "pin_type": "ground",
+      "id": "VIN",
+      "label": "VIN",
+      "pin_type": "power",
       "position": [
         0,
         120
       ]
     },
     {
-      "id": "GND2",
+      "id": "GND1",
       "label": "GND",
       "pin_type": "ground",
       "position": [
@@ -241,9 +295,9 @@
       ]
     },
     {
-      "id": "VIN",
-      "label": "VIN",
-      "pin_type": "power",
+      "id": "GND2",
+      "label": "GND",
+      "pin_type": "ground",
       "position": [
         0,
         160
@@ -251,21 +305,20 @@
     }
   ],
   "metadata": {
-    "fqbn": "arduino:avr:uno",
+    "fqbn": "arduino:avr:bt",
     "manufacturer": "Arduino",
     "microcontroller": "ATmega328P",
-    "clock_speed": "16MHz",
-    "operating_voltage": "5V",
+    "clock_speed": "8MHz",
+    "operating_voltage": "3.3V",
     "input_voltage_recommended": "7-12V",
-    "input_voltage_limits": "6-20V",
-    "digital_io_pins": 14,
+    "digital_io_pins": 20,
     "pwm_pins": 6,
     "analog_input_pins": 6,
-    "flash_memory": "32KB (0.5KB bootloader)",
+    "flash_memory": "32KB (2KB bootloader)",
     "sram": "2KB",
     "eeprom": "1KB",
-    "usb_interface": "ATmega16U2",
-    "datasheet_url": "https://docs.arduino.cc/hardware/uno-rev3",
+    "bluetooth_module": "Bluegiga WT11",
+    "datasheet_url": "https://docs.arduino.cc/hardware/arduino-bt",
     "dimensions_mm": "68.6 x 53.4"
   }
 }

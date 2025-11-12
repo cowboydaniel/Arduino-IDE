@@ -1,10 +1,10 @@
 {
-  "id": "arduino_uno",
-  "name": "Arduino Uno",
+  "id": "arduino_mini",
+  "name": "Arduino Mini",
   "component_type": "arduino_board",
-  "description": "Arduino Uno R3 microcontroller board based on ATmega328P",
-  "width": 260,
-  "height": 160,
+  "description": "Arduino Mini board for embedded applications",
+  "width": 280,
+  "height": 120,
   "pins": [
     {
       "id": "D0",
@@ -187,8 +187,26 @@
       ]
     },
     {
-      "id": "IOREF",
-      "label": "IOREF",
+      "id": "A6",
+      "label": "A6",
+      "pin_type": "analog",
+      "position": [
+        120,
+        120
+      ]
+    },
+    {
+      "id": "A7",
+      "label": "A7",
+      "pin_type": "analog",
+      "position": [
+        140,
+        120
+      ]
+    },
+    {
+      "id": "RAW",
+      "label": "RAW",
       "pin_type": "power",
       "position": [
         0,
@@ -196,8 +214,8 @@
       ]
     },
     {
-      "id": "RESET",
-      "label": "RESET",
+      "id": "VCC",
+      "label": "VCC",
       "pin_type": "power",
       "position": [
         0,
@@ -214,21 +232,12 @@
       ]
     },
     {
-      "id": "5V",
-      "label": "5V",
-      "pin_type": "power",
-      "position": [
-        0,
-        100
-      ]
-    },
-    {
       "id": "GND1",
       "label": "GND",
       "pin_type": "ground",
       "position": [
         0,
-        120
+        100
       ]
     },
     {
@@ -237,35 +246,24 @@
       "pin_type": "ground",
       "position": [
         0,
-        140
-      ]
-    },
-    {
-      "id": "VIN",
-      "label": "VIN",
-      "pin_type": "power",
-      "position": [
-        0,
-        160
+        120
       ]
     }
   ],
   "metadata": {
-    "fqbn": "arduino:avr:uno",
+    "fqbn": "arduino:avr:mini",
     "manufacturer": "Arduino",
     "microcontroller": "ATmega328P",
     "clock_speed": "16MHz",
     "operating_voltage": "5V",
-    "input_voltage_recommended": "7-12V",
-    "input_voltage_limits": "6-20V",
+    "input_voltage_limits": "7-9V (RAW)",
     "digital_io_pins": 14,
     "pwm_pins": 6,
-    "analog_input_pins": 6,
-    "flash_memory": "32KB (0.5KB bootloader)",
+    "analog_input_pins": 8,
+    "flash_memory": "32KB (2KB bootloader)",
     "sram": "2KB",
     "eeprom": "1KB",
-    "usb_interface": "ATmega16U2",
-    "datasheet_url": "https://docs.arduino.cc/hardware/uno-rev3",
-    "dimensions_mm": "68.6 x 53.4"
+    "datasheet_url": "https://docs.arduino.cc/hardware/arduino-mini",
+    "dimensions_mm": "30 x 18"
   }
 }
