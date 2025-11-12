@@ -1,0 +1,63 @@
+{
+  "id": "bjt_s8050_to92",
+  "name": "S8050 Switching NPN (TO-92)",
+  "component_type": "transistor",
+  "description": "High-gain NPN transistor designed for relay and motor driving. Packaged in TO-92 for compatibility with various layouts.",
+  "width": 70,
+  "height": 140,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "E",
+      "pin_type": "power",
+      "position": [
+        15,
+        115
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "B",
+      "pin_type": "analog",
+      "position": [
+        35,
+        115
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "C",
+      "pin_type": "power",
+      "position": [
+        55,
+        115
+      ]
+    }
+  ],
+  "metadata": {
+    "polarity": "NPN",
+    "typical_gain_hfe": "120-400",
+    "max_collector_current": "1.5A",
+    "max_collector_emitter_voltage": "25V",
+    "max_collector_base_voltage": "40V",
+    "max_base_emitter_voltage": "6V",
+    "transition_frequency": "100MHz",
+    "package": "TO-92",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Emitter"
+      },
+      {
+        "pin": "2",
+        "function": "Base"
+      },
+      {
+        "pin": "3",
+        "function": "Collector"
+      }
+    ],
+    "package_note": "Pin numbering from left to right while viewing the flat face.",
+    "datasheet_variant": "S8050 Switching NPN TO-92"
+  }
+}

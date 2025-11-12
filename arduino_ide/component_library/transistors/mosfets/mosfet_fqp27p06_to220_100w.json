@@ -1,0 +1,62 @@
+{
+  "id": "mosfet_fqp27p06_to220_100w",
+  "name": "FQP27P06 Power P-Channel MOSFET 100W (TO-220)",
+  "component_type": "transistor",
+  "description": "Robust P-channel MOSFET for high-side control of power loads. Packaged in TO-220 with a 100W thermal design rating.",
+  "width": 95,
+  "height": 170,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "G",
+      "pin_type": "analog",
+      "position": [
+        22,
+        140
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "D",
+      "pin_type": "power",
+      "position": [
+        47,
+        140
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "S",
+      "pin_type": "power",
+      "position": [
+        72,
+        140
+      ]
+    }
+  ],
+  "metadata": {
+    "channel_type": "P-Channel",
+    "rds_on": "0.049\u03a9",
+    "max_drain_current": "27A",
+    "max_drain_source_voltage": "-60V",
+    "gate_threshold_voltage": "-2.0 to -4.0V",
+    "package": "TO-220",
+    "power_rating": "100W",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Gate"
+      },
+      {
+        "pin": "2",
+        "function": "Drain"
+      },
+      {
+        "pin": "3",
+        "function": "Source"
+      }
+    ],
+    "package_note": "Tab connects to drain; pins counted left-to-right from front.",
+    "datasheet_variant": "FQP27P06 Power P-Channel MOSFET TO-220 100W"
+  }
+}

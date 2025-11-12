@@ -1,0 +1,62 @@
+{
+  "id": "mosfet_irlz44n_to220_30w",
+  "name": "IRLZ44N Logic-Level MOSFET 30W (TO-220)",
+  "component_type": "transistor",
+  "description": "Logic-level N-channel MOSFET optimized for microcontroller drive. Packaged in TO-220 with a 30W thermal design rating.",
+  "width": 95,
+  "height": 170,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "G",
+      "pin_type": "analog",
+      "position": [
+        22,
+        140
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "D",
+      "pin_type": "power",
+      "position": [
+        47,
+        140
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "S",
+      "pin_type": "power",
+      "position": [
+        72,
+        140
+      ]
+    }
+  ],
+  "metadata": {
+    "channel_type": "N-Channel",
+    "rds_on": "0.025\u03a9",
+    "max_drain_current": "47A",
+    "max_drain_source_voltage": "55V",
+    "gate_threshold_voltage": "1.0-2.0V",
+    "package": "TO-220",
+    "power_rating": "30W",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Gate"
+      },
+      {
+        "pin": "2",
+        "function": "Drain"
+      },
+      {
+        "pin": "3",
+        "function": "Source"
+      }
+    ],
+    "package_note": "Tab connects to drain; pins counted left-to-right from front.",
+    "datasheet_variant": "IRLZ44N Logic-Level MOSFET TO-220 30W"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "id": "bjt_bc557b_to220",
+  "name": "BC557B Low-Noise PNP (TO-220)",
+  "component_type": "transistor",
+  "description": "Low-noise PNP transistor suited for audio and instrumentation. Packaged in TO-220 for compatibility with various layouts.",
+  "width": 90,
+  "height": 160,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "B",
+      "pin_type": "analog",
+      "position": [
+        20,
+        130
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "C",
+      "pin_type": "power",
+      "position": [
+        45,
+        130
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "E",
+      "pin_type": "power",
+      "position": [
+        70,
+        130
+      ]
+    }
+  ],
+  "metadata": {
+    "polarity": "PNP",
+    "typical_gain_hfe": "200-450",
+    "max_collector_current": "100mA",
+    "max_collector_emitter_voltage": "45V",
+    "max_collector_base_voltage": "50V",
+    "max_base_emitter_voltage": "5V",
+    "transition_frequency": "150MHz",
+    "package": "TO-220",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Base"
+      },
+      {
+        "pin": "2",
+        "function": "Collector"
+      },
+      {
+        "pin": "3",
+        "function": "Emitter"
+      }
+    ],
+    "package_note": "Tab is connected to collector; pins counted left to right from front.",
+    "datasheet_variant": "BC557B Low-Noise PNP TO-220"
+  }
+}
