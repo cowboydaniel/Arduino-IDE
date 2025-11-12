@@ -1,0 +1,94 @@
+{
+  "id": "sensor_motion_adxl345_v1",
+  "name": "ADXL345 Triple-Axis Accelerometer (Version 1.0)",
+  "component_type": "sensor",
+  "description": "3-axis accelerometer with I2C/SPI digital interface Baseline firmware with default filtering",
+  "width": 60,
+  "height": 42,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        6,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        18,
+        0
+      ]
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "pin_type": "i2c",
+      "position": [
+        30,
+        0
+      ]
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "pin_type": "i2c",
+      "position": [
+        42,
+        0
+      ]
+    },
+    {
+      "id": "sdo",
+      "label": "SDO",
+      "pin_type": "spi",
+      "position": [
+        54,
+        0
+      ]
+    },
+    {
+      "id": "cs",
+      "label": "CS",
+      "pin_type": "spi",
+      "position": [
+        66,
+        0
+      ]
+    },
+    {
+      "id": "int1",
+      "label": "INT1",
+      "pin_type": "digital",
+      "position": [
+        78,
+        0
+      ]
+    },
+    {
+      "id": "int2",
+      "label": "INT2",
+      "pin_type": "digital",
+      "position": [
+        90,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "I2C/SPI",
+    "detection_range": "\u00b116g",
+    "field_of_view": "N/A",
+    "supply_voltage": "2-3.6V",
+    "supply_current": "145\u00b5A",
+    "update_rate": "3200Hz",
+    "variant": "Version 1.0",
+    "variant_notes": "Baseline firmware with default filtering",
+    "manufacturer": "Analog Devices",
+    "part_number": "ADXL345"
+  }
+}

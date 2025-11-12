@@ -1,0 +1,49 @@
+{
+  "id": "sensor_motion_hc_sr501_v1",
+  "name": "HC-SR501 PIR Motion Sensor (Version 1.0)",
+  "component_type": "sensor",
+  "description": "Passive infrared motion detector module with adjustable sensitivity Baseline firmware with default filtering",
+  "width": 60,
+  "height": 50,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        12,
+        0
+      ]
+    },
+    {
+      "id": "out",
+      "label": "OUT",
+      "pin_type": "digital",
+      "position": [
+        30,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        48,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "Digital",
+    "detection_range": "3m to 7m",
+    "field_of_view": "120\u00b0",
+    "supply_voltage": "5-20V",
+    "supply_current": "65\u00b5A standby",
+    "update_rate": "Adjustable",
+    "variant": "Version 1.0",
+    "variant_notes": "Baseline firmware with default filtering",
+    "manufacturer": "Generic",
+    "part_number": "HC-SR501"
+  }
+}

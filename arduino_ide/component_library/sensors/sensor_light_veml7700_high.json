@@ -1,0 +1,69 @@
+{
+  "id": "sensor_light_veml7700_high",
+  "name": "VEML7700 High Accuracy Light Sensor (High Sensitivity)",
+  "component_type": "sensor",
+  "description": "ALS with 16-bit resolution and I2C interface High gain for dim light detection",
+  "width": 54,
+  "height": 34,
+  "pins": [
+    {
+      "id": "vin",
+      "label": "VIN",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        20,
+        0
+      ]
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "pin_type": "i2c",
+      "position": [
+        32,
+        0
+      ]
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "pin_type": "i2c",
+      "position": [
+        44,
+        0
+      ]
+    },
+    {
+      "id": "addr",
+      "label": "ADDR",
+      "pin_type": "digital",
+      "position": [
+        56,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "I2C",
+    "measurement_range": "0.0036 lux to 120,000 lux",
+    "supply_voltage": "2.6-3.6V",
+    "supply_current": "170\u00b5A",
+    "output_format": "Digital",
+    "update_interval": "100ms",
+    "sensitivity_class": "High Sensitivity",
+    "sensitivity_notes": "High gain for dim light detection",
+    "variant": "High Sensitivity",
+    "variant_notes": "High gain for dim light detection",
+    "manufacturer": "Vishay",
+    "part_number": "VEML7700"
+  }
+}

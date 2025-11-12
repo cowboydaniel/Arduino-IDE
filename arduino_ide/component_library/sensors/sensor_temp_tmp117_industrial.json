@@ -1,0 +1,60 @@
+{
+  "id": "sensor_temp_tmp117_industrial",
+  "name": "TMP117 Ultra-High Accuracy Sensor (Industrial Calibrated)",
+  "component_type": "sensor",
+  "description": "TI digital temperature sensor with 16-bit resolution Configured for industrial calibrated with \u00b10.1\u00b0C typical",
+  "width": 56,
+  "height": 34,
+  "pins": [
+    {
+      "id": "vin",
+      "label": "VIN",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        20,
+        0
+      ]
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "pin_type": "i2c",
+      "position": [
+        32,
+        0
+      ]
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "pin_type": "i2c",
+      "position": [
+        44,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "I2C",
+    "measurement_range": "-55\u00b0C to 150\u00b0C",
+    "nominal_resolution": "0.0078\u00b0C",
+    "supply_voltage": "1.8-5.5V",
+    "supply_current": "210\u00b5A",
+    "output_format": "Digital",
+    "update_interval": "0.125s",
+    "variant": "Industrial Calibrated",
+    "variant_notes": "Configured for industrial calibrated with \u00b10.1\u00b0C typical",
+    "measurement_accuracy": "\u00b10.1\u00b0C typical",
+    "manufacturer": "Texas Instruments",
+    "part_number": "TMP117"
+  }
+}

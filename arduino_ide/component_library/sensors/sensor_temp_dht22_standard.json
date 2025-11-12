@@ -1,0 +1,60 @@
+{
+  "id": "sensor_temp_dht22_standard",
+  "name": "DHT22 Temperature & Humidity Sensor (Standard Accuracy)",
+  "component_type": "sensor",
+  "description": "Capacitive humidity and temperature sensor with digital interface Configured for standard accuracy with \u00b10.5\u00b0C typical",
+  "width": 55,
+  "height": 40,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        6,
+        0
+      ]
+    },
+    {
+      "id": "data",
+      "label": "DATA",
+      "pin_type": "digital",
+      "position": [
+        20,
+        0
+      ]
+    },
+    {
+      "id": "nc",
+      "label": "NC",
+      "pin_type": "digital",
+      "position": [
+        34,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        48,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "Single-Wire Digital",
+    "measurement_range": "-40\u00b0C to 80\u00b0C",
+    "nominal_resolution": "0.1\u00b0C",
+    "supply_voltage": "3.3-6V",
+    "supply_current": "1.5mA sampling",
+    "output_format": "Digital",
+    "update_interval": "2s",
+    "variant": "Standard Accuracy",
+    "variant_notes": "Configured for standard accuracy with \u00b10.5\u00b0C typical",
+    "measurement_accuracy": "\u00b10.5\u00b0C typical",
+    "manufacturer": "Aosong Electronics",
+    "part_number": "DHT22"
+  }
+}

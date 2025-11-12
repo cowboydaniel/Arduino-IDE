@@ -1,0 +1,61 @@
+{
+  "id": "sensor_gas_mq7_high",
+  "name": "MQ-7 Carbon Monoxide Sensor (High Sensitivity)",
+  "component_type": "sensor",
+  "description": "Carbon monoxide gas sensor with heater control Increased heater drive and calibration for low ppm detection",
+  "width": 58,
+  "height": 42,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "ao",
+      "label": "AO",
+      "pin_type": "analog",
+      "position": [
+        36,
+        0
+      ]
+    },
+    {
+      "id": "do",
+      "label": "DO",
+      "pin_type": "digital",
+      "position": [
+        50,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "Analog/Digital",
+    "detection_range": "20-2,000ppm",
+    "target_gases": "Carbon monoxide",
+    "heater_voltage": "5V cyclical",
+    "preheat_time": "48h",
+    "supply_voltage": "5V",
+    "supply_current": "150mA heater",
+    "sensitivity_class": "High Sensitivity",
+    "sensitivity_notes": "Increased heater drive and calibration for low ppm detection",
+    "variant": "High Sensitivity",
+    "variant_notes": "Increased heater drive and calibration for low ppm detection",
+    "manufacturer": "Winsen",
+    "part_number": "MQ-7"
+  }
+}

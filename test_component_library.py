@@ -95,7 +95,8 @@ def main():
         "led_red_5mm_standard",
         "resistor_220_1div4w_5pct",
         "pushbutton_tactile_6x6mm_black",
-        "sensor_temp_dht22_high_precision",
+        "sensor_temp_dht22_precision",
+        "sensor_motion_hc_sr04_v1",
         "ic_timer_555_dip8"
     ]
 
@@ -107,6 +108,43 @@ def main():
             print(f"  Pins: {', '.join([f'{p.label}({p.pin_type.value})' for p in comp.pins])}")
         else:
             print(f"\n✗ NOT FOUND: {test_id}")
+
+    # Validate sample coverage for each sensor subtype family
+    print("\n" + "=" * 70)
+    print("SENSOR SUBTYPE COVERAGE")
+    print("=" * 70)
+
+    sensor_samples = {
+        "Temperature Accuracy Classes": [
+            "sensor_temp_ds18b20_standard",
+            "sensor_temp_ds18b20_precision",
+            "sensor_temp_ds18b20_industrial"
+        ],
+        "Motion Sensor Versions": [
+            "sensor_motion_hc_sr04_v1",
+            "sensor_motion_hc_sr04_v2",
+            "sensor_motion_hc_sr04_industrial"
+        ],
+        "Light Sensor Sensitivities": [
+            "sensor_light_bh1750_low",
+            "sensor_light_bh1750_medium",
+            "sensor_light_bh1750_high",
+            "sensor_light_bh1750_ultra"
+        ],
+        "Gas Sensor Sensitivities": [
+            "sensor_gas_mq135_standard",
+            "sensor_gas_mq135_high"
+        ]
+    }
+
+    for category, ids in sensor_samples.items():
+        print(f"\n{category}:")
+        for comp_id in ids:
+            comp = service.get_component_definition(comp_id)
+            if comp:
+                print(f"  ✓ Loaded {comp.name} [{comp.id}]")
+            else:
+                print(f"  ✗ Missing {comp_id}")
 
     print("\n" + "=" * 70)
     print("TEST COMPLETE")
