@@ -268,8 +268,53 @@ class BoardIndex:
             enabled=False
         ),
         BoardPackageURL(
-            name="Raspberry Pi Pico",
+            name="Raspberry Pi Pico (RP2040)",
             url="https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="Teensy (PJRC)",
+            url="https://www.pjrc.com/teensy/package_teensy_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="DxCore/ATtiny (SpenceKonde)",
+            url="http://drazzy.com/package_drazzy.com_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="Arduino SAMD Beta",
+            url="https://downloads.arduino.cc/packages/package_staging_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="Seeed Studio",
+            url="https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="SparkFun AVR",
+            url="https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="MegaCoreX (ATmega)",
+            url="https://mcudude.github.io/MegaCoreX/package_MCUdude_MegaCoreX_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="Arduino-Pico (Official RP2040)",
+            url="https://github.com/arduino/ArduinoCore-mbed/raw/master/package_rp2040_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="Intel Curie",
+            url="https://downloads.arduino.cc/packages/package_intel_index.json",
+            enabled=False
+        ),
+        BoardPackageURL(
+            name="LGT8FX Boards",
+            url="https://raw.githubusercontent.com/dbuezas/lgt8fx/master/package_lgt8fx_index.json",
             enabled=False
         ),
     ]

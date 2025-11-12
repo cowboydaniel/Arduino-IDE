@@ -660,10 +660,8 @@ class BoardManagerDialog(QDialog):
         dialog = PackageURLDialog(self.board_manager.board_index.package_urls, self)
         if dialog.exec_() == QDialog.Accepted:
             self.board_manager._save_package_urls()
-            QMessageBox.information(
-                self, "URLs Saved",
-                "Package URLs saved. Click 'Refresh Packages' to update the index."
-            )
+            # Automatically refresh the package index
+            self.update_index()
 
     def update_index(self):
         """Update board package index"""
