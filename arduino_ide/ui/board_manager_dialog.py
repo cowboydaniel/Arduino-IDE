@@ -356,8 +356,8 @@ class BoardManagerDialog(QDialog):
         # Initial load
         self.refresh_packages()
 
-        # Automatically update index if needed (respects 1-hour cache)
-        self.board_manager.update_index(force=False)
+        # Automatically update index every time the board manager is opened
+        self.board_manager.update_index(force=True)
 
     def init_ui(self):
         """Initialize UI"""
