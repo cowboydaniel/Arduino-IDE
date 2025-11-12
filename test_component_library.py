@@ -95,7 +95,9 @@ def main():
         "arduino_uno",
         "led_red_5mm_standard",
         "resistor_220_1div4w_5pct",
-        "pushbutton_tactile_6x6mm_black",
+        "button_tactile_6x6mm_surface_mount_black_160gf_spst",
+        "button_momentary_16mm_panel_panel_mount_red_220gf_spdt",
+        "button_toggle_miniature_panel_mount_blue_1_8ncm_dpdt",
         "sensor_temp_dht22_high_precision",
         "ic_timer_555_dip8"
     ]
