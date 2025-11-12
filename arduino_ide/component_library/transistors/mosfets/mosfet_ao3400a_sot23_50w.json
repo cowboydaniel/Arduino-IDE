@@ -1,0 +1,62 @@
+{
+  "id": "mosfet_ao3400a_sot23_50w",
+  "name": "AO3400A Compact MOSFET 50W (SOT-23)",
+  "component_type": "transistor",
+  "description": "Compact low-Rds(on) MOSFET ideal for DC load switching. Packaged in SOT-23 with a 50W thermal design rating.",
+  "width": 60,
+  "height": 80,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "G",
+      "pin_type": "analog",
+      "position": [
+        12,
+        62
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "S",
+      "pin_type": "power",
+      "position": [
+        48,
+        62
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "D",
+      "pin_type": "power",
+      "position": [
+        30,
+        18
+      ]
+    }
+  ],
+  "metadata": {
+    "channel_type": "N-Channel",
+    "rds_on": "0.012\u03a9",
+    "max_drain_current": "5.8A",
+    "max_drain_source_voltage": "30V",
+    "gate_threshold_voltage": "1.0-3.0V",
+    "package": "SOT-23",
+    "power_rating": "50W",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Gate"
+      },
+      {
+        "pin": "2",
+        "function": "Source"
+      },
+      {
+        "pin": "3",
+        "function": "Drain"
+      }
+    ],
+    "package_note": "SOT-23 orientation with the single top lead used as the drain.",
+    "datasheet_variant": "AO3400A Compact MOSFET SOT-23 50W"
+  }
+}

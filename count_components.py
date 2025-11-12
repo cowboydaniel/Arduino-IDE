@@ -100,11 +100,11 @@ def count_components():
     stepper_voltages = 3 # 5V, 12V, 24V
     counts["Stepper Motors"] = stepper_types * stepper_steps * stepper_voltages
 
-    # Buttons & Switches
-    button_types = 4  # Tactile, Momentary, Latching, Toggle
-    button_sizes = 3  # 6x6mm, 12x12mm, 6x3mm
-    button_colors = 6 # Black, Red, Blue, Green, Yellow, White
-    counts["Buttons"] = button_types * button_sizes * button_colors
+    # Buttons & Switches (generated from tactile, momentary, and toggle matrices)
+    tactile_variants = 3 * 2 * 2 * 5   # sizes × mountings × forces × colors
+    momentary_variants = 3 * 2 * 1 * 5 # sizes × mountings × forces × colors
+    toggle_variants = 2 * 3 * 1 * 5    # sizes × mountings × forces × colors
+    counts["Buttons"] = tactile_variants + momentary_variants + toggle_variants
 
     # Potentiometers
     pot_values = 8    # 1K, 5K, 10K, etc.

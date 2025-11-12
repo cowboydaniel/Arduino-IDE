@@ -1,0 +1,63 @@
+{
+  "id": "bjt_mje3055t_sot23",
+  "name": "MJE3055T Power NPN (SOT-23)",
+  "component_type": "transistor",
+  "description": "Power NPN transistor for medium-current switching applications. Packaged in SOT-23 for compatibility with various layouts.",
+  "width": 60,
+  "height": 80,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "B",
+      "pin_type": "analog",
+      "position": [
+        12,
+        62
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "E",
+      "pin_type": "power",
+      "position": [
+        48,
+        62
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "C",
+      "pin_type": "power",
+      "position": [
+        30,
+        18
+      ]
+    }
+  ],
+  "metadata": {
+    "polarity": "NPN",
+    "typical_gain_hfe": "20-70",
+    "max_collector_current": "10A",
+    "max_collector_emitter_voltage": "60V",
+    "max_collector_base_voltage": "70V",
+    "max_base_emitter_voltage": "7V",
+    "transition_frequency": "2MHz",
+    "package": "SOT-23",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Base"
+      },
+      {
+        "pin": "2",
+        "function": "Emitter"
+      },
+      {
+        "pin": "3",
+        "function": "Collector"
+      }
+    ],
+    "package_note": "Standard SOT-23 orientation with the single lead on top as the collector.",
+    "datasheet_variant": "MJE3055T Power NPN SOT-23"
+  }
+}

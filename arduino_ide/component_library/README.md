@@ -20,6 +20,12 @@ component_library/
 └── misc/            # Other components
 ```
 
+## Transistor Library
+
+The `transistors/` folder is organized into dedicated `bjts/` and `mosfets/` subdirectories to make it easy to locate the desired device family. BJT entries currently cover 13 popular models, each released in TO-92, SOT-23, and TO-220 packages. MOSFET definitions span 10 models, every one provided in the same three packages and four distinct thermal design ratings (30W, 50W, 75W, and 100W) for a total of 159 transistor variants.
+
+Each transistor JSON file includes package-specific pin layouts (for example, Base/Collector/Emitter ordering for BJTs and Gate/Drain/Source orientation for MOSFETs) along with metadata describing polarity or channel type, gain or R<sub>DS(on)</sub>, current and voltage limits, and other key electrical characteristics. When adding new transistor types, follow this structure so automated tooling can discover polarity, package, and rating information consistently.
+
 ## Component File Format
 
 Each component is defined in a JSON file with the following structure:

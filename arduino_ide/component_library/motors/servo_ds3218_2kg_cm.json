@@ -1,0 +1,49 @@
+{
+  "id": "servo_ds3218_2kg_cm",
+  "name": "DS3218 Digital Servo (2kg-cm torque)",
+  "component_type": "servo",
+  "description": "Large Torque servo configured for 2.0 kg\u00b7cm output torque with 0.16s/60\u00b0 @ 6.8V response.",
+  "width": 60,
+  "height": 70,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        15,
+        0
+      ]
+    },
+    {
+      "id": "signal",
+      "label": "SIG",
+      "pin_type": "pwm",
+      "position": [
+        30,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        45,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "motor_subtype": "Servo",
+    "voltage": "4.8-6.8V",
+    "speed": "0.16s/60\u00b0 @ 6.8V",
+    "torque": "2.0 kg\u00b7cm",
+    "current": "0.65A stall",
+    "control_interface": "PWM (50Hz, 1-2ms pulse)",
+    "step_angle": "N/A",
+    "mechanical_dimensions": "40.5 \u00d7 20.0 \u00d7 40.5 mm",
+    "form_factor": "Large Torque",
+    "weight": "60g"
+  }
+}

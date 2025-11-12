@@ -5,6 +5,7 @@ Test script to verify component library loading from JSON files
 
 import sys
 import os
+import json
 from pathlib import Path
 
 # Add parent directory to path
@@ -68,6 +69,39 @@ def main():
         count = len(type_counts[comp_type])
         print(f"{comp_type.value:20s}: {count:3d} component(s)")
 
+    print("\n" + "=" * 70)
+    print("MOTOR SUBTYPE VALIDATION")
+    print("=" * 70)
+
+    motor_components = service.get_components_by_type(ComponentType.MOTOR)
+    servo_components = service.get_components_by_type(ComponentType.SERVO)
+
+    expected_dc = 6 * 6 * 3
+    expected_steppers = 3 * 4 * 3
+    expected_servos = 6 * 5
+
+    actual_dc = len([c for c in motor_components if c.id.startswith("motor_dc_")])
+    actual_steppers = len([c for c in motor_components if c.id.startswith("motor_stepper_")])
+    actual_servos = len([c for c in servo_components if c.id.startswith("servo_")])
+
+    motor_checks = [
+        ("DC Motors", actual_dc, expected_dc),
+        ("Stepper Motors", actual_steppers, expected_steppers),
+        ("Servo Motors", actual_servos, expected_servos),
+    ]
+
+    motor_validation_passed = True
+    for label, actual, expected in motor_checks:
+        if actual == expected:
+            print(f"✓ {label}: {actual} component definitions found (expected {expected})")
+        else:
+            print(f"✗ {label}: {actual} component definitions found (expected {expected})")
+            motor_validation_passed = False
+
+    if not motor_validation_passed:
+        print("\n✗ ERROR: Motor component library validation failed.\n")
+        return 1
+
     # Show detailed examples
     print("\n" + "=" * 70)
     print("EXAMPLE COMPONENTS")
@@ -97,6 +131,10 @@ def main():
         "pushbutton_tactile_6x6mm_black",
         "sensor_temp_dht22_precision",
         "sensor_motion_hc_sr04_v1",
+        "button_tactile_6x6mm_surface_mount_black_160gf_spst",
+        "button_momentary_16mm_panel_panel_mount_red_220gf_spdt",
+        "button_toggle_miniature_panel_mount_blue_1_8ncm_dpdt",
+        "sensor_temp_dht22_high_precision",
         "ic_timer_555_dip8"
     ]
 

@@ -1,0 +1,49 @@
+{
+  "id": "servo_fs5106r_3kg_cm",
+  "name": "FS5106R Continuous Servo (3kg-cm torque)",
+  "component_type": "servo",
+  "description": "Continuous servo configured for 3.0 kg\u00b7cm output torque with 0.12s/60\u00b0 @ 6.0V response.",
+  "width": 60,
+  "height": 70,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        15,
+        0
+      ]
+    },
+    {
+      "id": "signal",
+      "label": "SIG",
+      "pin_type": "pwm",
+      "position": [
+        30,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        45,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "motor_subtype": "Servo",
+    "voltage": "4.8-6.0V",
+    "speed": "0.12s/60\u00b0 @ 6.0V",
+    "torque": "3.0 kg\u00b7cm",
+    "current": "0.80A stall",
+    "control_interface": "PWM (50Hz, 1-2ms pulse)",
+    "step_angle": "N/A",
+    "mechanical_dimensions": "40.8 \u00d7 20.1 \u00d7 39.5 mm",
+    "form_factor": "Continuous",
+    "weight": "41g"
+  }
+}

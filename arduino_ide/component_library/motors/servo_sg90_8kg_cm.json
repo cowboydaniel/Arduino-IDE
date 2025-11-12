@@ -1,0 +1,49 @@
+{
+  "id": "servo_sg90_8kg_cm",
+  "name": "SG90 Micro Servo (8kg-cm torque)",
+  "component_type": "servo",
+  "description": "Micro servo configured for 8.0 kg\u00b7cm output torque with 0.12s/60\u00b0 @ 4.8V response.",
+  "width": 60,
+  "height": 70,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        15,
+        0
+      ]
+    },
+    {
+      "id": "signal",
+      "label": "SIG",
+      "pin_type": "pwm",
+      "position": [
+        30,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        45,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "motor_subtype": "Servo",
+    "voltage": "4.8-6.0V",
+    "speed": "0.12s/60\u00b0 @ 4.8V",
+    "torque": "8.0 kg\u00b7cm",
+    "current": "1.80A stall",
+    "control_interface": "PWM (50Hz, 1-2ms pulse)",
+    "step_angle": "N/A",
+    "mechanical_dimensions": "22.8 \u00d7 12.2 \u00d7 28.5 mm",
+    "form_factor": "Micro",
+    "weight": "9g"
+  }
+}

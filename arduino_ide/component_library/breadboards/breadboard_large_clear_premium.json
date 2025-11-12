@@ -1,0 +1,58 @@
+{
+  "id": "breadboard_large_clear_premium",
+  "name": "Large Breadboard (Clear, Premium)",
+  "component_type": "breadboard",
+  "description": "Large Project Breadboard in clear with 1660 tie points and quad length with dual rails on both sides.",
+  "width": 620,
+  "height": 200,
+  "pins": [],
+  "metadata": {
+    "manufacturer": "Generic",
+    "series": "Solderless Breadboard",
+    "size": "Large",
+    "color": "Clear",
+    "color_hex": "#EAEAEA",
+    "quality": "Premium",
+    "tie_points": 1660,
+    "tie_point_layout": {
+      "terminal_strips": {
+        "rows": 126,
+        "columns": 5,
+        "sections": 4,
+        "total": 1320
+      },
+      "power_rail_columns": 4,
+      "power_rail_tie_points": 340
+    },
+    "power_rails": 4,
+    "rail_configuration": "Quad length with dual rails on both sides",
+    "dimensions_mm": {
+      "length": 220.0,
+      "width": 70.0,
+      "height": 10.5
+    },
+    "contact_pitch": "2.54mm (0.1\")",
+    "material_shell": "ABS thermoplastic",
+    "material_contacts": "Phosphor bronze",
+    "material_quality": "High-impact ABS enclosure with gold-plated phosphor bronze contacts",
+    "electrical_ratings": {
+      "rated_voltage": "500V AC",
+      "rated_current": "3A per contact",
+      "dielectric_strength": "1500V AC/minute"
+    },
+    "contact_resistance": "<30m\u03a9",
+    "insulation_resistance": ">500M\u03a9 @ 500V DC",
+    "operating_temperature": "-55\u00b0C to +105\u00b0C",
+    "mounting_options": [
+      "Adhesive foam backing",
+      "Countersunk mounting holes (M3)",
+      "DIN rail clip adapters"
+    ],
+    "certifications": [
+      "RoHS",
+      "REACH"
+    ],
+    "size_notes": "Expanded workspace for complex prototyping and semi-permanent assemblies.",
+    "quality_notes": "Gold-plated contacts for low-loss signals and long service life."
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "id": "bjt_mpsa42_sot23",
+  "name": "MPSA42 High-Voltage NPN (SOT-23)",
+  "component_type": "transistor",
+  "description": "High-voltage NPN transistor for CRT and high-voltage signal stages. Packaged in SOT-23 for compatibility with various layouts.",
+  "width": 60,
+  "height": 80,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "B",
+      "pin_type": "analog",
+      "position": [
+        12,
+        62
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "E",
+      "pin_type": "power",
+      "position": [
+        48,
+        62
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "C",
+      "pin_type": "power",
+      "position": [
+        30,
+        18
+      ]
+    }
+  ],
+  "metadata": {
+    "polarity": "NPN",
+    "typical_gain_hfe": "40-240",
+    "max_collector_current": "500mA",
+    "max_collector_emitter_voltage": "300V",
+    "max_collector_base_voltage": "300V",
+    "max_base_emitter_voltage": "6V",
+    "transition_frequency": "50MHz",
+    "package": "SOT-23",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Base"
+      },
+      {
+        "pin": "2",
+        "function": "Emitter"
+      },
+      {
+        "pin": "3",
+        "function": "Collector"
+      }
+    ],
+    "package_note": "Standard SOT-23 orientation with the single lead on top as the collector.",
+    "datasheet_variant": "MPSA42 High-Voltage NPN SOT-23"
+  }
+}

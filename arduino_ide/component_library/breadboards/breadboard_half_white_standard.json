@@ -1,25 +1,56 @@
 {
   "id": "breadboard_half_white_standard",
-  "name": "Half-Size Breadboard (White)",
+  "name": "Half-Size Breadboard (White, Standard)",
   "component_type": "breadboard",
-  "description": "Standard half-size solderless breadboard with 400 tie points",
+  "description": "Half-Size Breadboard in white with 400 tie points and dual power rails on one side.",
   "width": 300,
-  "height": 100,
+  "height": 120,
   "pins": [],
   "metadata": {
     "manufacturer": "Generic",
+    "series": "Solderless Breadboard",
     "size": "Half-Size",
-    "tie_points": 400,
-    "power_rails": 2,
-    "dimensions": "82.5mm x 54mm",
     "color": "White",
+    "color_hex": "#F8F9FA",
     "quality": "Standard",
+    "tie_points": 400,
+    "tie_point_layout": {
+      "terminal_strips": {
+        "rows": 30,
+        "columns": 5,
+        "sections": 2,
+        "total": 300
+      },
+      "power_rail_columns": 2,
+      "power_rail_tie_points": 100
+    },
+    "power_rails": 2,
+    "rail_configuration": "Dual power rails on one side",
+    "dimensions_mm": {
+      "length": 82.5,
+      "width": 54.0,
+      "height": 9.0
+    },
     "contact_pitch": "2.54mm (0.1\")",
-    "contact_resistance": "<50mΩ",
-    "insulation_resistance": ">100MΩ",
-    "rated_voltage": "500V AC",
-    "rated_current": "3A per contact",
-    "dielectric_strength": "1500V AC/minute",
-    "operating_temperature": "-40°C to +85°C"
+    "material_shell": "ABS thermoplastic",
+    "material_contacts": "Phosphor bronze",
+    "material_quality": "ABS enclosure with nickel-plated phosphor bronze contacts",
+    "electrical_ratings": {
+      "rated_voltage": "300V AC",
+      "rated_current": "2A per contact",
+      "dielectric_strength": "1000V AC/minute"
+    },
+    "contact_resistance": "<50m\u03a9",
+    "insulation_resistance": ">100M\u03a9 @ 500V DC",
+    "operating_temperature": "-40\u00b0C to +85\u00b0C",
+    "mounting_options": [
+      "Adhesive foam backing",
+      "M2 mounting holes via adapter plate"
+    ],
+    "certifications": [
+      "RoHS"
+    ],
+    "size_notes": "Balanced size for single-board projects and Arduino shields.",
+    "quality_notes": "Balanced option for general prototyping and educational use."
   }
 }

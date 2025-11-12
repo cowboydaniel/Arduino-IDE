@@ -1,0 +1,62 @@
+{
+  "id": "mosfet_ao3400a_to220_100w",
+  "name": "AO3400A Compact MOSFET 100W (TO-220)",
+  "component_type": "transistor",
+  "description": "Compact low-Rds(on) MOSFET ideal for DC load switching. Packaged in TO-220 with a 100W thermal design rating.",
+  "width": 95,
+  "height": 170,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "G",
+      "pin_type": "analog",
+      "position": [
+        22,
+        140
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "D",
+      "pin_type": "power",
+      "position": [
+        47,
+        140
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "S",
+      "pin_type": "power",
+      "position": [
+        72,
+        140
+      ]
+    }
+  ],
+  "metadata": {
+    "channel_type": "N-Channel",
+    "rds_on": "0.009\u03a9",
+    "max_drain_current": "5.8A",
+    "max_drain_source_voltage": "30V",
+    "gate_threshold_voltage": "1.0-3.0V",
+    "package": "TO-220",
+    "power_rating": "100W",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Gate"
+      },
+      {
+        "pin": "2",
+        "function": "Drain"
+      },
+      {
+        "pin": "3",
+        "function": "Source"
+      }
+    ],
+    "package_note": "Tab connects to drain; pins counted left-to-right from front.",
+    "datasheet_variant": "AO3400A Compact MOSFET TO-220 100W"
+  }
+}

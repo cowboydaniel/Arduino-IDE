@@ -1,0 +1,76 @@
+{
+  "id": "button_toggle_miniature_pcb_vertical_black_1_8ncm_dpdt",
+  "name": "Black Toggle Switch (miniature, PCB Vertical, DPDT (On-On))",
+  "component_type": "button",
+  "description": "Robust lever toggle switch available for panel or PCB mounting with maintained positions. Features dpdt (on-on) contacts with a 1.8Ncm actuation force and pcb vertical hardware in a black finish.",
+  "width": 120,
+  "height": 200,
+  "pins": [
+    {
+      "id": "pole1_common",
+      "label": "P1 COM",
+      "pin_type": "digital",
+      "position": [
+        30.0,
+        20.0
+      ]
+    },
+    {
+      "id": "pole1_no",
+      "label": "P1 NO",
+      "pin_type": "digital",
+      "position": [
+        30.0,
+        100.0
+      ]
+    },
+    {
+      "id": "pole1_nc",
+      "label": "P1 NC",
+      "pin_type": "digital",
+      "position": [
+        30.0,
+        180.0
+      ]
+    },
+    {
+      "id": "pole2_common",
+      "label": "P2 COM",
+      "pin_type": "digital",
+      "position": [
+        90.0,
+        20.0
+      ]
+    },
+    {
+      "id": "pole2_no",
+      "label": "P2 NO",
+      "pin_type": "digital",
+      "position": [
+        90.0,
+        100.0
+      ]
+    },
+    {
+      "id": "pole2_nc",
+      "label": "P2 NC",
+      "pin_type": "digital",
+      "position": [
+        90.0,
+        180.0
+      ]
+    }
+  ],
+  "metadata": {
+    "family": "Toggle Switch",
+    "size": "miniature",
+    "mounting_style": "PCB Vertical",
+    "actuator_color": "Black",
+    "actuation_force": "1.8Ncm (Maintained toggle torque)",
+    "pole_and_throw": "DPDT (On-On)",
+    "contact_configuration": "Dual pole double throw maintained",
+    "electrical_rating": "250VAC 3A",
+    "mechanical_life": "30,000 cycles",
+    "travel": "2-position"
+  }
+}
