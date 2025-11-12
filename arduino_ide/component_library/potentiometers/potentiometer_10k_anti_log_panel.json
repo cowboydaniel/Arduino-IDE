@@ -1,0 +1,48 @@
+{
+  "id": "potentiometer_10k_anti_log_panel",
+  "name": "10k\u03a9 Anti-Logarithmic Panel Potentiometer",
+  "component_type": "potentiometer",
+  "description": "10k\u03a9 anti-logarithmic taper potentiometer for panel mounting. Ideal for microcontroller input scaling with reverse audio taper for balance and feedback controls and panel mount body with solder lug terminals and threaded bushing.",
+  "width": 50,
+  "height": 60,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "CW",
+      "pin_type": "analog",
+      "position": [
+        12,
+        50
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "Wiper",
+      "pin_type": "analog",
+      "position": [
+        25,
+        50
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "CCW",
+      "pin_type": "analog",
+      "position": [
+        38,
+        50
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "resistance": "10k\u03a9",
+    "taper": "Anti-Logarithmic",
+    "mounting_style": "Panel",
+    "shaft_style": "6.35mm smooth shaft with 3/8\" bushing, 20mm length",
+    "tolerance": "\u00b110%",
+    "power_rating": "0.25W",
+    "mechanical_travel": "300\u00b0 \u00b15\u00b0",
+    "mounting_details": "Panel mount with 3/8-32 threaded bushing, supplied nut and washer"
+  }
+}
