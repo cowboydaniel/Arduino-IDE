@@ -18,18 +18,66 @@ import requests
 
 # Optional PySide6 support
 try:
-    from PySide6.QtCore import QObject, Signal
+    from PySide6.QtCore import QObject, Signal, QThread
     HAS_QT = True
 except ImportError:
     # Provide stub for non-Qt usage
     QObject = object
     Signal = lambda *args, **kwargs: None
+    QThread = object
     HAS_QT = False
 
 from ..models import (
     Board, BoardPackage, BoardIndex, BoardPackageVersion,
     BoardPackageURL, BoardStatus, BoardCategory, BoardSpecs
 )
+
+
+class PackageOperationWorker(QThread if HAS_QT else object):
+    """Background worker for package operations (install/uninstall/update)"""
+
+    if HAS_QT:
+        finished = Signal(bool, str)  # (success, message)
+        progress = Signal(int)  # progress percentage
+        status = Signal(str)  # status message
+
+    def __init__(self, operation, *args, **kwargs):
+        """
+        Args:
+            operation: Callable to execute in background
+            *args, **kwargs: Arguments to pass to the operation
+        """
+        if HAS_QT:
+            super().__init__()
+        self.operation = operation
+        self.args = args
+        self.kwargs = kwargs
+        self._cancelled = False
+
+    def run(self):
+        """Execute the operation in background thread"""
+        try:
+            success = self.operation(*self.args, **self.kwargs, worker=self)
+            if not self._cancelled:
+                self._emit_signal('finished', success, "Operation completed")
+        except Exception as e:
+            if not self._cancelled:
+                self._emit_signal('finished', False, str(e))
+
+    def cancel(self):
+        """Cancel the operation"""
+        self._cancelled = True
+
+    def is_cancelled(self):
+        """Check if operation was cancelled"""
+        return self._cancelled
+
+    def _emit_signal(self, signal_name: str, *args):
+        """Safely emit a signal if it exists and Qt is available"""
+        if HAS_QT and hasattr(self, signal_name):
+            signal = getattr(self, signal_name)
+            if signal is not None:
+                signal.emit(*args)
 
 
 class BoardManager(QObject):
@@ -72,6 +120,9 @@ class BoardManager(QObject):
         self.board_index = BoardIndex()
         self.board_index.package_urls = BoardIndex.POPULAR_URLS.copy()
         self.installed_packages: Dict[str, str] = {}  # name -> version
+
+        # Track active operations
+        self.active_workers: Dict[str, PackageOperationWorker] = {}  # package_name -> worker
 
         # Load data
         self._load_package_urls()
@@ -294,12 +345,13 @@ class BoardManager(QObject):
 
         return results
 
-    def install_package(self, name: str, version: Optional[str] = None) -> bool:
+    def install_package(self, name: str, version: Optional[str] = None, worker: Optional['PackageOperationWorker'] = None) -> bool:
         """Install a board package/platform.
 
         Args:
             name: Can be either package name (e.g., "arduino") or platform ID (e.g., "arduino:avr")
             version: Specific version to install, or None for latest
+            worker: Optional worker for cancellation support
 
         Returns:
             True if installation succeeded, False otherwise
@@ -366,12 +418,19 @@ class BoardManager(QObject):
                 downloaded = 0
 
                 for chunk in response.iter_content(chunk_size=8192):
+                    # Check for cancellation
+                    if worker and worker.is_cancelled():
+                        self._emit_signal('status_message', f"Installation of {name} cancelled")
+                        return False
+
                     tmp_file.write(chunk)
                     downloaded += len(chunk)
 
                     if total_size > 0:
                         progress = int((downloaded / total_size) * 100)
                         self._emit_signal('progress_changed',progress)
+                        if worker:
+                            worker._emit_signal('progress', progress)
 
                 tmp_path = tmp_file.name
 
@@ -422,11 +481,12 @@ class BoardManager(QObject):
             self._emit_signal('status_message',f"Error installing {name}: {str(e)}")
             return False
 
-    def uninstall_package(self, name: str) -> bool:
+    def uninstall_package(self, name: str, worker: Optional['PackageOperationWorker'] = None) -> bool:
         """Uninstall a board package/platform.
 
         Args:
             name: Can be either package name (e.g., "arduino") or platform ID (e.g., "arduino:avr")
+            worker: Optional worker for cancellation support
 
         Returns:
             True if uninstallation succeeded, False otherwise
@@ -493,7 +553,7 @@ class BoardManager(QObject):
             self._emit_signal('status_message',f"Error uninstalling {name}: {str(e)}")
             return False
 
-    def update_package(self, name: str, version: Optional[str] = None) -> bool:
+    def update_package(self, name: str, version: Optional[str] = None, worker: Optional['PackageOperationWorker'] = None) -> bool:
         """Update a board package"""
         package = self.get_package(name)
         if not package:
@@ -512,7 +572,7 @@ class BoardManager(QObject):
             return False
 
         # Install new version
-        if self.install_package(name, version):
+        if self.install_package(name, version, worker):
             self._emit_signal('package_updated',name, old_version, version)
             return True
 
@@ -920,3 +980,140 @@ class BoardManager(QObject):
         except Exception as e:
             print(f"Failed to get board details for {fqbn}: {e}")
             return None
+
+    # ------------------------------------------------------------------
+    # Background Operations Management
+    # ------------------------------------------------------------------
+
+    def install_package_async(self, name: str, version: Optional[str] = None) -> Optional[PackageOperationWorker]:
+        """Start package installation in background thread.
+
+        Args:
+            name: Package name or platform ID
+            version: Version to install
+
+        Returns:
+            Worker object if started, None if operation already in progress
+        """
+        if not HAS_QT:
+            # Fallback to synchronous operation
+            self.install_package(name, version)
+            return None
+
+        # Check if operation already in progress
+        if name in self.active_workers:
+            self._emit_signal('status_message', f"Operation already in progress for {name}")
+            return None
+
+        # Create and start worker
+        worker = PackageOperationWorker(self.install_package, name, version)
+        worker.finished.connect(lambda success, msg: self._on_operation_finished(name, success, msg))
+        worker.status.connect(self.status_message.emit)
+
+        self.active_workers[name] = worker
+        worker.start()
+
+        return worker
+
+    def uninstall_package_async(self, name: str) -> Optional[PackageOperationWorker]:
+        """Start package uninstallation in background thread.
+
+        Args:
+            name: Package name or platform ID
+
+        Returns:
+            Worker object if started, None if operation already in progress
+        """
+        if not HAS_QT:
+            # Fallback to synchronous operation
+            self.uninstall_package(name)
+            return None
+
+        # Check if operation already in progress
+        if name in self.active_workers:
+            self._emit_signal('status_message', f"Operation already in progress for {name}")
+            return None
+
+        # Create and start worker
+        worker = PackageOperationWorker(self.uninstall_package, name)
+        worker.finished.connect(lambda success, msg: self._on_operation_finished(name, success, msg))
+        worker.status.connect(self.status_message.emit)
+
+        self.active_workers[name] = worker
+        worker.start()
+
+        return worker
+
+    def update_package_async(self, name: str, version: Optional[str] = None) -> Optional[PackageOperationWorker]:
+        """Start package update in background thread.
+
+        Args:
+            name: Package name
+            version: Version to update to
+
+        Returns:
+            Worker object if started, None if operation already in progress
+        """
+        if not HAS_QT:
+            # Fallback to synchronous operation
+            self.update_package(name, version)
+            return None
+
+        # Check if operation already in progress
+        if name in self.active_workers:
+            self._emit_signal('status_message', f"Operation already in progress for {name}")
+            return None
+
+        # Create and start worker
+        worker = PackageOperationWorker(self.update_package, name, version)
+        worker.finished.connect(lambda success, msg: self._on_operation_finished(name, success, msg))
+        worker.status.connect(self.status_message.emit)
+
+        self.active_workers[name] = worker
+        worker.start()
+
+        return worker
+
+    def cancel_operation(self, name: str) -> bool:
+        """Cancel an ongoing operation for a package.
+
+        Args:
+            name: Package name
+
+        Returns:
+            True if operation was cancelled, False if no operation in progress
+        """
+        if name in self.active_workers:
+            worker = self.active_workers[name]
+            worker.cancel()
+            return True
+        return False
+
+    def is_operation_in_progress(self, name: str) -> bool:
+        """Check if an operation is in progress for a package.
+
+        Args:
+            name: Package name
+
+        Returns:
+            True if operation in progress
+        """
+        return name in self.active_workers
+
+    def _on_operation_finished(self, name: str, success: bool, message: str):
+        """Handle operation completion.
+
+        Args:
+            name: Package name
+            success: Whether operation succeeded
+            message: Status message
+        """
+        # Remove from active workers
+        if name in self.active_workers:
+            worker = self.active_workers[name]
+            worker.deleteLater()  # Clean up worker
+            del self.active_workers[name]
+
+        # Emit completion message
+        if not success:
+            self._emit_signal('status_message', f"Operation failed: {message}")
