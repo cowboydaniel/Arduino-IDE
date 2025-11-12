@@ -409,6 +409,27 @@ class BoardManagerDialog(QDialog):
         self.filter_updates.stateChanged.connect(self.refresh_packages)
         left_layout.addWidget(self.filter_updates)
 
+        # Action buttons
+        action_buttons_layout = QHBoxLayout()
+
+        self.install_btn = QPushButton("Install")
+        self.install_btn.setEnabled(False)
+        self.install_btn.clicked.connect(self.on_install_button_clicked)
+        action_buttons_layout.addWidget(self.install_btn)
+
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setEnabled(False)
+        self.cancel_btn.clicked.connect(self.on_cancel_button_clicked)
+        action_buttons_layout.addWidget(self.cancel_btn)
+
+        self.uninstall_btn = QPushButton("Uninstall")
+        self.uninstall_btn.setEnabled(False)
+        self.uninstall_btn.clicked.connect(self.on_uninstall_button_clicked)
+        action_buttons_layout.addWidget(self.uninstall_btn)
+
+        action_buttons_layout.addStretch()
+        left_layout.addLayout(action_buttons_layout)
+
         # Package list
         self.package_list = QTreeWidget()
         self.package_list.setHeaderLabels(["Package", "Version", "Boards", "Status"])
@@ -536,6 +557,7 @@ class BoardManagerDialog(QDialog):
         package = item.data(0, Qt.UserRole)
         if package:
             self.show_package_boards(package)
+            self.update_action_buttons(package)
 
     def show_package_boards(self, package: BoardPackage):
         """Show boards in package"""
@@ -681,6 +703,57 @@ class BoardManagerDialog(QDialog):
             # Refresh to update status column
             self.refresh_packages()
 
+    def update_action_buttons(self, package: BoardPackage):
+        """Update action buttons based on package state"""
+        # Check if operation is in progress
+        in_progress = self.board_manager.is_operation_in_progress(package.name)
+
+        if in_progress:
+            # Only enable cancel button during operation
+            self.install_btn.setEnabled(False)
+            self.cancel_btn.setEnabled(True)
+            self.uninstall_btn.setEnabled(False)
+        else:
+            # Enable install or uninstall based on installation state
+            if package.installed_version:
+                self.install_btn.setEnabled(False)
+                self.cancel_btn.setEnabled(False)
+                self.uninstall_btn.setEnabled(True)
+            else:
+                self.install_btn.setEnabled(True)
+                self.cancel_btn.setEnabled(False)
+                self.uninstall_btn.setEnabled(False)
+
+    def on_install_button_clicked(self):
+        """Handle install button click"""
+        item = self.package_list.currentItem()
+        if not item:
+            return
+
+        package = item.data(0, Qt.UserRole)
+        if package and not package.installed_version:
+            self.install_package(package.name, package.latest_version)
+
+    def on_cancel_button_clicked(self):
+        """Handle cancel button click"""
+        item = self.package_list.currentItem()
+        if not item:
+            return
+
+        package = item.data(0, Qt.UserRole)
+        if package:
+            self.cancel_operation(package.name)
+
+    def on_uninstall_button_clicked(self):
+        """Handle uninstall button click"""
+        item = self.package_list.currentItem()
+        if not item:
+            return
+
+        package = item.data(0, Qt.UserRole)
+        if package and package.installed_version:
+            self.uninstall_package(package.name)
+
     def manage_package_urls(self):
         """Manage package URLs"""
         dialog = PackageURLDialog(self.board_manager.board_index.package_urls, self)
@@ -712,6 +785,13 @@ class BoardManagerDialog(QDialog):
         self.board_manager.get_all_boards()
 
         self.refresh_packages()
+
+        # Update action buttons if a package is selected
+        current_item = self.package_list.currentItem()
+        if current_item:
+            package = current_item.data(0, Qt.UserRole)
+            if package:
+                self.update_action_buttons(package)
 
         # Update status message
         if args:
