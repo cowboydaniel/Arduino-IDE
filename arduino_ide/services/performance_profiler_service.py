@@ -111,6 +111,27 @@ class ProfilingSession:
         return 0.0
 
 
+@dataclass
+class ComparisonMetric:
+    """Single metric comparison between versions"""
+    name: str
+    version_a_value: float
+    version_b_value: float
+    unit: str
+    delta: float
+    delta_percent: float
+    description: str = ""
+
+
+@dataclass
+class PerformanceComparisonResult:
+    """Complete comparison output"""
+    version_a: str
+    version_b: str
+    metrics: List[ComparisonMetric]
+    highlights: List[str]
+
+
 class PerformanceProfilerService(QObject):
     """
     Service for performance profiling
@@ -679,3 +700,119 @@ void printProfilingResults() {
         ])
 
         return suggestions
+
+
+class PerformanceComparison:
+    """Compare code versions side-by-side"""
+
+    def __init__(self, profiler_service: PerformanceProfilerService):
+        self.profiler_service = profiler_service
+
+    def compare(self, version_a: str, version_b: str) -> PerformanceComparisonResult:
+        """Compare two profiling sessions"""
+        session_a = self.profiler_service.get_session(version_a)
+        session_b = self.profiler_service.get_session(version_b)
+
+        if not session_a:
+            raise ValueError(f"Profiling session '{version_a}' not found")
+        if not session_b:
+            raise ValueError(f"Profiling session '{version_b}' not found")
+
+        metrics: List[ComparisonMetric] = []
+
+        metrics.append(self._compare_execution_time(session_a, session_b))
+        metrics.append(self._compare_memory_usage(session_a, session_b))
+        metrics.append(self._compare_power_consumption(session_a, session_b))
+
+        highlights = self._build_highlights(metrics, version_a, version_b)
+
+        return PerformanceComparisonResult(
+            version_a=version_a,
+            version_b=version_b,
+            metrics=metrics,
+            highlights=highlights
+        )
+
+    def _compare_execution_time(self, session_a: ProfilingSession, session_b: ProfilingSession) -> ComparisonMetric:
+        """Compare total execution time"""
+        value_a_ms = session_a.total_execution_time_us / 1000.0
+        value_b_ms = session_b.total_execution_time_us / 1000.0
+        return self._build_metric(
+            "Execution time",
+            value_a_ms,
+            value_b_ms,
+            "ms",
+            "Overall time spent executing the workload"
+        )
+
+    def _compare_memory_usage(self, session_a: ProfilingSession, session_b: ProfilingSession) -> ComparisonMetric:
+        """Compare average heap memory usage"""
+        avg_a = self._average_heap_usage(session_a)
+        avg_b = self._average_heap_usage(session_b)
+        description = "Average heap memory consumed during profiling"
+        return self._build_metric("Memory usage", avg_a, avg_b, "bytes", description)
+
+    def _compare_power_consumption(self, session_a: ProfilingSession, session_b: ProfilingSession) -> ComparisonMetric:
+        """Compare estimated power consumption based on CPU cycles"""
+        power_a = self._estimate_power_mj(session_a.total_cpu_cycles)
+        power_b = self._estimate_power_mj(session_b.total_cpu_cycles)
+        description = "Estimated energy usage derived from CPU cycles"
+        return self._build_metric("Power consumption", power_a, power_b, "mJ", description)
+
+    def _average_heap_usage(self, session: ProfilingSession) -> float:
+        """Compute the average heap usage for a session"""
+        if not session.memory_snapshots:
+            return 0.0
+        heap_values = [snap.heap_used for snap in session.memory_snapshots]
+        return sum(heap_values) / len(heap_values)
+
+    def _estimate_power_mj(self, cycles: int) -> float:
+        """Estimate power consumption based on CPU cycles"""
+        # Assume 16MHz MCU at 5V, ~1mA per MHz => 80mW.
+        # Energy ~= power * time, time = cycles / freq.
+        freq_hz = 16_000_000
+        power_w = 0.08  # 80mW baseline draw
+        time_s = cycles / freq_hz
+        energy_j = power_w * time_s
+        return energy_j * 1000  # convert to mJ
+
+    def _build_metric(self, name: str, value_a: float, value_b: float, unit: str, description: str) -> ComparisonMetric:
+        """Create a comparison metric entry"""
+        delta = value_b - value_a
+        delta_percent = 0.0
+        if value_a != 0:
+            delta_percent = (delta / value_a) * 100.0
+        return ComparisonMetric(
+            name=name,
+            version_a_value=value_a,
+            version_b_value=value_b,
+            unit=unit,
+            delta=delta,
+            delta_percent=delta_percent,
+            description=description
+        )
+
+    def _build_highlights(self, metrics: List[ComparisonMetric], version_a: str, version_b: str) -> List[str]:
+        """Generate highlight sentences for the comparison"""
+        highlights: List[str] = []
+        for metric in metrics:
+            if metric.delta == 0:
+                continue
+
+            if metric.name == "Memory usage" and metric.delta < 0:
+                highlights.append(
+                    f"Your optimization saved {abs(metric.delta_percent):.1f}% RAM between {version_a} and {version_b}."
+                )
+            elif metric.delta < 0:
+                highlights.append(
+                    f"{version_b} improved {metric.name.lower()} by {abs(metric.delta_percent):.1f}% compared to {version_a}."
+                )
+            else:
+                highlights.append(
+                    f"{metric.name} increased by {metric.delta_percent:.1f}% in {version_b} compared to {version_a}."
+                )
+
+        if not highlights:
+            highlights.append("No significant performance delta detected between the selected versions.")
+
+        return highlights
