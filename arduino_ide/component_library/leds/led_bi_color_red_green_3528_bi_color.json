@@ -1,0 +1,52 @@
+{
+  "id": "led_bi_color_red_green_3528_bi_color",
+  "name": "Bi-Color Red/Green SMD 3528 Bi-Color LED",
+  "component_type": "led",
+  "description": "Dual-die LED allowing two colors from a shared package. This dual-color indicator comes in a SMD 3528 package.",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "cathode_a",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        12,
+        28
+      ]
+    },
+    {
+      "id": "cathode_b",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        36,
+        28
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Bi-Color Red/Green",
+    "size": "SMD 3528",
+    "forward_voltage": "Red: 1.8-2.2V / Green: 2.9-3.2V",
+    "forward_current": "20mA per channel",
+    "wavelength": "Red: 620-630nm / Green: 520-530nm",
+    "brightness": "Red: 765-1190mcd / Green: 935-1530mcd",
+    "mounting_type": "SMD",
+    "led_type": "Bi-Color",
+    "package": "SMD 3528 SMD LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "45°",
+    "notes": "Common anode dual-color configuration."
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "led_infrared_10mm_standard",
+  "name": "Infrared 10mm Standard LED",
+  "component_type": "led",
+  "description": "Standard clear lens indicator LED. This 940nm IR emitter comes in a 10mm package.",
+  "width": 44,
+  "height": 64,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        22,
+        64
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Infrared",
+    "size": "10mm",
+    "forward_voltage": "1.4-1.7V",
+    "forward_current": "20mA",
+    "wavelength": "940nm",
+    "brightness": "N/A",
+    "mounting_type": "THT",
+    "led_type": "Standard",
+    "package": "10mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "25°",
+    "notes": "General-purpose indicator LED."
+  }
+}

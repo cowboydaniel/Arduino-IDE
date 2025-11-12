@@ -1,0 +1,61 @@
+{
+  "id": "led_amber_3528_rgb",
+  "name": "Amber SMD 3528 RGB LED",
+  "component_type": "led",
+  "description": "Multi-die LED with separate red, green, and blue channels. This amber indicator output comes in a SMD 3528 package.",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "cathode_1",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        10,
+        28
+      ]
+    },
+    {
+      "id": "cathode_2",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        24,
+        28
+      ]
+    },
+    {
+      "id": "cathode_3",
+      "label": "B",
+      "pin_type": "ground",
+      "position": [
+        38,
+        28
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Amber",
+    "size": "SMD 3528",
+    "forward_voltage": "2.0-2.4V",
+    "forward_current": "20mA per channel",
+    "wavelength": "600-610nm",
+    "brightness": "900-1600mcd",
+    "mounting_type": "SMD",
+    "led_type": "RGB",
+    "package": "SMD 3528 SMD LED",
+    "lens_type": "Clear",
+    "viewing_angle": "40°",
+    "notes": "Common anode tri-color LED."
+  }
+}

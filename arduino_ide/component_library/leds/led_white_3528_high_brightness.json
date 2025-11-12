@@ -1,0 +1,43 @@
+{
+  "id": "led_white_3528_high_brightness",
+  "name": "White SMD 3528 High Brightness LED",
+  "component_type": "led",
+  "description": "High-intensity LED for daylight visibility. This neutral white phosphor LED comes in a SMD 3528 package.",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        24,
+        28
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "White",
+    "size": "SMD 3528",
+    "forward_voltage": "3.1-3.5V",
+    "forward_current": "30mA",
+    "wavelength": "CCT 5600K",
+    "brightness": "6300-9900mcd",
+    "mounting_type": "SMD",
+    "led_type": "High Brightness",
+    "package": "SMD 3528 SMD LED",
+    "lens_type": "Clear",
+    "viewing_angle": "20°",
+    "notes": "Designed for maximum luminous output."
+  }
+}

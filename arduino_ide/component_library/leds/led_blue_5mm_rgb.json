@@ -1,0 +1,61 @@
+{
+  "id": "led_blue_5mm_rgb",
+  "name": "Blue 5mm RGB LED",
+  "component_type": "led",
+  "description": "Multi-die LED with separate red, green, and blue channels. This deep blue output comes in a 5mm package.",
+  "width": 30,
+  "height": 50,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        15,
+        0
+      ]
+    },
+    {
+      "id": "cathode_1",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        6,
+        50
+      ]
+    },
+    {
+      "id": "cathode_2",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        15,
+        50
+      ]
+    },
+    {
+      "id": "cathode_3",
+      "label": "B",
+      "pin_type": "ground",
+      "position": [
+        24,
+        50
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Blue",
+    "size": "5mm",
+    "forward_voltage": "3.0-3.4V",
+    "forward_current": "20mA per channel",
+    "wavelength": "460-470nm",
+    "brightness": "600-1400mcd",
+    "mounting_type": "THT",
+    "led_type": "RGB",
+    "package": "5mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "40°",
+    "notes": "Common anode tri-color LED."
+  }
+}

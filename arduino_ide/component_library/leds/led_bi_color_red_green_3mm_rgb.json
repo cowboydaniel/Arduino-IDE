@@ -1,0 +1,61 @@
+{
+  "id": "led_bi_color_red_green_3mm_rgb",
+  "name": "Bi-Color Red/Green 3mm RGB LED",
+  "component_type": "led",
+  "description": "Multi-die LED with separate red, green, and blue channels. This dual-color indicator comes in a 3mm package.",
+  "width": 20,
+  "height": 40,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        10,
+        0
+      ]
+    },
+    {
+      "id": "cathode_1",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        4,
+        40
+      ]
+    },
+    {
+      "id": "cathode_2",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        10,
+        40
+      ]
+    },
+    {
+      "id": "cathode_3",
+      "label": "B",
+      "pin_type": "ground",
+      "position": [
+        16,
+        40
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Bi-Color Red/Green",
+    "size": "3mm",
+    "forward_voltage": "Red: 1.9-2.2V / Green: 2.9-3.2V",
+    "forward_current": "20mA per channel",
+    "wavelength": "Red: 620-630nm / Green: 520-530nm",
+    "brightness": "Red: 900-1400mcd / Green: 1100-1800mcd",
+    "mounting_type": "THT",
+    "led_type": "RGB",
+    "package": "3mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "40°",
+    "notes": "Common anode tri-color LED."
+  }
+}

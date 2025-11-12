@@ -1,0 +1,43 @@
+{
+  "id": "led_uv_5mm_diffused",
+  "name": "Ultraviolet 5mm Diffused LED",
+  "component_type": "led",
+  "description": "Diffused epoxy lens LED with wide viewing angle. This near-UV emission comes in a 5mm package.",
+  "width": 30,
+  "height": 50,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        15,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        15,
+        50
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Ultraviolet",
+    "size": "5mm",
+    "forward_voltage": "3.2-3.6V",
+    "forward_current": "20mA",
+    "wavelength": "395-405nm",
+    "brightness": "780-1170mcd",
+    "mounting_type": "THT",
+    "led_type": "Diffused",
+    "package": "5mm THT LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "60°",
+    "notes": "Even light distribution through frosted lens."
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "led_red_10mm_high_brightness",
+  "name": "Red 10mm High Brightness LED",
+  "component_type": "led",
+  "description": "High-intensity LED for daylight visibility. This classic red indicator color comes in a 10mm package.",
+  "width": 44,
+  "height": 64,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        22,
+        64
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Red",
+    "size": "10mm",
+    "forward_voltage": "1.9-2.3V",
+    "forward_current": "30mA",
+    "wavelength": "620-630nm",
+    "brightness": "1440-2700mcd",
+    "mounting_type": "THT",
+    "led_type": "High Brightness",
+    "package": "10mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "20°",
+    "notes": "Designed for maximum luminous output."
+  }
+}

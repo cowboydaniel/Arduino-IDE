@@ -1,0 +1,43 @@
+{
+  "id": "led_blue_3528_diffused",
+  "name": "Blue SMD 3528 Diffused LED",
+  "component_type": "led",
+  "description": "Diffused epoxy lens LED with wide viewing angle. This deep blue output comes in a SMD 3528 package.",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        24,
+        28
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Blue",
+    "size": "SMD 3528",
+    "forward_voltage": "3.0-3.4V",
+    "forward_current": "20mA",
+    "wavelength": "460-470nm",
+    "brightness": "390-910mcd",
+    "mounting_type": "SMD",
+    "led_type": "Diffused",
+    "package": "SMD 3528 SMD LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "60°",
+    "notes": "Even light distribution through frosted lens."
+  }
+}

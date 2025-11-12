@@ -1,0 +1,43 @@
+{
+  "id": "led_red_3528_diffused",
+  "name": "Red SMD 3528 Diffused LED",
+  "component_type": "led",
+  "description": "Diffused epoxy lens LED with wide viewing angle. This classic red indicator color comes in a SMD 3528 package.",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        24,
+        28
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Red",
+    "size": "SMD 3528",
+    "forward_voltage": "1.8-2.2V",
+    "forward_current": "20mA",
+    "wavelength": "620-630nm",
+    "brightness": "520-975mcd",
+    "mounting_type": "SMD",
+    "led_type": "Diffused",
+    "package": "SMD 3528 SMD LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "60°",
+    "notes": "Even light distribution through frosted lens."
+  }
+}
