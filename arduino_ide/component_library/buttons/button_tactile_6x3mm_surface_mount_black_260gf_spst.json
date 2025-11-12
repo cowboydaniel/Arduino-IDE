@@ -1,0 +1,40 @@
+{
+  "id": "button_tactile_6x3mm_surface_mount_black_260gf_spst",
+  "name": "Black Tactile Pushbutton (6x3mm, Surface Mount, SPST (Normally Open))",
+  "component_type": "button",
+  "description": "Low-profile tactile switch with momentary action, ideal for user input and reset buttons. Features spst (normally open) contacts with a 260gf actuation force and surface mount hardware in a black finish.",
+  "width": 70,
+  "height": 60,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "1",
+      "pin_type": "digital",
+      "position": [
+        17.5,
+        54.0
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "2",
+      "pin_type": "digital",
+      "position": [
+        52.5,
+        54.0
+      ]
+    }
+  ],
+  "metadata": {
+    "family": "Tactile Pushbutton",
+    "size": "6x3mm",
+    "mounting_style": "Surface Mount",
+    "actuator_color": "Black",
+    "actuation_force": "260gf (Firm touch)",
+    "pole_and_throw": "SPST (Normally Open)",
+    "contact_configuration": "Normally open tactile contacts",
+    "electrical_rating": "12VDC 50mA",
+    "mechanical_life": "100,000 cycles",
+    "travel": "0.2mm"
+  }
+}
