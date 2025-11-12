@@ -1,0 +1,60 @@
+{
+  "id": "sensor_temp_sht31_industrial",
+  "name": "SHT31 Temperature & Humidity Sensor (Industrial Calibrated)",
+  "component_type": "sensor",
+  "description": "Sensirion digital humidity and temperature sensor Configured for industrial calibrated with \u00b10.1\u00b0C typical",
+  "width": 56,
+  "height": 32,
+  "pins": [
+    {
+      "id": "vin",
+      "label": "VIN",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        20,
+        0
+      ]
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "pin_type": "i2c",
+      "position": [
+        32,
+        0
+      ]
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "pin_type": "i2c",
+      "position": [
+        44,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "I2C",
+    "measurement_range": "-40\u00b0C to 125\u00b0C",
+    "nominal_resolution": "0.01\u00b0C",
+    "supply_voltage": "2.4-5.5V",
+    "supply_current": "900\u00b5A",
+    "output_format": "Digital",
+    "update_interval": "0.015s",
+    "variant": "Industrial Calibrated",
+    "variant_notes": "Configured for industrial calibrated with \u00b10.1\u00b0C typical",
+    "measurement_accuracy": "\u00b10.1\u00b0C typical",
+    "manufacturer": "Sensirion",
+    "part_number": "SHT31"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "id": "sensor_light_bh1750_low",
+  "name": "BH1750 Digital Light Sensor (Low Sensitivity)",
+  "component_type": "sensor",
+  "description": "I2C ambient light sensor with lux output Configured for bright environments with reduced gain",
+  "width": 54,
+  "height": 34,
+  "pins": [
+    {
+      "id": "vin",
+      "label": "VIN",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        20,
+        0
+      ]
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "pin_type": "i2c",
+      "position": [
+        32,
+        0
+      ]
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "pin_type": "i2c",
+      "position": [
+        44,
+        0
+      ]
+    },
+    {
+      "id": "addr",
+      "label": "ADDR",
+      "pin_type": "digital",
+      "position": [
+        56,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "I2C",
+    "measurement_range": "1 lux to 65,535 lux",
+    "supply_voltage": "3-5V",
+    "supply_current": "120\u00b5A",
+    "output_format": "Digital",
+    "update_interval": "120ms",
+    "sensitivity_class": "Low Sensitivity",
+    "sensitivity_notes": "Configured for bright environments with reduced gain",
+    "variant": "Low Sensitivity",
+    "variant_notes": "Configured for bright environments with reduced gain",
+    "manufacturer": "ROHM",
+    "part_number": "BH1750FVI"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "id": "sensor_light_tsl2561_medium",
+  "name": "TSL2561 Luminosity Sensor (Medium Sensitivity)",
+  "component_type": "sensor",
+  "description": "Light-to-digital converter with dual photodiodes Balanced response for indoor lighting",
+  "width": 54,
+  "height": 34,
+  "pins": [
+    {
+      "id": "vin",
+      "label": "VIN",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        20,
+        0
+      ]
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "pin_type": "i2c",
+      "position": [
+        32,
+        0
+      ]
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "pin_type": "i2c",
+      "position": [
+        44,
+        0
+      ]
+    },
+    {
+      "id": "int",
+      "label": "INT",
+      "pin_type": "digital",
+      "position": [
+        56,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "I2C",
+    "measurement_range": "0.1 lux to 40,000 lux",
+    "supply_voltage": "3-5V",
+    "supply_current": "0.6mA",
+    "output_format": "Digital",
+    "update_interval": "400ms",
+    "sensitivity_class": "Medium Sensitivity",
+    "sensitivity_notes": "Balanced response for indoor lighting",
+    "variant": "Medium Sensitivity",
+    "variant_notes": "Balanced response for indoor lighting",
+    "manufacturer": "ams OSRAM",
+    "part_number": "TSL2561"
+  }
+}

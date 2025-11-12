@@ -1,0 +1,51 @@
+{
+  "id": "sensor_temp_lm35_industrial",
+  "name": "LM35 Analog Temperature Sensor (Industrial Calibrated)",
+  "component_type": "sensor",
+  "description": "Analog temperature sensor with linear 10mV/\u00b0C output Configured for industrial calibrated with \u00b10.1\u00b0C typical",
+  "width": 45,
+  "height": 28,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "out",
+      "label": "OUT",
+      "pin_type": "analog",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        36,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "Analog Voltage",
+    "measurement_range": "-55\u00b0C to 150\u00b0C",
+    "nominal_resolution": "0.1\u00b0C",
+    "supply_voltage": "4-30V",
+    "supply_current": "60\u00b5A typical",
+    "output_format": "Analog voltage 10mV/\u00b0C",
+    "update_interval": "Continuous",
+    "variant": "Industrial Calibrated",
+    "variant_notes": "Configured for industrial calibrated with \u00b10.1\u00b0C typical",
+    "measurement_accuracy": "\u00b10.1\u00b0C typical",
+    "manufacturer": "Texas Instruments",
+    "part_number": "LM35DZ"
+  }
+}

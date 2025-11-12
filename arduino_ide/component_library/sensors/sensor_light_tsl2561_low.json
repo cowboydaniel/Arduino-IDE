@@ -1,0 +1,69 @@
+{
+  "id": "sensor_light_tsl2561_low",
+  "name": "TSL2561 Luminosity Sensor (Low Sensitivity)",
+  "component_type": "sensor",
+  "description": "Light-to-digital converter with dual photodiodes Configured for bright environments with reduced gain",
+  "width": 54,
+  "height": 34,
+  "pins": [
+    {
+      "id": "vin",
+      "label": "VIN",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        20,
+        0
+      ]
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "pin_type": "i2c",
+      "position": [
+        32,
+        0
+      ]
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "pin_type": "i2c",
+      "position": [
+        44,
+        0
+      ]
+    },
+    {
+      "id": "int",
+      "label": "INT",
+      "pin_type": "digital",
+      "position": [
+        56,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "I2C",
+    "measurement_range": "0.1 lux to 40,000 lux",
+    "supply_voltage": "3-5V",
+    "supply_current": "0.6mA",
+    "output_format": "Digital",
+    "update_interval": "400ms",
+    "sensitivity_class": "Low Sensitivity",
+    "sensitivity_notes": "Configured for bright environments with reduced gain",
+    "variant": "Low Sensitivity",
+    "variant_notes": "Configured for bright environments with reduced gain",
+    "manufacturer": "ams OSRAM",
+    "part_number": "TSL2561"
+  }
+}

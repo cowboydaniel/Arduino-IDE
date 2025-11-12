@@ -128,6 +128,9 @@ def main():
         "arduino_uno",
         "led_red_5mm_standard",
         "resistor_220_1div4w_5pct",
+        "pushbutton_tactile_6x6mm_black",
+        "sensor_temp_dht22_precision",
+        "sensor_motion_hc_sr04_v1",
         "button_tactile_6x6mm_surface_mount_black_160gf_spst",
         "button_momentary_16mm_panel_panel_mount_red_220gf_spdt",
         "button_toggle_miniature_panel_mount_blue_1_8ncm_dpdt",
@@ -144,43 +147,42 @@ def main():
         else:
             print(f"\n✗ NOT FOUND: {test_id}")
 
-    # Verify breadboard coverage for each size tier
-    breadboard_ids = [
-        "breadboard_mini_white_standard",
-        "breadboard_half_white_standard",
-        "breadboard_full_white_standard",
-        "breadboard_large_white_standard"
-    ]
+    # Validate sample coverage for each sensor subtype family
+    print("\n" + "=" * 70)
+    print("SENSOR SUBTYPE COVERAGE")
+    print("=" * 70)
 
-    print("\nBreadboard size tier checks:")
-    for bb_id in breadboard_ids:
-        comp = service.get_component_definition(bb_id)
-        if comp:
-            json_path = (
-                Path(__file__).resolve().parent
-                / "arduino_ide"
-                / "component_library"
-                / "breadboards"
-                / f"{bb_id}.json"
-            )
-            try:
-                with json_path.open("r", encoding="utf-8") as fh:
-                    data = json.load(fh)
-                metadata = data.get("metadata", {})
-                tie_points = metadata.get("tie_points", "?")
-                power_rails = metadata.get("power_rails", "?")
-                dimensions = metadata.get("dimensions_mm", {})
-                length = dimensions.get("length", "?")
-                width = dimensions.get("width", "?")
-                print(
-                    "  ✓ {} -> {} tie points, {} power rails, {}mm x {}mm".format(
-                        bb_id, tie_points, power_rails, length, width
-                    )
-                )
-            except FileNotFoundError:
-                print(f"  ✗ Definition file missing on disk: {json_path}")
-        else:
-            print(f"  ✗ Missing breadboard definition: {bb_id}")
+    sensor_samples = {
+        "Temperature Accuracy Classes": [
+            "sensor_temp_ds18b20_standard",
+            "sensor_temp_ds18b20_precision",
+            "sensor_temp_ds18b20_industrial"
+        ],
+        "Motion Sensor Versions": [
+            "sensor_motion_hc_sr04_v1",
+            "sensor_motion_hc_sr04_v2",
+            "sensor_motion_hc_sr04_industrial"
+        ],
+        "Light Sensor Sensitivities": [
+            "sensor_light_bh1750_low",
+            "sensor_light_bh1750_medium",
+            "sensor_light_bh1750_high",
+            "sensor_light_bh1750_ultra"
+        ],
+        "Gas Sensor Sensitivities": [
+            "sensor_gas_mq135_standard",
+            "sensor_gas_mq135_high"
+        ]
+    }
+
+    for category, ids in sensor_samples.items():
+        print(f"\n{category}:")
+        for comp_id in ids:
+            comp = service.get_component_definition(comp_id)
+            if comp:
+                print(f"  ✓ Loaded {comp.name} [{comp.id}]")
+            else:
+                print(f"  ✗ Missing {comp_id}")
 
     print("\n" + "=" * 70)
     print("TEST COMPLETE")

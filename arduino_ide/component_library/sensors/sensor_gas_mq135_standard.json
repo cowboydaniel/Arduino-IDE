@@ -1,0 +1,61 @@
+{
+  "id": "sensor_gas_mq135_standard",
+  "name": "MQ-135 Air Quality Sensor (Standard Sensitivity)",
+  "component_type": "sensor",
+  "description": "Broad spectrum gas sensor for air quality monitoring Factory baseline sensitivity for general gas monitoring",
+  "width": 58,
+  "height": 42,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "ao",
+      "label": "AO",
+      "pin_type": "analog",
+      "position": [
+        36,
+        0
+      ]
+    },
+    {
+      "id": "do",
+      "label": "DO",
+      "pin_type": "digital",
+      "position": [
+        50,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "Analog/Digital",
+    "detection_range": "10-1,000ppm",
+    "target_gases": "NH3, NOx, alcohol, benzene, smoke",
+    "heater_voltage": "5V",
+    "preheat_time": "24h",
+    "supply_voltage": "5V",
+    "supply_current": "150mA heater",
+    "sensitivity_class": "Standard Sensitivity",
+    "sensitivity_notes": "Factory baseline sensitivity for general gas monitoring",
+    "variant": "Standard Sensitivity",
+    "variant_notes": "Factory baseline sensitivity for general gas monitoring",
+    "manufacturer": "Winsen",
+    "part_number": "MQ-135"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "id": "sensor_temp_tsic306_precision",
+  "name": "TSic 306 Temperature Sensor (Precision Calibrated)",
+  "component_type": "sensor",
+  "description": "Precision digital temperature sensor with low power consumption Configured for precision calibrated with \u00b10.25\u00b0C typical",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "vdd",
+      "label": "VDD",
+      "pin_type": "power",
+      "position": [
+        8,
+        0
+      ]
+    },
+    {
+      "id": "data",
+      "label": "DATA",
+      "pin_type": "digital",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        36,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "Single-Wire Digital",
+    "measurement_range": "-10\u00b0C to 60\u00b0C",
+    "nominal_resolution": "0.1\u00b0C",
+    "supply_voltage": "2.97-5.5V",
+    "supply_current": "35\u00b5A",
+    "output_format": "Digital",
+    "update_interval": "0.1s",
+    "variant": "Precision Calibrated",
+    "variant_notes": "Configured for precision calibrated with \u00b10.25\u00b0C typical",
+    "measurement_accuracy": "\u00b10.25\u00b0C typical",
+    "manufacturer": "ZMDI",
+    "part_number": "TSic 306"
+  }
+}

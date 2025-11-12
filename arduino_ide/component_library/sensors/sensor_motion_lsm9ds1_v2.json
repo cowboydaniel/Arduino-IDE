@@ -1,0 +1,121 @@
+{
+  "id": "sensor_motion_lsm9ds1_v2",
+  "name": "LSM9DS1 9-DOF IMU Sensor (Version 2.0)",
+  "component_type": "sensor",
+  "description": "9-axis accelerometer, gyroscope, and magnetometer sensor Updated firmware with improved noise rejection",
+  "width": 70,
+  "height": 48,
+  "pins": [
+    {
+      "id": "vin",
+      "label": "VIN",
+      "pin_type": "power",
+      "position": [
+        6,
+        0
+      ]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        18,
+        0
+      ]
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "pin_type": "i2c",
+      "position": [
+        30,
+        0
+      ]
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "pin_type": "i2c",
+      "position": [
+        42,
+        0
+      ]
+    },
+    {
+      "id": "csg",
+      "label": "CSG",
+      "pin_type": "spi",
+      "position": [
+        54,
+        0
+      ]
+    },
+    {
+      "id": "csxm",
+      "label": "CSXM",
+      "pin_type": "spi",
+      "position": [
+        66,
+        0
+      ]
+    },
+    {
+      "id": "sdog",
+      "label": "SDOG",
+      "pin_type": "spi",
+      "position": [
+        78,
+        0
+      ]
+    },
+    {
+      "id": "sdoxm",
+      "label": "SDOXM",
+      "pin_type": "spi",
+      "position": [
+        90,
+        0
+      ]
+    },
+    {
+      "id": "intg",
+      "label": "INTG",
+      "pin_type": "digital",
+      "position": [
+        102,
+        0
+      ]
+    },
+    {
+      "id": "int1",
+      "label": "INT1",
+      "pin_type": "digital",
+      "position": [
+        114,
+        0
+      ]
+    },
+    {
+      "id": "den",
+      "label": "DEN",
+      "pin_type": "digital",
+      "position": [
+        126,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "interface": "I2C/SPI",
+    "detection_range": "\u00b116g / \u00b12000\u00b0/s / \u00b116gauss",
+    "field_of_view": "N/A",
+    "supply_voltage": "2.4-3.6V",
+    "supply_current": "6.5mA",
+    "update_rate": "952Hz",
+    "variant": "Version 2.0",
+    "variant_notes": "Updated firmware with improved noise rejection",
+    "manufacturer": "STMicroelectronics",
+    "part_number": "LSM9DS1"
+  }
+}
