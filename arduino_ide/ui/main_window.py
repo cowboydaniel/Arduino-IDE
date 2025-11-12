@@ -24,6 +24,7 @@ from arduino_ide.ui.problems_panel import ProblemsPanel
 from arduino_ide.ui.output_panel import OutputPanel
 from arduino_ide.ui.status_bar import StatusBar
 from arduino_ide.ui.quick_actions_panel import QuickActionsPanel
+from arduino_ide.ui.code_quality_panel import CodeQualityPanel
 from arduino_ide.ui.library_manager_dialog import LibraryManagerDialog
 from arduino_ide.ui.board_manager_dialog import BoardManagerDialog
 from arduino_ide.ui.find_replace_dialog import FindReplaceDialog
@@ -176,6 +177,8 @@ class MainWindow(QMainWindow):
         self.settings = QSettings()
         self.theme_manager = ThemeManager()
         self.recent_files = self._load_recent_files()
+        self.view_menu = None
+        self.code_quality_panel = None
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
@@ -442,9 +445,9 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(circuit_designer_action)
 
         # View Menu
-        view_menu = menubar.addMenu("&View")
+        self.view_menu = menubar.addMenu("&View")
 
-        theme_menu = view_menu.addMenu("Theme")
+        theme_menu = self.view_menu.addMenu("Theme")
 
         light_theme = QAction("Light", self)
         light_theme.triggered.connect(lambda: self.theme_manager.apply_theme("light"))
@@ -661,6 +664,11 @@ class MainWindow(QMainWindow):
         self.quick_actions_panel.serial_monitor_clicked.connect(self.toggle_serial_monitor)
         self.quick_actions_panel.serial_plotter_clicked.connect(self.toggle_plotter)
 
+        # --- DOCKED PANELS ---
+        self.code_quality_panel = CodeQualityPanel(self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.code_quality_panel)
+        if self.view_menu:
+            self.view_menu.addAction(self.code_quality_panel.toggleViewAction())
         # Sync contextual help state with the initial Serial Monitor visibility
         self._broadcast_serial_monitor_state(self._is_serial_monitor_active())
 
@@ -708,6 +716,7 @@ class MainWindow(QMainWindow):
 
         # Trigger initial background compile for memory usage (after a short delay to ensure setup is complete)
         QTimer.singleShot(500, self._do_background_compile)
+        self._update_code_quality_panel()
 
         return editor_container
 
@@ -1112,6 +1121,7 @@ void loop() {
 
         # Schedule a new background compile after delay
         self._background_compile_timer.start(self._background_compile_delay)
+        self._update_code_quality_panel()
 
     def _do_background_compile(self):
         """Perform a silent background compilation to update memory usage"""
@@ -2053,6 +2063,18 @@ void loop() {
         self.save_state()
         event.accept()
 
+    def _update_code_quality_panel(self):
+        """Run static analysis on the current editor and refresh the panel."""
+        if not self.code_quality_panel:
+            return
+
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget and hasattr(current_widget, 'editor'):
+            code_text = current_widget.editor.toPlainText()
+        else:
+            code_text = ""
+        self.code_quality_panel.analyze_code(code_text)
+
     def update_pin_usage(self):
         """Update pin usage overview from current editor"""
         current_widget = self.editor_tabs.currentWidget()
@@ -2078,6 +2100,7 @@ void loop() {
             if current_widget and hasattr(current_widget, 'filename'):
                 self.update_status_bar_for_file(current_widget.filename)
             self.update_cursor_position()
+            self._update_code_quality_panel()
 
             # Trigger background compile for new tab (after a short delay)
             QTimer.singleShot(500, self._do_background_compile)
