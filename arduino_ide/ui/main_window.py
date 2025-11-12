@@ -28,10 +28,12 @@ from arduino_ide.ui.library_manager_dialog import LibraryManagerDialog
 from arduino_ide.ui.board_manager_dialog import BoardManagerDialog
 from arduino_ide.ui.find_replace_dialog import FindReplaceDialog
 from arduino_ide.ui.snippets_panel import SnippetsLibraryDialog
+from arduino_ide.ui.circuit_editor import CircuitDesignerWindow
 from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
 from arduino_ide.services.project_manager import ProjectManager
+from arduino_ide.services.circuit_service import CircuitService
 from arduino_ide.ui.example_templates import build_missing_example_template
 from arduino_ide.services import ArduinoCliService
 from arduino_ide.services.visual_programming_service import VisualProgrammingService
@@ -213,6 +215,9 @@ class MainWindow(QMainWindow):
         # Initialize visual programming service
         self.visual_programming_service = VisualProgrammingService()
         self.visual_programming_window = None  # Will be created when opened
+        # Initialize circuit service
+        self.circuit_service = CircuitService()
+        self.circuit_designer_window = None  # Will be created on demand
 
         self._cli_current_operation = None
         self._last_cli_error = ""
@@ -417,11 +422,18 @@ class MainWindow(QMainWindow):
         snippets_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_K)
         snippets_action.triggered.connect(self.show_snippets_library)
         tools_menu.addAction(snippets_action)
+        tools_menu.addSeparator()
 
         block_code_action = QAction("Block Code Editor...", self)
         block_code_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_B)
         block_code_action.triggered.connect(self.show_block_code_editor)
         tools_menu.addAction(block_code_action)
+        tools_menu.addSeparator()
+
+        circuit_designer_action = QAction("Circuit Designer...", self)
+        circuit_designer_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_C)
+        circuit_designer_action.triggered.connect(self.open_circuit_designer)
+        tools_menu.addAction(circuit_designer_action)
 
         # View Menu
         view_menu = menubar.addMenu("&View")
@@ -575,6 +587,14 @@ class MainWindow(QMainWindow):
         status_btn.setToolTip("Toggle Real-time Status Display")
         status_btn.triggered.connect(self.toggle_status_display)
         main_toolbar.addAction(status_btn)
+
+        main_toolbar.addSeparator()
+
+        # Circuit Designer
+        circuit_btn = QAction("🔌 Circuit Designer", self)
+        circuit_btn.setToolTip("Open Circuit Designer")
+        circuit_btn.triggered.connect(self.open_circuit_designer)
+        main_toolbar.addAction(circuit_btn)
 
     def create_dock_widgets(self):
         """Create panels (no dock widgets)"""
@@ -1877,6 +1897,21 @@ void loop() {
         # Show confirmation
         self.status_bar.set_status("Block code inserted into sketch")
         self.console_panel.append_output("Generated code inserted from Block Code Editor", color="#6A9955")
+    def open_circuit_designer(self):
+        """Open circuit designer window"""
+        self.console_panel.append_output("Opening Circuit Designer...")
+        self.status_bar.set_status("Circuit Designer")
+
+        # Create window if it doesn't exist or was closed
+        if self.circuit_designer_window is None or not self.circuit_designer_window.isVisible():
+            self.circuit_designer_window = CircuitDesignerWindow(self.circuit_service, self)
+
+        # Show and raise the window
+        self.circuit_designer_window.show()
+        self.circuit_designer_window.raise_()
+        self.circuit_designer_window.activateWindow()
+
+        self.status_bar.set_status("Circuit Designer Opened")
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def on_board_selected_from_manager(self, fqbn: str):
