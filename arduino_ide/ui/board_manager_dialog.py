@@ -496,9 +496,11 @@ class BoardManagerDialog(QDialog):
 
             # Show operation status
             if self.board_manager.is_operation_in_progress(package.name):
-                item.setText(3, "⏳ In progress...")
+                item.setText(3, "In Progress")
+            elif package.installed_version:
+                item.setText(3, "Installed")
             else:
-                item.setText(3, "")
+                item.setText(3, "Not Installed")
 
             item.setData(0, Qt.UserRole, package)
             self.package_list.addTopLevelItem(item)
