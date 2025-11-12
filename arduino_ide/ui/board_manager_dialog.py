@@ -515,9 +515,13 @@ class BoardManagerDialog(QDialog):
 
         self.package_list.clear()
         for package in self.current_packages:
+            # Skip packages with no valid version
+            if not package.installed_version and not package.latest_version:
+                continue
+
             item = QTreeWidgetItem()
             item.setText(0, package.name)
-            item.setText(1, package.installed_version or package.latest_version or "N/A")
+            item.setText(1, package.installed_version or package.latest_version)
 
             # Get board count from package metadata (works for both installed and non-installed)
             board_count = self._get_package_board_count(package)
