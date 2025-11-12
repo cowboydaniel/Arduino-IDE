@@ -86,6 +86,63 @@ class ArduinoCliService(QObject):
             args.append("--verify")
         self._start_process(args)
 
+    def run_debug_compile(self, sketch_path: str, fqbn: str, *, build_path: Optional[str] = None,
+                          build_cache_path: Optional[str] = None, verbose: bool = True,
+                          export_binaries: bool = True) -> None:
+        """Compile sketch with debug symbols and optimization disabled.
+
+        This method configures compilation for debugging by:
+        - Enabling debug symbols (-g flag)
+        - Disabling optimizations (-O0)
+        - Using optimize_for_debug flag
+        - Enabling verbose output by default
+        - Exporting binaries with debug symbols
+
+        Args:
+            sketch_path: Path to the sketch file or directory
+            fqbn: Fully Qualified Board Name
+            build_path: Optional path for build artifacts
+            build_cache_path: Optional path for caching core.a
+            verbose: Print detailed compilation logs (default: True)
+            export_binaries: Export compiled binaries (default: True)
+        """
+
+        # Call run_compile with debug-specific settings
+        self.run_compile(
+            sketch_path=sketch_path,
+            fqbn=fqbn,
+            build_path=build_path,
+            build_cache_path=build_cache_path,
+            config="Debug",  # Use Debug configuration
+            verbose=verbose,
+            export_binaries=export_binaries,
+            warnings='all',  # Show all warnings in debug mode
+            optimize_for_debug=True  # Enable debug optimization flag
+        )
+
+    def run_debug_upload(self, sketch_path: str, fqbn: str, port: str, *,
+                         build_path: Optional[str] = None,
+                         verify: bool = True) -> None:
+        """Upload debug-compiled sketch to board.
+
+        Same as run_upload but with verify enabled by default for safety.
+
+        Args:
+            sketch_path: Path to the sketch file or directory
+            fqbn: Fully Qualified Board Name
+            port: Serial port for upload
+            build_path: Optional path for build artifacts
+            verify: Verify upload after writing (default: True)
+        """
+
+        self.run_upload(
+            sketch_path=sketch_path,
+            fqbn=fqbn,
+            port=port,
+            build_path=build_path,
+            verify=verify
+        )
+
     # ------------------------------------------------------------------
     # Board and Platform Management (Synchronous)
     # ------------------------------------------------------------------
