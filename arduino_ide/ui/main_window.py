@@ -36,6 +36,8 @@ from arduino_ide.services.project_manager import ProjectManager
 from arduino_ide.services.circuit_service import CircuitService
 from arduino_ide.ui.example_templates import build_missing_example_template
 from arduino_ide.services import ArduinoCliService
+from arduino_ide.services.visual_programming_service import VisualProgrammingService
+from arduino_ide.ui.visual_programming_editor import VisualProgrammingEditor
 import re
 
 
@@ -210,6 +212,9 @@ class MainWindow(QMainWindow):
             board_manager=self.board_manager
         )
 
+        # Initialize visual programming service
+        self.visual_programming_service = VisualProgrammingService()
+        self.visual_programming_window = None  # Will be created when opened
         # Initialize circuit service
         self.circuit_service = CircuitService()
         self.circuit_designer_window = None  # Will be created on demand
@@ -417,7 +422,12 @@ class MainWindow(QMainWindow):
         snippets_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_K)
         snippets_action.triggered.connect(self.show_snippets_library)
         tools_menu.addAction(snippets_action)
+        tools_menu.addSeparator()
 
+        block_code_action = QAction("Block Code Editor...", self)
+        block_code_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_B)
+        block_code_action.triggered.connect(self.show_block_code_editor)
+        tools_menu.addAction(block_code_action)
         tools_menu.addSeparator()
 
         circuit_designer_action = QAction("Circuit Designer...", self)
@@ -1835,6 +1845,58 @@ void loop() {
         self.snippets_dialog.raise_()
         self.snippets_dialog.activateWindow()
 
+    def show_block_code_editor(self):
+        """Show block code editor in standalone window"""
+        # Create window if it doesn't exist
+        if self.visual_programming_window is None:
+            from PySide6.QtWidgets import QMainWindow
+
+            # Create a standalone window
+            self.visual_programming_window = QMainWindow(self)
+            self.visual_programming_window.setWindowTitle("Block Code Editor")
+            self.visual_programming_window.resize(1200, 800)
+
+            # Create the visual programming editor
+            editor = VisualProgrammingEditor(self.visual_programming_service)
+
+            # Connect code generation signal to insert code into sketch
+            editor.code_generated.connect(self.insert_generated_code)
+
+            # Set as central widget
+            self.visual_programming_window.setCentralWidget(editor)
+
+        # Show the window
+        self.visual_programming_window.show()
+        self.visual_programming_window.raise_()
+        self.visual_programming_window.activateWindow()
+
+    def insert_generated_code(self, code: str):
+        """Insert generated code from block editor into current sketch"""
+        current_widget = self.editor_tabs.currentWidget()
+        if not current_widget or not hasattr(current_widget, 'editor'):
+            QMessageBox.warning(
+                self,
+                "No Sketch Open",
+                "Please open or create a sketch to insert the generated code."
+            )
+            return
+
+        # Get the editor and insert the code
+        editor = current_widget.editor
+        cursor = editor.textCursor()
+
+        # Insert the generated code at cursor position
+        cursor.insertText(code)
+
+        # Set the cursor to the editor
+        editor.setTextCursor(cursor)
+
+        # Mark the document as modified
+        editor.document().setModified(True)
+
+        # Show confirmation
+        self.status_bar.set_status("Block code inserted into sketch")
+        self.console_panel.append_output("Generated code inserted from Block Code Editor", color="#6A9955")
     def open_circuit_designer(self):
         """Open circuit designer window"""
         self.console_panel.append_output("Opening Circuit Designer...")
