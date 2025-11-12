@@ -226,6 +226,7 @@ class MainWindow(QMainWindow):
         self._cli_current_operation = None
         self._last_cli_error = ""
         self._open_monitor_after_upload = False
+        self._serial_monitor_open = False
         self._last_selected_port = None
         self._compilation_output = ""  # Store compilation output for parsing
         self._upload_after_compile = False  # Flag to trigger upload after successful compilation
@@ -308,6 +309,7 @@ class MainWindow(QMainWindow):
         # Bottom tab widget (only under left area, NOT under right column)
         self.bottom_tabs = QTabWidget()
         self.bottom_tabs.setMinimumHeight(150)
+        self.bottom_tabs.currentChanged.connect(self._on_bottom_tab_changed)
         left_area_layout.addWidget(self.bottom_tabs)
 
         # Add left area to main splitter
@@ -659,6 +661,9 @@ class MainWindow(QMainWindow):
         self.quick_actions_panel.serial_monitor_clicked.connect(self.toggle_serial_monitor)
         self.quick_actions_panel.serial_plotter_clicked.connect(self.toggle_plotter)
 
+        # Sync contextual help state with the initial Serial Monitor visibility
+        self._broadcast_serial_monitor_state(self._is_serial_monitor_active())
+
     def create_new_editor(self, filename="untitled.ino", *, file_path=None, content=None, mark_clean=False):
         """Create a new editor tab"""
         editor_container = EditorContainer(filename, file_path=file_path)
@@ -682,6 +687,9 @@ class MainWindow(QMainWindow):
 
         # Connect function clicks to context panel
         editor_container.editor.function_clicked.connect(self.context_panel.update_context)
+
+        # Keep contextual help aware of Serial Monitor visibility
+        editor_container.editor.set_serial_monitor_open(self._serial_monitor_open)
 
         editor_container.dirtyChanged.connect(
             lambda dirty, container=editor_container: self.on_editor_dirty_changed(container)
@@ -1445,6 +1453,36 @@ void loop() {
         plotter_index = self.bottom_tabs.indexOf(self.plotter_panel)
         if plotter_index >= 0:
             self.bottom_tabs.setCurrentIndex(plotter_index)
+
+    def _on_bottom_tab_changed(self, index):
+        """Update contextual help when the bottom tab selection changes."""
+
+        if not hasattr(self, "serial_monitor"):
+            return
+
+        widget = self.bottom_tabs.widget(index) if index >= 0 else None
+        self._broadcast_serial_monitor_state(widget is self.serial_monitor)
+
+    def _broadcast_serial_monitor_state(self, is_open: bool):
+        """Notify all editors about the Serial Monitor visibility."""
+
+        self._serial_monitor_open = bool(is_open)
+        for i in range(self.editor_tabs.count()):
+            container = self.editor_tabs.widget(i)
+            if not container:
+                continue
+
+            editor = getattr(container, "editor", None)
+            if editor:
+                editor.set_serial_monitor_open(self._serial_monitor_open)
+
+    def _is_serial_monitor_active(self) -> bool:
+        """Return True if the Serial Monitor tab is currently selected."""
+
+        return (
+            hasattr(self, "serial_monitor")
+            and self.bottom_tabs.currentWidget() is self.serial_monitor
+        )
 
     def show_find_dialog(self):
         """Show find/replace dialog"""
