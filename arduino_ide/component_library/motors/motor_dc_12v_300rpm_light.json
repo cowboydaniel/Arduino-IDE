@@ -1,0 +1,40 @@
+{
+  "id": "motor_dc_12v_300rpm_light",
+  "name": "Light Duty 12V 300 RPM DC Gear Motor",
+  "component_type": "motor",
+  "description": "Brushed DC gearmotor rated for 12V operation with a 300 RPM output and 0.25 kg\u00b7cm torque capability.",
+  "width": 90,
+  "height": 60,
+  "pins": [
+    {
+      "id": "positive",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        15,
+        30
+      ]
+    },
+    {
+      "id": "negative",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        75,
+        30
+      ]
+    }
+  ],
+  "metadata": {
+    "motor_subtype": "Brushed DC",
+    "voltage": "12V nominal",
+    "speed": "300 RPM output",
+    "torque": "0.25 kg\u00b7cm rated torque",
+    "current": "0.48A rated, 1.92A stall",
+    "no_load_current": "0.11A",
+    "control_interface": "Two-wire brushed motor (H-bridge/MOSFET)",
+    "step_angle": "N/A",
+    "mechanical_dimensions": "\u00d824 mm can, 30 mm length, 2 mm D-shaft",
+    "shaft_type": "2 mm D-shaft"
+  }
+}
