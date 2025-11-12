@@ -38,6 +38,7 @@ from arduino_ide.ui.example_templates import build_missing_example_template
 from arduino_ide.services import ArduinoCliService
 from arduino_ide.services.visual_programming_service import VisualProgrammingService
 from arduino_ide.ui.visual_programming_editor import VisualProgrammingEditor
+from arduino_ide.services.error_recovery import SmartErrorRecovery
 import re
 
 
@@ -203,6 +204,7 @@ class MainWindow(QMainWindow):
         self.cli_service.output_received.connect(self._handle_cli_output)
         self.cli_service.error_received.connect(self._handle_cli_error)
         self.cli_service.finished.connect(self._handle_cli_finished)
+        self.error_recovery = SmartErrorRecovery()
 
         # Initialize package managers
         self.library_manager = LibraryManager()
@@ -922,6 +924,34 @@ void loop() {
         for line in lines:
             self.console_panel.append_output(line, color=color)
 
+    def _show_error_recovery_hints(self, compiler_output):
+        """Display smart recovery hints for the most recent compiler error."""
+
+        if not compiler_output or not compiler_output.strip():
+            return
+
+        suggestions = self.error_recovery.analyze_compile_error(compiler_output)
+        if not suggestions:
+            return
+
+        highlight = "#CCA700"
+        self.console_panel.append_output("💡 Potential fixes:", color=highlight)
+
+        for suggestion in suggestions:
+            if suggestion.issue == "unknown":
+                title = "General guidance"
+                confidence = ""
+            else:
+                title = suggestion.issue.capitalize()
+                confidence = (
+                    f" ({int(round(suggestion.confidence * 100))}% match)"
+                    if suggestion.confidence
+                    else ""
+                )
+            self.console_panel.append_output(f"  • {title}{confidence}", color=highlight)
+            for fix in suggestion.suggestions:
+                self.console_panel.append_output(f"      - {fix}", color=highlight)
+
     def _handle_cli_output(self, text):
         # Only show output for non-background compiles
         if not self._is_background_compile:
@@ -996,6 +1026,7 @@ void loop() {
                     self.console_panel.append_output("✗ Compilation failed.", color="#F48771")
                     self.status_bar.set_status("Compilation Failed")
                     QMessageBox.critical(self, "Compilation Failed", detail)
+                    self._show_error_recovery_hints(full_output)
                     # Cancel upload if compilation failed
                     self._upload_after_compile = False
                 elif operation == "upload":
