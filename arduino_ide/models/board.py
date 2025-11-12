@@ -278,8 +278,8 @@ class BoardIndex:
             enabled=False
         ),
         BoardPackageURL(
-            name="DxCore/ATtiny (SpenceKonde)",
-            url="http://drazzy.com/package_drazzy.com_index.json",
+            name="PRODUINO UNO 4u (DxCore)",
+            url="https://github.com/cowboydaniel/PRODUINO-UNO-4u/raw/main/package_drazzy.com_index.json",
             enabled=False
         ),
         BoardPackageURL(
