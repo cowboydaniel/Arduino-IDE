@@ -16,8 +16,14 @@ from typing import Optional, Dict, List
 from pathlib import Path
 
 from arduino_ide.services.circuit_service import (
-    CircuitService, ComponentDefinition, ComponentInstance,
-    Connection, ComponentType, PinType, Pin
+    CircuitService,
+    ComponentDefinition,
+    ComponentInstance,
+    Connection,
+    ComponentType,
+    PinType,
+    Pin,
+    CircuitSerializationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -736,14 +742,14 @@ class CircuitEditor(QWidget):
         )
 
 
-    def save_circuit_to_file(self, file_path: str) -> bool:
+    def save_circuit_to_file(self, file_path: str):
         """Save circuit to file"""
-        return self.service.save_circuit(file_path)
+        self.service.save_circuit(file_path)
 
 
-    def load_circuit_from_file(self, file_path: str) -> bool:
+    def load_circuit_from_file(self, file_path: str):
         """Load circuit from file"""
-        return self.service.load_circuit(file_path)
+        self.service.load_circuit(file_path)
 
 
 class CircuitDesignerWindow(QMainWindow):
@@ -835,26 +841,30 @@ class CircuitDesignerWindow(QMainWindow):
             self,
             "Open Circuit",
             str(Path.home()),
-            "Circuit Files (*.json);;All Files (*)"
+            "KiCAD Schematics (*.kicad_sch);;Legacy Circuit (*.json);;All Files (*)"
         )
 
         if not file_path:
             return
 
-        if self.circuit_editor.load_circuit_from_file(file_path):
-            self.current_file = file_path
-            self.setWindowTitle(f"Arduino Circuit Designer - {Path(file_path).name}")
-            QMessageBox.information(
-                self,
-                "Circuit Loaded",
-                f"Successfully loaded circuit from {Path(file_path).name}"
-            )
-        else:
+        try:
+            self.circuit_editor.load_circuit_from_file(file_path)
+        except CircuitSerializationError as exc:
+            logger.exception("Failed to load circuit")
             QMessageBox.critical(
                 self,
                 "Load Failed",
-                f"Failed to load circuit from {Path(file_path).name}"
+                f"Failed to load circuit from {Path(file_path).name}.\n{exc}"
             )
+            return
+
+        self.current_file = file_path
+        self.setWindowTitle(f"Arduino Circuit Designer - {Path(file_path).name}")
+        QMessageBox.information(
+            self,
+            "Circuit Loaded",
+            f"Successfully loaded circuit from {Path(file_path).name}"
+        )
 
     @Slot()
     def _on_save_clicked(self):
@@ -870,8 +880,8 @@ class CircuitDesignerWindow(QMainWindow):
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Circuit As",
-            str(Path.home() / "circuit.json"),
-            "Circuit Files (*.json);;All Files (*)"
+            str(Path.home() / "circuit.kicad_sch"),
+            "KiCAD Schematics (*.kicad_sch);;Legacy Circuit (*.json);;All Files (*)"
         )
 
         if not file_path:
@@ -881,20 +891,24 @@ class CircuitDesignerWindow(QMainWindow):
 
     def _save_to_file(self, file_path: str):
         """Save circuit to file"""
-        if self.circuit_editor.save_circuit_to_file(file_path):
-            self.current_file = file_path
-            self.setWindowTitle(f"Arduino Circuit Designer - {Path(file_path).name}")
-            QMessageBox.information(
-                self,
-                "Circuit Saved",
-                f"Successfully saved circuit to {Path(file_path).name}"
-            )
-        else:
+        try:
+            self.circuit_editor.save_circuit_to_file(file_path)
+        except CircuitSerializationError as exc:
+            logger.exception("Failed to save circuit")
             QMessageBox.critical(
                 self,
                 "Save Failed",
-                f"Failed to save circuit to {Path(file_path).name}"
+                f"Failed to save circuit to {Path(file_path).name}.\n{exc}"
             )
+            return
+
+        self.current_file = file_path
+        self.setWindowTitle(f"Arduino Circuit Designer - {Path(file_path).name}")
+        QMessageBox.information(
+            self,
+            "Circuit Saved",
+            f"Successfully saved circuit to {Path(file_path).name}"
+        )
 
     def _show_about(self):
         """Show about dialog"""

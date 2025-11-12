@@ -7,12 +7,16 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Set
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Set
 from dataclasses import dataclass, field
 from enum import Enum
 from PySide6.QtCore import QObject, Signal
 
 logger = logging.getLogger(__name__)
+
+
+class CircuitSerializationError(Exception):
+    """Raised when circuit data cannot be converted between formats."""
 
 
 class ComponentType(Enum):
@@ -76,7 +80,8 @@ class ComponentInstance:
     x: float
     y: float
     rotation: float = 0.0  # Degrees
-    properties: Dict[str, any] = field(default_factory=dict)
+    properties: Dict[str, Any] = field(default_factory=dict)
+    sheet_id: str = "root"
 
 
 @dataclass
@@ -88,6 +93,16 @@ class Connection:
     to_component: str
     to_pin: str
     wire_color: str = "#000000"
+
+
+@dataclass
+class Sheet:
+    """Schematic sheet"""
+    sheet_id: str
+    name: str
+    parent_id: Optional[str] = None
+    properties: Dict[str, Any] = field(default_factory=dict)
+    children: List[str] = field(default_factory=list)
 
 
 class CircuitService(QObject):
@@ -110,9 +125,14 @@ class CircuitService(QObject):
         self._component_definitions: Dict[str, ComponentDefinition] = {}
         self._components: Dict[str, ComponentInstance] = {}
         self._connections: Dict[str, Connection] = {}
+        self._sheets: Dict[str, Sheet] = {}
+        self._root_sheet_id = "root"
 
         self._next_component_id = 1
         self._next_connection_id = 1
+        self._next_sheet_index = 1
+
+        self._reset_circuit_state()
 
         # Initialize component library
         self._init_component_library()
@@ -153,6 +173,71 @@ class CircuitService(QObject):
         logger.info(f"Component library initialized with {component_count} components")
         if error_count > 0:
             logger.warning(f"Failed to load {error_count} component files")
+
+    def _init_sheet_hierarchy(self, root_sheet_id: str, root_sheet_name: str):
+        """Initialize the sheet hierarchy with a root sheet."""
+        self._root_sheet_id = root_sheet_id
+        self._sheets = {
+            root_sheet_id: Sheet(
+                sheet_id=root_sheet_id,
+                name=root_sheet_name,
+                parent_id=None,
+            )
+        }
+        self._next_sheet_index = 1
+
+    def _reset_circuit_state(self, root_sheet_id: str = "root", root_sheet_name: str = "Root"):
+        """Reset the mutable state for components, connections, and sheets."""
+        self._components = {}
+        self._connections = {}
+        self._init_sheet_hierarchy(root_sheet_id, root_sheet_name)
+        self._next_component_id = 1
+        self._next_connection_id = 1
+
+    def _generate_sheet_id(self) -> str:
+        sheet_id = f"sheet_{self._next_sheet_index}"
+        self._next_sheet_index += 1
+        return sheet_id
+
+    @staticmethod
+    def _extract_numeric_suffix(value: str) -> int:
+        digits = []
+        for char in reversed(value):
+            if char.isdigit():
+                digits.append(char)
+            else:
+                break
+
+        if not digits:
+            return 0
+
+        digits.reverse()
+        return int("".join(digits))
+
+    def _next_index_from_ids(self, identifiers: Iterable[str]) -> int:
+        max_value = 0
+        has_items = False
+        for identifier in identifiers:
+            has_items = True
+            max_value = max(max_value, self._extract_numeric_suffix(identifier))
+
+        if not has_items:
+            return 1
+
+        return max_value + 1
+
+    def _refresh_counters(self):
+        """Update ID counters based on the current objects."""
+        self._next_component_id = self._next_index_from_ids(self._components.keys())
+        self._next_connection_id = self._next_index_from_ids(self._connections.keys())
+
+        sheet_numbers = [
+            self._extract_numeric_suffix(sheet_id)
+            for sheet_id in self._sheets.keys()
+            if sheet_id.startswith("sheet_")
+        ]
+        max_sheet = max(sheet_numbers) if sheet_numbers else 0
+        self._next_sheet_index = max_sheet + 1 if max_sheet > 0 else 1
 
     def _load_component_from_json(self, json_path: Path) -> Optional[ComponentDefinition]:
         """Load a component definition from a JSON file"""
@@ -235,12 +320,21 @@ class CircuitService(QObject):
         return [c for c in self._component_definitions.values() if c.component_type == component_type]
 
 
-    def add_component(self, component_id: str, x: float, y: float) -> Optional[ComponentInstance]:
+    def add_component(
+        self,
+        component_id: str,
+        x: float,
+        y: float,
+        sheet_id: Optional[str] = None,
+    ) -> Optional[ComponentInstance]:
         """Add a component instance to the circuit"""
         comp_def = self.get_component_definition(component_id)
         if not comp_def:
             logger.error(f"Component definition not found: {component_id}")
             return None
+
+        if sheet_id is None or sheet_id not in self._sheets:
+            sheet_id = self._root_sheet_id
 
         instance_id = f"comp_{self._next_component_id}"
         self._next_component_id += 1
@@ -249,7 +343,8 @@ class CircuitService(QObject):
             instance_id=instance_id,
             definition_id=component_id,
             x=x,
-            y=y
+            y=y,
+            sheet_id=sheet_id,
         )
 
         self._components[instance_id] = instance
@@ -368,6 +463,59 @@ class CircuitService(QObject):
         """Get all connections in the circuit"""
         return list(self._connections.values())
 
+    def get_root_sheet(self) -> Sheet:
+        """Return the root sheet"""
+        return self._sheets[self._root_sheet_id]
+
+    def get_sheet(self, sheet_id: str) -> Optional[Sheet]:
+        """Get a sheet by ID"""
+        return self._sheets.get(sheet_id)
+
+    def get_components_in_sheet(self, sheet_id: str) -> List[ComponentInstance]:
+        """Return components that belong to the specified sheet"""
+        return [c for c in self._components.values() if c.sheet_id == sheet_id]
+
+    def add_sheet(
+        self,
+        name: str,
+        parent_id: Optional[str] = None,
+        properties: Optional[Dict[str, Any]] = None,
+        sheet_id: Optional[str] = None,
+    ) -> Sheet:
+        """Create a new sheet under the given parent."""
+        if parent_id is None:
+            parent_id = self._root_sheet_id
+
+        if parent_id not in self._sheets:
+            raise CircuitSerializationError(f"Parent sheet '{parent_id}' not found")
+
+        if sheet_id is None:
+            sheet_id = self._generate_sheet_id()
+        elif sheet_id in self._sheets:
+            raise CircuitSerializationError(f"Sheet '{sheet_id}' already exists")
+        else:
+            self._next_sheet_index = max(self._next_sheet_index, self._extract_numeric_suffix(sheet_id) + 1)
+
+        sheet = Sheet(
+            sheet_id=sheet_id,
+            name=name,
+            parent_id=parent_id,
+            properties=properties or {},
+        )
+        self._sheets[sheet_id] = sheet
+        self._sheets[parent_id].children.append(sheet_id)
+
+        return sheet
+
+    def assign_component_to_sheet(self, instance_id: str, sheet_id: str) -> bool:
+        """Assign an existing component to a sheet"""
+        if instance_id not in self._components or sheet_id not in self._sheets:
+            return False
+
+        self._components[instance_id].sheet_id = sheet_id
+        self.circuit_changed.emit()
+        return True
+
 
     def validate_circuit(self) -> Tuple[bool, List[str]]:
         """
@@ -419,90 +567,537 @@ class CircuitService(QObject):
 
     def clear_circuit(self):
         """Clear all components and connections"""
-        self._components.clear()
-        self._connections.clear()
+        self._reset_circuit_state()
         self.circuit_changed.emit()
         logger.info("Circuit cleared")
 
 
-    def save_circuit(self, file_path: str) -> bool:
-        """Save circuit to JSON file"""
+    def save_circuit(self, file_path: str):
+        """Save the circuit to either KiCAD or legacy JSON format."""
+        path = Path(file_path)
+        suffix = path.suffix.lower()
+
         try:
-            data = {
-                "components": [
-                    {
-                        "instance_id": c.instance_id,
-                        "definition_id": c.definition_id,
-                        "x": c.x,
-                        "y": c.y,
-                        "rotation": c.rotation,
-                        "properties": c.properties
-                    }
-                    for c in self._components.values()
-                ],
-                "connections": [
-                    {
-                        "connection_id": c.connection_id,
-                        "from_component": c.from_component,
-                        "from_pin": c.from_pin,
-                        "to_component": c.to_component,
-                        "to_pin": c.to_pin,
-                        "wire_color": c.wire_color
-                    }
-                    for c in self._connections.values()
-                ]
-            }
+            if suffix == ".kicad_sch":
+                content = self._serialize_to_kicad()
+                path.write_text(content, encoding="utf-8")
+                logger.info(f"Circuit saved to KiCAD schematic: {file_path}")
+            elif suffix == ".json":
+                self._save_legacy_json(path)
+                logger.info(f"Circuit saved to legacy JSON: {file_path}")
+            else:
+                raise CircuitSerializationError(
+                    f"Unsupported circuit file format: {path.suffix or 'unknown'}"
+                )
+        except OSError as exc:
+            raise CircuitSerializationError(f"Failed to save circuit: {exc}") from exc
 
-            with open(file_path, 'w') as f:
-                json.dump(data, f, indent=2)
+    def load_circuit(self, file_path: str):
+        """Load a circuit from KiCAD schematic or legacy JSON."""
+        path = Path(file_path)
+        suffix = path.suffix.lower()
 
-            logger.info(f"Circuit saved to {file_path}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to save circuit: {e}")
-            return False
-
-
-    def load_circuit(self, file_path: str) -> bool:
-        """Load circuit from JSON file"""
         try:
-            with open(file_path, 'r') as f:
-                data = json.load(f)
-
-            self.clear_circuit()
-
-            # Load components
-            for comp_data in data.get("components", []):
-                component = ComponentInstance(
-                    instance_id=comp_data["instance_id"],
-                    definition_id=comp_data["definition_id"],
-                    x=comp_data["x"],
-                    y=comp_data["y"],
-                    rotation=comp_data.get("rotation", 0.0),
-                    properties=comp_data.get("properties", {})
+            if suffix == ".kicad_sch":
+                content = path.read_text(encoding="utf-8")
+                self._load_from_kicad(content)
+                logger.info(f"Circuit loaded from KiCAD schematic: {file_path}")
+            elif suffix == ".json":
+                self._load_legacy_json(path)
+                logger.info(f"Circuit loaded from legacy JSON: {file_path}")
+            else:
+                raise CircuitSerializationError(
+                    f"Unsupported circuit file format: {path.suffix or 'unknown'}"
                 )
-                self._components[component.instance_id] = component
+        except OSError as exc:
+            raise CircuitSerializationError(f"Failed to load circuit: {exc}") from exc
 
-            # Load connections
-            for conn_data in data.get("connections", []):
-                connection = Connection(
-                    connection_id=conn_data["connection_id"],
-                    from_component=conn_data["from_component"],
-                    from_pin=conn_data["from_pin"],
-                    to_component=conn_data["to_component"],
-                    to_pin=conn_data["to_pin"],
-                    wire_color=conn_data.get("wire_color", "#000000")
+    def import_legacy_json(self, file_path: str):
+        """Load a legacy JSON project for one-time migration."""
+        path = Path(file_path)
+        if path.suffix.lower() != ".json":
+            raise CircuitSerializationError("Legacy import expects a JSON file")
+
+        self._load_legacy_json(path)
+
+    def export_to_kicad(self, file_path: str):
+        """Explicit helper that always writes a KiCAD schematic."""
+        path = Path(file_path)
+        if path.suffix.lower() != ".kicad_sch":
+            raise CircuitSerializationError("KiCAD export expects a .kicad_sch file")
+
+        content = self._serialize_to_kicad()
+        try:
+            path.write_text(content, encoding="utf-8")
+        except OSError as exc:
+            raise CircuitSerializationError(f"Failed to write KiCAD schematic: {exc}") from exc
+
+    def _save_legacy_json(self, path: Path):
+        data = {
+            "root_sheet_id": self._root_sheet_id,
+            "sheets": [
+                {
+                    "sheet_id": sheet.sheet_id,
+                    "name": sheet.name,
+                    "parent_id": sheet.parent_id,
+                    "properties": sheet.properties,
+                    "children": list(sheet.children),
+                }
+                for sheet in self._sheets.values()
+            ],
+            "components": [
+                {
+                    "instance_id": c.instance_id,
+                    "definition_id": c.definition_id,
+                    "x": c.x,
+                    "y": c.y,
+                    "rotation": c.rotation,
+                    "properties": c.properties,
+                    "sheet_id": c.sheet_id,
+                }
+                for c in self._components.values()
+            ],
+            "connections": [
+                {
+                    "connection_id": c.connection_id,
+                    "from_component": c.from_component,
+                    "from_pin": c.from_pin,
+                    "to_component": c.to_component,
+                    "to_pin": c.to_pin,
+                    "wire_color": c.wire_color,
+                }
+                for c in self._connections.values()
+            ],
+        }
+
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def _load_legacy_json(self, path: Path):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise CircuitSerializationError(f"Invalid JSON: {exc}") from exc
+
+        sheets_data = data.get("sheets") or []
+
+        if sheets_data:
+            root_sheet_id = data.get("root_sheet_id") or sheets_data[0].get("sheet_id", "root")
+            root_sheet_name = next(
+                (sheet.get("name", "Root") for sheet in sheets_data if sheet.get("sheet_id") == root_sheet_id),
+                "Root",
+            )
+            root_properties = next(
+                (sheet.get("properties", {}) for sheet in sheets_data if sheet.get("sheet_id") == root_sheet_id),
+                {},
+            )
+            self._reset_circuit_state(root_sheet_id, root_sheet_name)
+            self._sheets[root_sheet_id].properties = root_properties
+        else:
+            self._reset_circuit_state()
+
+        if sheets_data:
+            for sheet in self._sheets.values():
+                sheet.children = []
+
+            for sheet_data in sheets_data:
+                sheet_id = sheet_data.get("sheet_id")
+                if not sheet_id or sheet_id == self._root_sheet_id:
+                    continue
+
+                parent_id = sheet_data.get("parent_id") or self._root_sheet_id
+                sheet = Sheet(
+                    sheet_id=sheet_id,
+                    name=sheet_data.get("name", sheet_id),
+                    parent_id=parent_id,
+                    properties=sheet_data.get("properties", {}),
+                    children=[],
                 )
-                self._connections[connection.connection_id] = connection
+                self._sheets[sheet_id] = sheet
 
-            self.circuit_changed.emit()
-            logger.info(f"Circuit loaded from {file_path}")
-            return True
+            for sheet_data in sheets_data:
+                sheet_id = sheet_data.get("sheet_id")
+                if not sheet_id or sheet_id not in self._sheets:
+                    continue
+                children = [child for child in sheet_data.get("children", []) if child in self._sheets]
+                self._sheets[sheet_id].children = children
 
-        except Exception as e:
-            logger.error(f"Failed to load circuit: {e}")
-            return False
+            for sheet in self._sheets.values():
+                if sheet.parent_id and sheet.parent_id in self._sheets:
+                    parent = self._sheets[sheet.parent_id]
+                    if sheet.sheet_id not in parent.children:
+                        parent.children.append(sheet.sheet_id)
+
+        self._components = {}
+        for comp_data in data.get("components", []):
+            sheet_id = comp_data.get("sheet_id", self._root_sheet_id)
+            if sheet_id not in self._sheets:
+                self._sheets[sheet_id] = Sheet(sheet_id=sheet_id, name=sheet_id, parent_id=self._root_sheet_id)
+                self._sheets[self._root_sheet_id].children.append(sheet_id)
+
+            component = ComponentInstance(
+                instance_id=comp_data["instance_id"],
+                definition_id=comp_data["definition_id"],
+                x=comp_data["x"],
+                y=comp_data["y"],
+                rotation=comp_data.get("rotation", 0.0),
+                properties=comp_data.get("properties", {}),
+                sheet_id=sheet_id,
+            )
+            self._components[component.instance_id] = component
+
+        self._connections = {}
+        for conn_data in data.get("connections", []):
+            connection = Connection(
+                connection_id=conn_data["connection_id"],
+                from_component=conn_data["from_component"],
+                from_pin=conn_data["from_pin"],
+                to_component=conn_data["to_component"],
+                to_pin=conn_data["to_pin"],
+                wire_color=conn_data.get("wire_color", "#000000"),
+            )
+            self._connections[connection.connection_id] = connection
+
+        self._refresh_counters()
+        self.circuit_changed.emit()
+
+    def _serialize_to_kicad(self) -> str:
+        tree: List[Any] = [
+            "kicad_sch",
+            ["version", "20211014"],
+            ["generator", "Arduino Circuit Designer"],
+            self._serialize_sheet_node(self.get_root_sheet()),
+        ]
+
+        for code, connection in enumerate(sorted(self._connections.values(), key=lambda c: c.connection_id), start=1):
+            tree.append(self._serialize_net_node(connection, code))
+
+        return _sexpr_format(tree)
+
+    def _serialize_sheet_node(self, sheet: Sheet) -> List[Any]:
+        node: List[Any] = [
+            "sheet",
+            ["id", sheet.sheet_id],
+            ["name", sheet.name],
+        ]
+
+        for key, value in sorted(sheet.properties.items()):
+            node.append(["property", key, self._stringify_property(value)])
+
+        for component in sorted(self.get_components_in_sheet(sheet.sheet_id), key=lambda c: c.instance_id):
+            node.append(self._serialize_symbol_node(component))
+
+        for child_id in sheet.children:
+            child = self._sheets.get(child_id)
+            if child:
+                node.append(self._serialize_sheet_node(child))
+
+        return node
+
+    def _serialize_symbol_node(self, component: ComponentInstance) -> List[Any]:
+        node: List[Any] = [
+            "symbol",
+            ["lib_id", component.definition_id],
+            ["reference", component.instance_id],
+            [
+                "at",
+                f"{component.x:.4f}",
+                f"{component.y:.4f}",
+                f"{component.rotation:.4f}",
+            ],
+            ["property", "sheet_id", component.sheet_id],
+        ]
+
+        comp_def = self.get_component_definition(component.definition_id)
+        if comp_def:
+            node.append(["property", "component_name", comp_def.name])
+            node.append(["property", "component_type", comp_def.component_type.value])
+
+        for key, value in sorted(component.properties.items()):
+            node.append(["property", key, self._stringify_property(value)])
+
+        return node
+
+    def _serialize_net_node(self, connection: Connection, code: int) -> List[Any]:
+        return [
+            "net",
+            ["code", str(code)],
+            ["name", connection.connection_id],
+            ["property", "connection_id", connection.connection_id],
+            ["property", "wire_color", connection.wire_color],
+            ["node", ["ref", connection.from_component], ["pin", connection.from_pin]],
+            ["node", ["ref", connection.to_component], ["pin", connection.to_pin]],
+        ]
+
+    @staticmethod
+    def _stringify_property(value: Any) -> str:
+        return json.dumps(value)
+
+    @staticmethod
+    def _parse_property_value(value: str) -> Any:
+        try:
+            return json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            return value
+
+    def _load_from_kicad(self, content: str):
+        try:
+            tree = _sexpr_parse(content)
+        except ValueError as exc:
+            raise CircuitSerializationError(f"Invalid KiCAD schematic: {exc}") from exc
+
+        if not tree or tree[0] != "kicad_sch":
+            raise CircuitSerializationError("File is not a KiCAD schematic")
+
+        sheet_node = next((child for child in tree[1:] if _sexpr_is(child, "sheet")), None)
+        if not sheet_node:
+            raise CircuitSerializationError("Schematic missing root sheet")
+
+        root_sheet_id = _sexpr_child_value(sheet_node, "id") or "root"
+        root_sheet_name = _sexpr_child_value(sheet_node, "name") or "Root"
+        raw_properties = _sexpr_collect_properties(sheet_node)
+        root_properties = {key: self._parse_property_value(value) for key, value in raw_properties.items()}
+
+        self._reset_circuit_state(root_sheet_id, root_sheet_name)
+        self._sheets[root_sheet_id].properties = root_properties
+        self._populate_sheet_from_node(sheet_node, None, is_root=True)
+
+        self._connections = {}
+        for child in tree[1:]:
+            if _sexpr_is(child, "net"):
+                self._create_connection_from_node(child)
+
+        self._refresh_counters()
+        self.circuit_changed.emit()
+
+    def _populate_sheet_from_node(
+        self,
+        node: List[Any],
+        parent_id: Optional[str],
+        is_root: bool = False,
+    ):
+        sheet_id = _sexpr_child_value(node, "id") or self._generate_sheet_id()
+        sheet_name = _sexpr_child_value(node, "name") or sheet_id
+        raw_properties = _sexpr_collect_properties(node)
+        properties = {key: self._parse_property_value(value) for key, value in raw_properties.items()}
+
+        if is_root:
+            sheet_id = self._root_sheet_id
+            sheet = self._sheets[sheet_id]
+            sheet.name = sheet_name
+            sheet.properties = properties
+            sheet.children = []
+        else:
+            parent_ref = parent_id or self._root_sheet_id
+            if sheet_id in self._sheets:
+                sheet = self._sheets[sheet_id]
+                sheet.name = sheet_name
+                sheet.parent_id = parent_ref
+                sheet.properties = properties
+                sheet.children = []
+            else:
+                sheet = self.add_sheet(sheet_name, parent_ref, properties, sheet_id=sheet_id)
+                sheet.children = []
+
+        for child in node[1:]:
+            if isinstance(child, list) and child:
+                if child[0] == "symbol":
+                    self._create_component_from_symbol(child, sheet_id)
+                elif child[0] == "sheet":
+                    self._populate_sheet_from_node(child, sheet_id)
+
+    def _create_component_from_symbol(self, node: List[Any], sheet_id: str):
+        lib_id = _sexpr_child_value(node, "lib_id")
+        if not lib_id:
+            raise CircuitSerializationError("Symbol missing lib_id")
+
+        reference = _sexpr_child_value(node, "reference") or f"comp_{self._next_component_id}"
+        at_values = _sexpr_child_values(node, "at")
+        x = float(at_values[0]) if len(at_values) >= 1 else 0.0
+        y = float(at_values[1]) if len(at_values) >= 2 else 0.0
+        rotation = float(at_values[2]) if len(at_values) >= 3 else 0.0
+        properties = _sexpr_collect_properties(node)
+        for system_key in ("sheet_id", "component_name", "component_type"):
+            properties.pop(system_key, None)
+        decoded_properties = {
+            key: self._parse_property_value(value)
+            for key, value in properties.items()
+        }
+
+        if reference in self._components:
+            raise CircuitSerializationError(f"Duplicate component reference '{reference}'")
+
+        component = ComponentInstance(
+            instance_id=reference,
+            definition_id=lib_id,
+            x=x,
+            y=y,
+            rotation=rotation,
+            properties=decoded_properties,
+            sheet_id=sheet_id,
+        )
+        self._components[component.instance_id] = component
+
+    def _create_connection_from_node(self, node: List[Any]):
+        properties = _sexpr_collect_properties(node)
+        node_entries = [child for child in node[1:] if _sexpr_is(child, "node")]
+
+        if len(node_entries) != 2:
+            raise CircuitSerializationError("Each net must describe exactly two nodes")
+
+        refs = []
+        for entry in node_entries:
+            ref = _sexpr_child_value(entry, "ref")
+            pin = _sexpr_child_value(entry, "pin")
+            if not ref or not pin:
+                raise CircuitSerializationError("Net node missing ref or pin")
+            refs.append((ref, pin))
+
+        connection_id = properties.get("connection_id") or f"conn_{self._next_connection_id}"
+        connection = Connection(
+            connection_id=connection_id,
+            from_component=refs[0][0],
+            from_pin=refs[0][1],
+            to_component=refs[1][0],
+            to_pin=refs[1][1],
+            wire_color=properties.get("wire_color", "#000000"),
+        )
+        self._connections[connection.connection_id] = connection
+
+
+def _sexpr_format(node: Any) -> str:
+    if isinstance(node, list):
+        return "(" + " ".join(_sexpr_format(child) for child in node) + ")"
+    return _sexpr_atom(node)
+
+
+def _sexpr_atom(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+
+    if isinstance(value, (int, float)):
+        return str(value)
+
+    text = str(value)
+    if not text:
+        return '""'
+
+    needs_quotes = any(ch.isspace() or ch in '()"' for ch in text)
+    if needs_quotes:
+        escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    return text
+
+
+def _sexpr_parse(text: str) -> Any:
+    tokens = _sexpr_tokenize(text)
+    if not tokens:
+        return []
+
+    node, index = _sexpr_parse_tokens(tokens, 0)
+    if index != len(tokens):
+        raise ValueError("Unexpected tokens after parsing expression")
+    return node
+
+
+def _sexpr_parse_tokens(tokens: List[str], index: int):
+    if tokens[index] != "(":
+        return tokens[index], index + 1
+
+    items: List[Any] = []
+    index += 1
+    while index < len(tokens) and tokens[index] != ")":
+        token = tokens[index]
+        if token == "(":
+            child, index = _sexpr_parse_tokens(tokens, index)
+            items.append(child)
+        else:
+            items.append(token)
+            index += 1
+
+    if index >= len(tokens):
+        raise ValueError("Missing closing parenthesis")
+
+    return items, index + 1
+
+
+def _sexpr_tokenize(text: str) -> List[str]:
+    tokens: List[str] = []
+    i = 0
+    length = len(text)
+
+    while i < length:
+        char = text[i]
+        if char in "()":
+            tokens.append(char)
+            i += 1
+        elif char.isspace():
+            i += 1
+        elif char == '"':
+            i += 1
+            buffer = []
+            while i < length:
+                if text[i] == '\\':
+                    if i + 1 >= length:
+                        raise ValueError("Invalid escape in string literal")
+                    buffer.append(text[i + 1])
+                    i += 2
+                    continue
+                if text[i] == '"':
+                    i += 1
+                    break
+                buffer.append(text[i])
+                i += 1
+            else:
+                raise ValueError("Unterminated string literal")
+            tokens.append("".join(buffer))
+        else:
+            start = i
+            while i < length and not text[i].isspace() and text[i] not in "()":
+                i += 1
+            tokens.append(text[start:i])
+
+    return tokens
+
+
+def _sexpr_child_value(node: List[Any], name: str, default=None):
+    child = _sexpr_child(node, name)
+    if child is None:
+        return default
+
+    if len(child) == 2:
+        return child[1]
+
+    return child[1:]
+
+
+def _sexpr_child_values(node: List[Any], name: str) -> List[Any]:
+    child = _sexpr_child(node, name)
+    if child is None:
+        return []
+    return child[1:]
+
+
+def _sexpr_child(node: List[Any], name: str) -> Optional[List[Any]]:
+    for child in node[1:]:
+        if isinstance(child, list) and child and child[0] == name:
+            return child
+    return None
+
+
+def _sexpr_is(node: Any, name: str) -> bool:
+    return isinstance(node, list) and bool(node) and node[0] == name
+
+
+def _sexpr_collect_properties(node: List[Any]) -> Dict[str, str]:
+    properties: Dict[str, str] = {}
+    for child in node[1:]:
+        if _sexpr_is(child, "property") and len(child) >= 3:
+            key = str(child[1])
+            value = child[2]
+            if isinstance(value, list):
+                value = " ".join(str(part) for part in value)
+            properties[key] = str(value)
+    return properties
 
 
     def generate_connection_list(self) -> str:
