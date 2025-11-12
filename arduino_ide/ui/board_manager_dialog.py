@@ -489,10 +489,36 @@ class BoardManagerDialog(QDialog):
             item = QTreeWidgetItem()
             item.setText(0, package.name)
             item.setText(1, package.installed_version or package.latest_version or "N/A")
-            item.setText(2, str(len(package.boards)))
+
+            # Get board count from package metadata (works for both installed and non-installed)
+            board_count = self._get_package_board_count(package)
+            item.setText(2, str(board_count))
 
             item.setData(0, Qt.UserRole, package)
             self.package_list.addTopLevelItem(item)
+
+    def _get_package_board_count(self, package: BoardPackage) -> int:
+        """Get board count for a package.
+
+        For installed packages: Uses discovered boards from boards.txt
+        For non-installed packages: Uses metadata from package index
+        """
+        # If we have discovered boards (from installed package), use that count
+        if package.boards:
+            return len(package.boards)
+
+        # Otherwise, get count from package index metadata
+        # This allows showing board count even for non-installed packages
+        latest_version = package.get_latest_version_obj()
+        if latest_version and latest_version.boards_count > 0:
+            return latest_version.boards_count
+
+        # Fallback: check if any version has board count metadata
+        for version in package.versions:
+            if version.boards_count > 0:
+                return version.boards_count
+
+        return 0
 
     def on_package_clicked(self, item, column):
         """Handle package selection"""
