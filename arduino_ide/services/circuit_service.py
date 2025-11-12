@@ -1,6 +1,5 @@
 """Circuit Service utilities for circuit editing workflows."""
 
-import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -57,7 +56,7 @@ class CircuitService(QObject):
     circuit_validated = Signal(bool, list)  # is_valid, error_list
     circuit_changed = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, symbol_adapter: Optional["KiCADSymbolAdapter"] = None):
         super().__init__(parent)
 
         self._component_definitions: Dict[str, ComponentDefinition] = {}
@@ -84,97 +83,39 @@ class CircuitService(QObject):
 
 
     def _init_component_library(self):
-        """Initialize library of available components from JSON files"""
+        """Initialize the component library using the KiCAD symbol adapter."""
 
-        # Find component library directory
-        service_dir = Path(__file__).parent
-        component_lib_dir = service_dir.parent / "component_library"
+        self._component_definitions.clear()
 
-        if not component_lib_dir.exists():
-            logger.warning(f"Component library directory not found: {component_lib_dir}")
+        adapter = self._symbol_adapter
+        if adapter is None:
+            try:
+                from .kicad_symbol_adapter import KiCADSymbolAdapter
+            except Exception as exc:  # pragma: no cover - defensive import guard
+                logger.warning("KiCAD symbol adapter unavailable: %s", exc)
+                logger.info("Component library initialized with 0 components")
+                return
+
+            adapter = KiCADSymbolAdapter(
+                search_paths=config.KICAD_GLOBAL_SYMBOL_LIBRARY_PATHS,
+                cache_dir=config.KICAD_PROJECT_CACHE_DIR,
+            )
+            self._symbol_adapter = adapter
+
+        try:
+            components = adapter.load_components()
+        except Exception as exc:
+            logger.error("Failed to load KiCAD components: %s", exc)
             logger.info("Component library initialized with 0 components")
             return
 
-        # Load all JSON component files
-        component_count = 0
-        error_count = 0
+        for component_def in components:
+            self.register_component(component_def)
 
-        for json_file in component_lib_dir.rglob("*.json"):
-            # Skip README and other non-component files
-            if json_file.name.lower() in ["readme.json", "package.json"]:
-                continue
-
-            try:
-                component_def = self._load_component_from_json(json_file)
-                if component_def:
-                    self.register_component(component_def)
-                    component_count += 1
-            except Exception as e:
-                logger.error(f"Failed to load component from {json_file}: {e}")
-                error_count += 1
-
-        logger.info(f"Component library initialized with {component_count} components")
-        if error_count > 0:
-            logger.warning(f"Failed to load {error_count} component files")
-
-    def _load_component_from_json(self, json_path: Path) -> Optional[ComponentDefinition]:
-        """Load a component definition from a JSON file"""
-
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-
-            # Validate required fields
-            required_fields = ["id", "name", "component_type", "description", "width", "height", "pins"]
-            for field in required_fields:
-                if field not in data:
-                    logger.error(f"Component {json_path.name} missing required field: {field}")
-                    return None
-
-            # Parse component type
-            try:
-                component_type = ComponentType(data["component_type"])
-            except ValueError:
-                logger.error(f"Invalid component_type '{data['component_type']}' in {json_path.name}")
-                return None
-
-            # Parse pins
-            pins = []
-            for pin_data in data["pins"]:
-                try:
-                    pin_type = PinType(pin_data["pin_type"])
-                    pin = Pin(
-                        id=pin_data["id"],
-                        label=pin_data["label"],
-                        pin_type=pin_type,
-                        position=(pin_data["position"][0], pin_data["position"][1])
-                    )
-                    pins.append(pin)
-                except (ValueError, KeyError, IndexError) as e:
-                    logger.error(f"Invalid pin definition in {json_path.name}: {e}")
-                    return None
-
-            # Create component definition
-            component_def = ComponentDefinition(
-                id=data["id"],
-                name=data["name"],
-                component_type=component_type,
-                width=float(data["width"]),
-                height=float(data["height"]),
-                pins=pins,
-                image_path=data.get("image_path"),
-                description=data["description"],
-                datasheet_url=data.get("metadata", {}).get("datasheet_url")
-            )
-
-            return component_def
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in {json_path}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error loading component from {json_path}: {e}")
-            return None
+        logger.info(
+            "Component library initialized with %s KiCAD symbol(s)",
+            len(self._component_definitions),
+        )
 
 
     def register_component(self, component_def: ComponentDefinition):

@@ -8,11 +8,12 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                QGraphicsItem, QGraphicsEllipseItem, QGraphicsLineItem,
                                QGraphicsRectItem, QGraphicsTextItem, QListWidget,
                                QListWidgetItem, QLabel, QMessageBox, QGroupBox,
-                               QScrollArea, QToolBox, QMainWindow, QFileDialog)
+                               QScrollArea, QToolBox, QMainWindow, QFileDialog,
+                               QComboBox, QLineEdit)
 from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QLineF, Slot
 from PySide6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPainterPath, QPolygonF, QAction, QKeySequence
 import logging
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 from pathlib import Path
 
 from arduino_ide.services.circuit_service import CircuitService
@@ -27,6 +28,52 @@ from arduino_ide.models.circuit_domain import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def build_component_groups(
+    components: List[ComponentDefinition],
+    mode: str,
+    filter_text: str = "",
+) -> List[Tuple[str, List[ComponentDefinition]]]:
+    """Return grouped component lists for the library widget."""
+
+    normalized_mode = (mode or "library").strip().lower()
+    filter_text = (filter_text or "").strip().lower()
+
+    def _matches(component: ComponentDefinition) -> bool:
+        if not filter_text:
+            return True
+        searchable = [
+            component.id,
+            component.name,
+            component.description,
+            str(component.metadata.get("library", "")),
+            component.metadata.get("symbol_name", ""),
+            " ".join(component.metadata.get("keywords", [])),
+        ]
+        return any(filter_text in entry.lower() for entry in searchable if entry)
+
+    filtered_components = [comp for comp in components if _matches(comp)]
+    if not filtered_components:
+        return []
+
+    groups: Dict[str, List[ComponentDefinition]] = {}
+    if normalized_mode == "keyword":
+        for comp in filtered_components:
+            keywords = comp.metadata.get("keywords") or ["(No Keywords)"]
+            for keyword in keywords:
+                groups.setdefault(keyword, []).append(comp)
+    elif normalized_mode == "symbol":
+        groups = {"All Symbols": filtered_components}
+    else:  # default to library grouping
+        for comp in filtered_components:
+            library = comp.metadata.get("library") or "(Unknown Library)"
+            groups.setdefault(library, []).append(comp)
+
+    ordered_groups: List[Tuple[str, List[ComponentDefinition]]] = []
+    for label in sorted(groups.keys(), key=lambda value: value.lower()):
+        ordered_groups.append((label, sorted(groups[label], key=lambda comp: comp.name.lower())))
+    return ordered_groups
 
 
 class PinGraphicsItem(QGraphicsEllipseItem):
@@ -227,22 +274,30 @@ class ComponentLibraryWidget(QWidget):
         title.setStyleSheet("font-weight: bold; font-size: 12pt;")
         layout.addWidget(title)
 
+        controls_layout = QHBoxLayout()
+        controls_layout.setSpacing(5)
+
+        group_label = QLabel("Group by:")
+        controls_layout.addWidget(group_label)
+
+        self.group_mode = QComboBox()
+        self.group_mode.addItems(["Library", "Keyword", "Symbol"])
+        self.group_mode.currentTextChanged.connect(self._refresh_groups)
+        controls_layout.addWidget(self.group_mode)
+        controls_layout.addStretch()
+
+        layout.addLayout(controls_layout)
+
+        self.filter_input = QLineEdit()
+        self.filter_input.setPlaceholderText("Filter by library, keyword, or symbol name")
+        self.filter_input.textChanged.connect(self._refresh_groups)
+        layout.addWidget(self.filter_input)
+
         # Toolbox with component categories
         self.toolbox = QToolBox()
-
-        # Group by component type
-        type_groups = {}
-        for comp_def in self.service.get_all_component_definitions():
-            if comp_def.component_type not in type_groups:
-                type_groups[comp_def.component_type] = []
-            type_groups[comp_def.component_type].append(comp_def)
-
-        # Add each category
-        for comp_type, components in sorted(type_groups.items(), key=lambda x: x[0].value):
-            category_widget = self._create_category_widget(components)
-            self.toolbox.addItem(category_widget, comp_type.value.replace("_", " ").title())
-
         layout.addWidget(self.toolbox)
+
+        self._refresh_groups()
 
 
     def _create_category_widget(self, components: List[ComponentDefinition]) -> QWidget:
@@ -260,6 +315,35 @@ class ComponentLibraryWidget(QWidget):
 
         layout.addStretch()
         return widget
+
+    def _refresh_groups(self):
+        """Update toolbox groupings based on the current filters."""
+
+        while self.toolbox.count():
+            widget = self.toolbox.widget(0)
+            self.toolbox.removeItem(0)
+            if widget is not None:
+                widget.deleteLater()
+
+        groups = build_component_groups(
+            self.service.get_all_component_definitions(),
+            self.group_mode.currentText(),
+            self.filter_input.text(),
+        )
+
+        if not groups:
+            placeholder = QWidget()
+            placeholder_layout = QVBoxLayout(placeholder)
+            label = QLabel("No symbols match your filters.")
+            label.setWordWrap(True)
+            placeholder_layout.addWidget(label)
+            placeholder_layout.addStretch()
+            self.toolbox.addItem(placeholder, "No Results")
+            return
+
+        for group_name, components in groups:
+            category_widget = self._create_category_widget(components)
+            self.toolbox.addItem(category_widget, group_name)
 
 
 class CircuitWorkspaceView(QGraphicsView):

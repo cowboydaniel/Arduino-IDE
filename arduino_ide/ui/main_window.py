@@ -24,11 +24,13 @@ from arduino_ide.ui.problems_panel import ProblemsPanel
 from arduino_ide.ui.output_panel import OutputPanel
 from arduino_ide.ui.status_bar import StatusBar
 from arduino_ide.ui.quick_actions_panel import QuickActionsPanel
+from arduino_ide.ui.code_quality_panel import CodeQualityPanel
 from arduino_ide.ui.library_manager_dialog import LibraryManagerDialog
 from arduino_ide.ui.board_manager_dialog import BoardManagerDialog
 from arduino_ide.ui.find_replace_dialog import FindReplaceDialog
 from arduino_ide.ui.snippets_panel import SnippetsLibraryDialog
 from arduino_ide.ui.circuit_editor import CircuitDesignerWindow
+from arduino_ide.ui.onboarding_wizard import OnboardingWizard
 from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
@@ -38,6 +40,7 @@ from arduino_ide.ui.example_templates import build_missing_example_template
 from arduino_ide.services import ArduinoCliService
 from arduino_ide.services.visual_programming_service import VisualProgrammingService
 from arduino_ide.ui.visual_programming_editor import VisualProgrammingEditor
+from arduino_ide.services.error_recovery import SmartErrorRecovery
 import re
 
 
@@ -174,6 +177,8 @@ class MainWindow(QMainWindow):
         self.settings = QSettings()
         self.theme_manager = ThemeManager()
         self.recent_files = self._load_recent_files()
+        self.view_menu = None
+        self.code_quality_panel = None
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
@@ -203,6 +208,7 @@ class MainWindow(QMainWindow):
         self.cli_service.output_received.connect(self._handle_cli_output)
         self.cli_service.error_received.connect(self._handle_cli_error)
         self.cli_service.finished.connect(self._handle_cli_finished)
+        self.error_recovery = SmartErrorRecovery()
 
         # Initialize package managers
         self.library_manager = LibraryManager()
@@ -218,10 +224,12 @@ class MainWindow(QMainWindow):
         # Initialize circuit service
         self.circuit_service = CircuitService()
         self.circuit_designer_window = None  # Will be created on demand
+        self.onboarding_wizard = None
 
         self._cli_current_operation = None
         self._last_cli_error = ""
         self._open_monitor_after_upload = False
+        self._serial_monitor_open = False
         self._last_selected_port = None
         self._compilation_output = ""  # Store compilation output for parsing
         self._upload_after_compile = False  # Flag to trigger upload after successful compilation
@@ -304,6 +312,7 @@ class MainWindow(QMainWindow):
         # Bottom tab widget (only under left area, NOT under right column)
         self.bottom_tabs = QTabWidget()
         self.bottom_tabs.setMinimumHeight(150)
+        self.bottom_tabs.currentChanged.connect(self._on_bottom_tab_changed)
         left_area_layout.addWidget(self.bottom_tabs)
 
         # Add left area to main splitter
@@ -436,9 +445,9 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(circuit_designer_action)
 
         # View Menu
-        view_menu = menubar.addMenu("&View")
+        self.view_menu = menubar.addMenu("&View")
 
-        theme_menu = view_menu.addMenu("Theme")
+        theme_menu = self.view_menu.addMenu("Theme")
 
         light_theme = QAction("Light", self)
         light_theme.triggered.connect(lambda: self.theme_manager.apply_theme("light"))
@@ -469,6 +478,10 @@ class MainWindow(QMainWindow):
         docs_action = QAction("Documentation", self)
         docs_action.setShortcut(Qt.Key_F1)
         help_menu.addAction(docs_action)
+
+        onboarding_action = QAction("Getting Started Tour...", self)
+        onboarding_action.triggered.connect(self.show_onboarding_wizard)
+        help_menu.addAction(onboarding_action)
 
         about_action = QAction("About", self)
         about_action.triggered.connect(self.show_about)
@@ -651,6 +664,14 @@ class MainWindow(QMainWindow):
         self.quick_actions_panel.serial_monitor_clicked.connect(self.toggle_serial_monitor)
         self.quick_actions_panel.serial_plotter_clicked.connect(self.toggle_plotter)
 
+        # --- DOCKED PANELS ---
+        self.code_quality_panel = CodeQualityPanel(self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.code_quality_panel)
+        if self.view_menu:
+            self.view_menu.addAction(self.code_quality_panel.toggleViewAction())
+        # Sync contextual help state with the initial Serial Monitor visibility
+        self._broadcast_serial_monitor_state(self._is_serial_monitor_active())
+
     def create_new_editor(self, filename="untitled.ino", *, file_path=None, content=None, mark_clean=False):
         """Create a new editor tab"""
         editor_container = EditorContainer(filename, file_path=file_path)
@@ -675,6 +696,9 @@ class MainWindow(QMainWindow):
         # Connect function clicks to context panel
         editor_container.editor.function_clicked.connect(self.context_panel.update_context)
 
+        # Keep contextual help aware of Serial Monitor visibility
+        editor_container.editor.set_serial_monitor_open(self._serial_monitor_open)
+
         editor_container.dirtyChanged.connect(
             lambda dirty, container=editor_container: self.on_editor_dirty_changed(container)
         )
@@ -692,6 +716,7 @@ class MainWindow(QMainWindow):
 
         # Trigger initial background compile for memory usage (after a short delay to ensure setup is complete)
         QTimer.singleShot(500, self._do_background_compile)
+        self._update_code_quality_panel()
 
         return editor_container
 
@@ -922,6 +947,34 @@ void loop() {
         for line in lines:
             self.console_panel.append_output(line, color=color)
 
+    def _show_error_recovery_hints(self, compiler_output):
+        """Display smart recovery hints for the most recent compiler error."""
+
+        if not compiler_output or not compiler_output.strip():
+            return
+
+        suggestions = self.error_recovery.analyze_compile_error(compiler_output)
+        if not suggestions:
+            return
+
+        highlight = "#CCA700"
+        self.console_panel.append_output("💡 Potential fixes:", color=highlight)
+
+        for suggestion in suggestions:
+            if suggestion.issue == "unknown":
+                title = "General guidance"
+                confidence = ""
+            else:
+                title = suggestion.issue.capitalize()
+                confidence = (
+                    f" ({int(round(suggestion.confidence * 100))}% match)"
+                    if suggestion.confidence
+                    else ""
+                )
+            self.console_panel.append_output(f"  • {title}{confidence}", color=highlight)
+            for fix in suggestion.suggestions:
+                self.console_panel.append_output(f"      - {fix}", color=highlight)
+
     def _handle_cli_output(self, text):
         # Only show output for non-background compiles
         if not self._is_background_compile:
@@ -996,6 +1049,7 @@ void loop() {
                     self.console_panel.append_output("✗ Compilation failed.", color="#F48771")
                     self.status_bar.set_status("Compilation Failed")
                     QMessageBox.critical(self, "Compilation Failed", detail)
+                    self._show_error_recovery_hints(full_output)
                     # Cancel upload if compilation failed
                     self._upload_after_compile = False
                 elif operation == "upload":
@@ -1067,6 +1121,7 @@ void loop() {
 
         # Schedule a new background compile after delay
         self._background_compile_timer.start(self._background_compile_delay)
+        self._update_code_quality_panel()
 
     def _do_background_compile(self):
         """Perform a silent background compilation to update memory usage"""
@@ -1409,6 +1464,36 @@ void loop() {
         if plotter_index >= 0:
             self.bottom_tabs.setCurrentIndex(plotter_index)
 
+    def _on_bottom_tab_changed(self, index):
+        """Update contextual help when the bottom tab selection changes."""
+
+        if not hasattr(self, "serial_monitor"):
+            return
+
+        widget = self.bottom_tabs.widget(index) if index >= 0 else None
+        self._broadcast_serial_monitor_state(widget is self.serial_monitor)
+
+    def _broadcast_serial_monitor_state(self, is_open: bool):
+        """Notify all editors about the Serial Monitor visibility."""
+
+        self._serial_monitor_open = bool(is_open)
+        for i in range(self.editor_tabs.count()):
+            container = self.editor_tabs.widget(i)
+            if not container:
+                continue
+
+            editor = getattr(container, "editor", None)
+            if editor:
+                editor.set_serial_monitor_open(self._serial_monitor_open)
+
+    def _is_serial_monitor_active(self) -> bool:
+        """Return True if the Serial Monitor tab is currently selected."""
+
+        return (
+            hasattr(self, "serial_monitor")
+            and self.bottom_tabs.currentWidget() is self.serial_monitor
+        )
+
     def show_find_dialog(self):
         """Show find/replace dialog"""
         # Get current editor
@@ -1527,6 +1612,14 @@ void loop() {
 
         about_dialog.linkActivated.connect(open_link)
         about_dialog.exec()
+
+    def show_onboarding_wizard(self):
+        """Launch the onboarding wizard dialog."""
+        if self.onboarding_wizard is None:
+            self.onboarding_wizard = OnboardingWizard(self)
+        self.onboarding_wizard.show()
+        self.onboarding_wizard.raise_()
+        self.onboarding_wizard.activateWindow()
 
     def on_board_changed(self, board_name):
         """Handle board selection change"""
@@ -1970,6 +2063,18 @@ void loop() {
         self.save_state()
         event.accept()
 
+    def _update_code_quality_panel(self):
+        """Run static analysis on the current editor and refresh the panel."""
+        if not self.code_quality_panel:
+            return
+
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget and hasattr(current_widget, 'editor'):
+            code_text = current_widget.editor.toPlainText()
+        else:
+            code_text = ""
+        self.code_quality_panel.analyze_code(code_text)
+
     def update_pin_usage(self):
         """Update pin usage overview from current editor"""
         current_widget = self.editor_tabs.currentWidget()
@@ -1995,6 +2100,7 @@ void loop() {
             if current_widget and hasattr(current_widget, 'filename'):
                 self.update_status_bar_for_file(current_widget.filename)
             self.update_cursor_position()
+            self._update_code_quality_panel()
 
             # Trigger background compile for new tab (after a short delay)
             QTimer.singleShot(500, self._do_background_compile)
