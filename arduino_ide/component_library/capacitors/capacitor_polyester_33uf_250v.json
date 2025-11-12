@@ -1,0 +1,37 @@
+{
+  "id": "capacitor_polyester_33uf_250v",
+  "name": "33\u00b5F 250V Polyester Capacitor",
+  "component_type": "capacitor",
+  "description": "33\u00b5F Polyester capacitor rated for 250V with \u00b110% tolerance.",
+  "width": 45,
+  "height": 18,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "1",
+      "pin_type": "power",
+      "position": [
+        0,
+        9.0
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "2",
+      "pin_type": "power",
+      "position": [
+        45,
+        9.0
+      ]
+    }
+  ],
+  "metadata": {
+    "dielectric_type": "Polyester Film",
+    "capacitance": "33\u00b5F",
+    "tolerance": "\u00b110%",
+    "voltage_rating": "250V",
+    "esr": "0.08\u03a9 @ 10kHz",
+    "package": "Axial Lead 5mm",
+    "polarized": false
+  }
+}

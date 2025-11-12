@@ -94,6 +94,7 @@ def main():
         "arduino_uno",
         "led_red_5mm_standard",
         "resistor_220_1div4w_5pct",
+        "capacitor_ceramic_10pf_50v",
         "pushbutton_tactile_6x6mm_black",
         "sensor_temp_dht22_high_precision",
         "ic_timer_555_dip8"

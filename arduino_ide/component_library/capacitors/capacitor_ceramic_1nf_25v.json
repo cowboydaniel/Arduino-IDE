@@ -1,0 +1,37 @@
+{
+  "id": "capacitor_ceramic_1nf_25v",
+  "name": "1nF 25V Ceramic Capacitor",
+  "component_type": "capacitor",
+  "description": "1nF Ceramic capacitor rated for 25V with \u00b15% tolerance.",
+  "width": 40,
+  "height": 20,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "1",
+      "pin_type": "power",
+      "position": [
+        0,
+        10.0
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "2",
+      "pin_type": "power",
+      "position": [
+        40,
+        10.0
+      ]
+    }
+  ],
+  "metadata": {
+    "dielectric_type": "X7R Ceramic",
+    "capacitance": "1nF",
+    "tolerance": "\u00b15%",
+    "voltage_rating": "25V",
+    "esr": "0.05\u03a9 @ 100kHz",
+    "package": "Radial Lead 5mm",
+    "polarized": false
+  }
+}
