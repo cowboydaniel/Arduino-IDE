@@ -16,9 +16,15 @@ import logging
 from typing import Optional, Dict, List, Tuple
 from pathlib import Path
 
-from arduino_ide.services.circuit_service import (
-    CircuitService, ComponentDefinition, ComponentInstance,
-    Connection, ComponentType, PinType, Pin
+from arduino_ide.services.circuit_service import CircuitService
+from arduino_ide.models.circuit_domain import (
+    ComponentDefinition,
+    ComponentInstance,
+    Connection,
+    ComponentType,
+    ElectricalRuleDiagnostic,
+    PinType,
+    Pin,
 )
 
 logger = logging.getLogger(__name__)
@@ -147,7 +153,8 @@ class ComponentGraphicsItem(QGraphicsRectItem):
 
         # Add label
         self.label = QGraphicsTextItem(self)
-        self.label.setPlainText(comp_def.name)
+        display_label = comp_instance.annotation or comp_def.name
+        self.label.setPlainText(display_label)
         self.label.setDefaultTextColor(Qt.black)
         font = QFont()
         font.setBold(True)
@@ -200,6 +207,9 @@ class ComponentGraphicsItem(QGraphicsRectItem):
             PinType.PWM: QColor("#9B59B6"),
             PinType.POWER: QColor("#E74C3C"),
             PinType.GROUND: QColor("#000000"),
+            PinType.I2C: QColor("#1abc9c"),
+            PinType.SPI: QColor("#8e44ad"),
+            PinType.SERIAL: QColor("#2c3e50"),
         }
         return color_map.get(pin_type, QColor("#95A5A6"))
 
@@ -785,7 +795,7 @@ class CircuitEditor(QWidget):
     @Slot()
     def _on_validate_clicked(self):
         """Handle validate button"""
-        is_valid, errors = self.service.validate_circuit()
+        is_valid, diagnostics = self.service.validate_circuit()
 
         if is_valid:
             QMessageBox.information(
@@ -794,16 +804,29 @@ class CircuitEditor(QWidget):
                 "Circuit validation passed! No errors found."
             )
         else:
-            error_text = "\n".join(f"• {err}" for err in errors)
+            error_text = "\n".join(
+                self._format_diagnostic(diag)
+                for diag in diagnostics
+            )
             QMessageBox.warning(
                 self,
                 "Circuit Validation Failed",
-                f"Found {len(errors)} error(s):\n\n{error_text}"
+                f"Found {len(diagnostics)} issue(s):\n\n{error_text}"
             )
 
 
+    def _format_diagnostic(self, diag: ElectricalRuleDiagnostic) -> str:
+        context = []
+        if diag.related_net:
+            context.append(f"net {diag.related_net}")
+        if diag.related_component:
+            context.append(f"component {diag.related_component}")
+        context_text = f" ({', '.join(context)})" if context else ""
+        return f"• {diag.severity.upper()} {diag.code}: {diag.message}{context_text}"
+
+
     @Slot(bool, list)
-    def _on_circuit_validated(self, is_valid: bool, errors: List[str]):
+    def _on_circuit_validated(self, is_valid: bool, errors: List[dict]):
         """Handle circuit validated"""
         self.circuit_validated.emit(is_valid, errors)
 
