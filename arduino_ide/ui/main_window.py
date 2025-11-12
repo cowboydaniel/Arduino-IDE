@@ -29,6 +29,7 @@ from arduino_ide.ui.board_manager_dialog import BoardManagerDialog
 from arduino_ide.ui.find_replace_dialog import FindReplaceDialog
 from arduino_ide.ui.snippets_panel import SnippetsLibraryDialog
 from arduino_ide.ui.circuit_editor import CircuitDesignerWindow
+from arduino_ide.ui.onboarding_wizard import OnboardingWizard
 from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
@@ -218,6 +219,7 @@ class MainWindow(QMainWindow):
         # Initialize circuit service
         self.circuit_service = CircuitService()
         self.circuit_designer_window = None  # Will be created on demand
+        self.onboarding_wizard = None
 
         self._cli_current_operation = None
         self._last_cli_error = ""
@@ -469,6 +471,10 @@ class MainWindow(QMainWindow):
         docs_action = QAction("Documentation", self)
         docs_action.setShortcut(Qt.Key_F1)
         help_menu.addAction(docs_action)
+
+        onboarding_action = QAction("Getting Started Tour...", self)
+        onboarding_action.triggered.connect(self.show_onboarding_wizard)
+        help_menu.addAction(onboarding_action)
 
         about_action = QAction("About", self)
         about_action.triggered.connect(self.show_about)
@@ -1527,6 +1533,14 @@ void loop() {
 
         about_dialog.linkActivated.connect(open_link)
         about_dialog.exec()
+
+    def show_onboarding_wizard(self):
+        """Launch the onboarding wizard dialog."""
+        if self.onboarding_wizard is None:
+            self.onboarding_wizard = OnboardingWizard(self)
+        self.onboarding_wizard.show()
+        self.onboarding_wizard.raise_()
+        self.onboarding_wizard.activateWindow()
 
     def on_board_changed(self, board_name):
         """Handle board selection change"""
