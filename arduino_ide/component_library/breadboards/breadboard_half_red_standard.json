@@ -1,8 +1,8 @@
 {
-  "id": "breadboard_half_white_standard",
-  "name": "Half-Size Breadboard (White, Standard)",
+  "id": "breadboard_half_red_standard",
+  "name": "Half-Size Breadboard (Red, Standard)",
   "component_type": "breadboard",
-  "description": "Half-Size Breadboard in white with 400 tie points and dual power rails on one side.",
+  "description": "Half-Size Breadboard in red with 400 tie points and dual power rails on one side.",
   "width": 300,
   "height": 120,
   "pins": [],
@@ -10,8 +10,8 @@
     "manufacturer": "Generic",
     "series": "Solderless Breadboard",
     "size": "Half-Size",
-    "color": "White",
-    "color_hex": "#F8F9FA",
+    "color": "Red",
+    "color_hex": "#D62828",
     "quality": "Standard",
     "tie_points": 400,
     "tie_point_layout": {

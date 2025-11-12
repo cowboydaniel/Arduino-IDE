@@ -1,35 +1,35 @@
 {
-  "id": "breadboard_half_white_standard",
-  "name": "Half-Size Breadboard (White, Standard)",
+  "id": "breadboard_full_black_standard",
+  "name": "Full-Size Breadboard (Black, Standard)",
   "component_type": "breadboard",
-  "description": "Half-Size Breadboard in white with 400 tie points and dual power rails on one side.",
-  "width": 300,
-  "height": 120,
+  "description": "Full-Size Breadboard in black with 830 tie points and dual power rails on both sides.",
+  "width": 460,
+  "height": 160,
   "pins": [],
   "metadata": {
     "manufacturer": "Generic",
     "series": "Solderless Breadboard",
-    "size": "Half-Size",
-    "color": "White",
-    "color_hex": "#F8F9FA",
+    "size": "Full-Size",
+    "color": "Black",
+    "color_hex": "#1F1F1F",
     "quality": "Standard",
-    "tie_points": 400,
+    "tie_points": 830,
     "tie_point_layout": {
       "terminal_strips": {
-        "rows": 30,
+        "rows": 63,
         "columns": 5,
         "sections": 2,
-        "total": 300
+        "total": 630
       },
-      "power_rail_columns": 2,
-      "power_rail_tie_points": 100
+      "power_rail_columns": 4,
+      "power_rail_tie_points": 200
     },
-    "power_rails": 2,
-    "rail_configuration": "Dual power rails on one side",
+    "power_rails": 4,
+    "rail_configuration": "Dual power rails on both sides",
     "dimensions_mm": {
-      "length": 82.5,
-      "width": 54.0,
-      "height": 9.0
+      "length": 165.0,
+      "width": 55.0,
+      "height": 10.0
     },
     "contact_pitch": "2.54mm (0.1\")",
     "material_shell": "ABS thermoplastic",
@@ -45,12 +45,13 @@
     "operating_temperature": "-40\u00b0C to +85\u00b0C",
     "mounting_options": [
       "Adhesive foam backing",
-      "M2 mounting holes via adapter plate"
+      "Countersunk mounting holes (M3)",
+      "Snap-fit alignment keys"
     ],
     "certifications": [
       "RoHS"
     ],
-    "size_notes": "Balanced size for single-board projects and Arduino shields.",
+    "size_notes": "Full-length layout accommodates DIP ICs with separate buses for power distribution.",
     "quality_notes": "Balanced option for general prototyping and educational use."
   }
 }
