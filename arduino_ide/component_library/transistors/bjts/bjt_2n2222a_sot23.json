@@ -1,0 +1,63 @@
+{
+  "id": "bjt_2n2222a_sot23",
+  "name": "2N2222A General-Purpose NPN (SOT-23)",
+  "component_type": "transistor",
+  "description": "Versatile NPN transistor used for switching and amplification. Packaged in SOT-23 for compatibility with various layouts.",
+  "width": 60,
+  "height": 80,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "B",
+      "pin_type": "analog",
+      "position": [
+        12,
+        62
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "E",
+      "pin_type": "power",
+      "position": [
+        48,
+        62
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "C",
+      "pin_type": "power",
+      "position": [
+        30,
+        18
+      ]
+    }
+  ],
+  "metadata": {
+    "polarity": "NPN",
+    "typical_gain_hfe": "100-300",
+    "max_collector_current": "600mA",
+    "max_collector_emitter_voltage": "40V",
+    "max_collector_base_voltage": "75V",
+    "max_base_emitter_voltage": "6V",
+    "transition_frequency": "300MHz",
+    "package": "SOT-23",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Base"
+      },
+      {
+        "pin": "2",
+        "function": "Emitter"
+      },
+      {
+        "pin": "3",
+        "function": "Collector"
+      }
+    ],
+    "package_note": "Standard SOT-23 orientation with the single lead on top as the collector.",
+    "datasheet_variant": "2N2222A General-Purpose NPN SOT-23"
+  }
+}

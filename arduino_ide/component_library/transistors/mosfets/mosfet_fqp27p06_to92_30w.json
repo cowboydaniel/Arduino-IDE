@@ -1,0 +1,62 @@
+{
+  "id": "mosfet_fqp27p06_to92_30w",
+  "name": "FQP27P06 Power P-Channel MOSFET 30W (TO-92)",
+  "component_type": "transistor",
+  "description": "Robust P-channel MOSFET for high-side control of power loads. Packaged in TO-92 with a 30W thermal design rating.",
+  "width": 70,
+  "height": 140,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "G",
+      "pin_type": "analog",
+      "position": [
+        15,
+        115
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "D",
+      "pin_type": "power",
+      "position": [
+        35,
+        115
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "S",
+      "pin_type": "power",
+      "position": [
+        55,
+        115
+      ]
+    }
+  ],
+  "metadata": {
+    "channel_type": "P-Channel",
+    "rds_on": "0.070\u03a9",
+    "max_drain_current": "27A",
+    "max_drain_source_voltage": "-60V",
+    "gate_threshold_voltage": "-2.0 to -4.0V",
+    "package": "TO-92",
+    "power_rating": "30W",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Gate"
+      },
+      {
+        "pin": "2",
+        "function": "Drain"
+      },
+      {
+        "pin": "3",
+        "function": "Source"
+      }
+    ],
+    "package_note": "Viewed from flat face with leads downward.",
+    "datasheet_variant": "FQP27P06 Power P-Channel MOSFET TO-92 30W"
+  }
+}

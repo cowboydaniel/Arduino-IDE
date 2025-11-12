@@ -1,0 +1,62 @@
+{
+  "id": "mosfet_fqp27p06_sot23_75w",
+  "name": "FQP27P06 Power P-Channel MOSFET 75W (SOT-23)",
+  "component_type": "transistor",
+  "description": "Robust P-channel MOSFET for high-side control of power loads. Packaged in SOT-23 with a 75W thermal design rating.",
+  "width": 60,
+  "height": 80,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "G",
+      "pin_type": "analog",
+      "position": [
+        12,
+        62
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "S",
+      "pin_type": "power",
+      "position": [
+        48,
+        62
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "D",
+      "pin_type": "power",
+      "position": [
+        30,
+        18
+      ]
+    }
+  ],
+  "metadata": {
+    "channel_type": "P-Channel",
+    "rds_on": "0.056\u03a9",
+    "max_drain_current": "27A",
+    "max_drain_source_voltage": "-60V",
+    "gate_threshold_voltage": "-2.0 to -4.0V",
+    "package": "SOT-23",
+    "power_rating": "75W",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Gate"
+      },
+      {
+        "pin": "2",
+        "function": "Source"
+      },
+      {
+        "pin": "3",
+        "function": "Drain"
+      }
+    ],
+    "package_note": "SOT-23 orientation with the single top lead used as the drain.",
+    "datasheet_variant": "FQP27P06 Power P-Channel MOSFET SOT-23 75W"
+  }
+}

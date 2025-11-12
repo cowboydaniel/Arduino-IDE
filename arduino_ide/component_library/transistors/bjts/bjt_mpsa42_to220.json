@@ -1,0 +1,63 @@
+{
+  "id": "bjt_mpsa42_to220",
+  "name": "MPSA42 High-Voltage NPN (TO-220)",
+  "component_type": "transistor",
+  "description": "High-voltage NPN transistor for CRT and high-voltage signal stages. Packaged in TO-220 for compatibility with various layouts.",
+  "width": 90,
+  "height": 160,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "B",
+      "pin_type": "analog",
+      "position": [
+        20,
+        130
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "C",
+      "pin_type": "power",
+      "position": [
+        45,
+        130
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "E",
+      "pin_type": "power",
+      "position": [
+        70,
+        130
+      ]
+    }
+  ],
+  "metadata": {
+    "polarity": "NPN",
+    "typical_gain_hfe": "40-240",
+    "max_collector_current": "500mA",
+    "max_collector_emitter_voltage": "300V",
+    "max_collector_base_voltage": "300V",
+    "max_base_emitter_voltage": "6V",
+    "transition_frequency": "50MHz",
+    "package": "TO-220",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Base"
+      },
+      {
+        "pin": "2",
+        "function": "Collector"
+      },
+      {
+        "pin": "3",
+        "function": "Emitter"
+      }
+    ],
+    "package_note": "Tab is connected to collector; pins counted left to right from front.",
+    "datasheet_variant": "MPSA42 High-Voltage NPN TO-220"
+  }
+}

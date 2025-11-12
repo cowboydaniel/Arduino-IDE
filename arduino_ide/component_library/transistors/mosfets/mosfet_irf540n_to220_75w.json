@@ -1,0 +1,62 @@
+{
+  "id": "mosfet_irf540n_to220_75w",
+  "name": "IRF540N Power MOSFET 75W (TO-220)",
+  "component_type": "transistor",
+  "description": "High-voltage N-channel MOSFET for motor and power control. Packaged in TO-220 with a 75W thermal design rating.",
+  "width": 95,
+  "height": 170,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "G",
+      "pin_type": "analog",
+      "position": [
+        22,
+        140
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "D",
+      "pin_type": "power",
+      "position": [
+        47,
+        140
+      ]
+    },
+    {
+      "id": "pin3",
+      "label": "S",
+      "pin_type": "power",
+      "position": [
+        72,
+        140
+      ]
+    }
+  ],
+  "metadata": {
+    "channel_type": "N-Channel",
+    "rds_on": "0.035\u03a9",
+    "max_drain_current": "33A",
+    "max_drain_source_voltage": "100V",
+    "gate_threshold_voltage": "2.0-4.0V",
+    "package": "TO-220",
+    "power_rating": "75W",
+    "pin_configuration": [
+      {
+        "pin": "1",
+        "function": "Gate"
+      },
+      {
+        "pin": "2",
+        "function": "Drain"
+      },
+      {
+        "pin": "3",
+        "function": "Source"
+      }
+    ],
+    "package_note": "Tab connects to drain; pins counted left-to-right from front.",
+    "datasheet_variant": "IRF540N Power MOSFET TO-220 75W"
+  }
+}
