@@ -477,6 +477,13 @@ class BoardManagerDialog(QDialog):
             updates_only=updates_only
         )
 
+        # Ensure boards are discovered for installed packages
+        # This is needed on initial load or when packages are installed
+        if any(pkg.installed_version for pkg in self.current_packages):
+            # Only discover if we have installed packages and boards haven't been loaded
+            if not any(pkg.boards for pkg in self.current_packages if pkg.installed_version):
+                self.board_manager.get_all_boards()
+
         self.package_list.clear()
         for package in self.current_packages:
             item = QTreeWidgetItem()
@@ -626,4 +633,9 @@ class BoardManagerDialog(QDialog):
     def on_package_changed(self, *args):
         """Handle package installation/uninstallation/update"""
         self.progress_bar.setVisible(False)
+
+        # Discover boards from newly installed/updated packages
+        # This populates package.boards so the count shows correctly
+        self.board_manager.get_all_boards()
+
         self.refresh_packages()
