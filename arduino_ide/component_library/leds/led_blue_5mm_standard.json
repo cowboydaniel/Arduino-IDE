@@ -1,8 +1,8 @@
 {
   "id": "led_blue_5mm_standard",
-  "name": "Blue 5mm LED",
+  "name": "Blue 5mm Standard LED",
   "component_type": "led",
-  "description": "Standard blue 5mm Light Emitting Diode",
+  "description": "Standard clear lens indicator LED. This deep blue output comes in a 5mm package.",
   "width": 30,
   "height": 50,
   "pins": [
@@ -10,13 +10,19 @@
       "id": "anode",
       "label": "+",
       "pin_type": "power",
-      "position": [15, 0]
+      "position": [
+        15,
+        0
+      ]
     },
     {
       "id": "cathode",
       "label": "-",
       "pin_type": "ground",
-      "position": [15, 50]
+      "position": [
+        15,
+        50
+      ]
     }
   ],
   "metadata": {
@@ -25,9 +31,13 @@
     "size": "5mm",
     "forward_voltage": "3.0-3.4V",
     "forward_current": "20mA",
-    "max_forward_current": "30mA",
     "wavelength": "460-470nm",
-    "brightness": "1500-2000mcd",
-    "viewing_angle": "30°"
+    "brightness": "600-1400mcd",
+    "mounting_type": "THT",
+    "led_type": "Standard",
+    "package": "5mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "25°",
+    "notes": "General-purpose indicator LED."
   }
 }

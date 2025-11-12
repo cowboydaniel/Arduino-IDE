@@ -1,0 +1,61 @@
+{
+  "id": "led_bi_color_red_green_3528_rgb",
+  "name": "Bi-Color Red/Green SMD 3528 RGB LED",
+  "component_type": "led",
+  "description": "Multi-die LED with separate red, green, and blue channels. This dual-color indicator comes in a SMD 3528 package.",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "cathode_1",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        10,
+        28
+      ]
+    },
+    {
+      "id": "cathode_2",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        24,
+        28
+      ]
+    },
+    {
+      "id": "cathode_3",
+      "label": "B",
+      "pin_type": "ground",
+      "position": [
+        38,
+        28
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Bi-Color Red/Green",
+    "size": "SMD 3528",
+    "forward_voltage": "Red: 1.9-2.2V / Green: 2.9-3.2V",
+    "forward_current": "20mA per channel",
+    "wavelength": "Red: 620-630nm / Green: 520-530nm",
+    "brightness": "Red: 900-1400mcd / Green: 1100-1800mcd",
+    "mounting_type": "SMD",
+    "led_type": "RGB",
+    "package": "SMD 3528 SMD LED",
+    "lens_type": "Clear",
+    "viewing_angle": "40°",
+    "notes": "Common anode tri-color LED."
+  }
+}

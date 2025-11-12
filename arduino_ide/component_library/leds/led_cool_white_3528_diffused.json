@@ -1,0 +1,43 @@
+{
+  "id": "led_cool_white_3528_diffused",
+  "name": "Cool White SMD 3528 Diffused LED",
+  "component_type": "led",
+  "description": "Diffused epoxy lens LED with wide viewing angle. This cool white output comes in a SMD 3528 package.",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        24,
+        28
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Cool White",
+    "size": "SMD 3528",
+    "forward_voltage": "3.0-3.4V",
+    "forward_current": "20mA",
+    "wavelength": "CCT 6500K",
+    "brightness": "2340-3640mcd",
+    "mounting_type": "SMD",
+    "led_type": "Diffused",
+    "package": "SMD 3528 SMD LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "60°",
+    "notes": "Even light distribution through frosted lens."
+  }
+}

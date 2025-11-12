@@ -1,0 +1,43 @@
+{
+  "id": "led_yellow_10mm_diffused",
+  "name": "Yellow 10mm Diffused LED",
+  "component_type": "led",
+  "description": "Diffused epoxy lens LED with wide viewing angle. This bright amber-yellow emission comes in a 10mm package.",
+  "width": 44,
+  "height": 64,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        22,
+        64
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Yellow",
+    "size": "10mm",
+    "forward_voltage": "2.0-2.4V",
+    "forward_current": "20mA",
+    "wavelength": "585-595nm",
+    "brightness": "585-975mcd",
+    "mounting_type": "THT",
+    "led_type": "Diffused",
+    "package": "10mm THT LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "60°",
+    "notes": "Even light distribution through frosted lens."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "led_green_5mm_bi_color",
+  "name": "Green 5mm Bi-Color LED",
+  "component_type": "led",
+  "description": "Dual-die LED allowing two colors from a shared package. This high-visibility green emission comes in a 5mm package.",
+  "width": 30,
+  "height": 50,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        15,
+        0
+      ]
+    },
+    {
+      "id": "cathode_a",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        8,
+        50
+      ]
+    },
+    {
+      "id": "cathode_b",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        22,
+        50
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Green",
+    "size": "5mm",
+    "forward_voltage": "2.8-3.2V",
+    "forward_current": "20mA per channel",
+    "wavelength": "520-530nm",
+    "brightness": "765-1530mcd",
+    "mounting_type": "THT",
+    "led_type": "Bi-Color",
+    "package": "5mm THT LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "45°",
+    "notes": "Common anode dual-color configuration."
+  }
+}

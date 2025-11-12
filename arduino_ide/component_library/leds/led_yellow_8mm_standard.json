@@ -1,0 +1,43 @@
+{
+  "id": "led_yellow_8mm_standard",
+  "name": "Yellow 8mm Standard LED",
+  "component_type": "led",
+  "description": "Standard clear lens indicator LED. This bright amber-yellow emission comes in a 8mm package.",
+  "width": 36,
+  "height": 56,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        18,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        18,
+        56
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Yellow",
+    "size": "8mm",
+    "forward_voltage": "2.0-2.4V",
+    "forward_current": "20mA",
+    "wavelength": "585-595nm",
+    "brightness": "900-1500mcd",
+    "mounting_type": "THT",
+    "led_type": "Standard",
+    "package": "8mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "25°",
+    "notes": "General-purpose indicator LED."
+  }
+}

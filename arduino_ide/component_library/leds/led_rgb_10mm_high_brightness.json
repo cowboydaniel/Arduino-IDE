@@ -1,0 +1,61 @@
+{
+  "id": "led_rgb_10mm_high_brightness",
+  "name": "RGB 10mm High Brightness LED",
+  "component_type": "led",
+  "description": "High-intensity LED for daylight visibility. This tri-color RGB package comes in a 10mm package.",
+  "width": 44,
+  "height": 64,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "cathode_1",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        9,
+        64
+      ]
+    },
+    {
+      "id": "cathode_2",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        22,
+        64
+      ]
+    },
+    {
+      "id": "cathode_3",
+      "label": "B",
+      "pin_type": "ground",
+      "position": [
+        35,
+        64
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "RGB",
+    "size": "10mm",
+    "forward_voltage": "R: 1.9-2.3V / G: 3.0-3.3V / B: 3.1-3.4V",
+    "forward_current": "30mA per channel",
+    "wavelength": "R: 620-630nm / G: 520-530nm / B: 460-470nm",
+    "brightness": "R: 1260-1980mcd / G: 2160-3240mcd / B: 720-1260mcd",
+    "mounting_type": "THT",
+    "led_type": "High Brightness",
+    "package": "10mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "20°",
+    "notes": "Designed for maximum luminous output."
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "led_yellow_8mm_high_brightness",
+  "name": "Yellow 8mm High Brightness LED",
+  "component_type": "led",
+  "description": "High-intensity LED for daylight visibility. This bright amber-yellow emission comes in a 8mm package.",
+  "width": 36,
+  "height": 56,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        18,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        18,
+        56
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Yellow",
+    "size": "8mm",
+    "forward_voltage": "2.1-2.5V",
+    "forward_current": "30mA",
+    "wavelength": "585-595nm",
+    "brightness": "1620-2700mcd",
+    "mounting_type": "THT",
+    "led_type": "High Brightness",
+    "package": "8mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "20°",
+    "notes": "Designed for maximum luminous output."
+  }
+}

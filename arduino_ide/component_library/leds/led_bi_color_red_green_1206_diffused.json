@@ -1,0 +1,52 @@
+{
+  "id": "led_bi_color_red_green_1206_diffused",
+  "name": "Bi-Color Red/Green SMD 1206 Diffused LED",
+  "component_type": "led",
+  "description": "Diffused epoxy lens LED with wide viewing angle. This dual-color indicator comes in a SMD 1206 package.",
+  "width": 42,
+  "height": 24,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        21,
+        0
+      ]
+    },
+    {
+      "id": "cathode_a",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        10,
+        24
+      ]
+    },
+    {
+      "id": "cathode_b",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        32,
+        24
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Bi-Color Red/Green",
+    "size": "SMD 1206",
+    "forward_voltage": "Red: 1.8-2.2V / Green: 2.9-3.2V",
+    "forward_current": "20mA per channel",
+    "wavelength": "Red: 620-630nm / Green: 520-530nm",
+    "brightness": "Red: 585-910mcd / Green: 715-1170mcd",
+    "mounting_type": "SMD",
+    "led_type": "Diffused",
+    "package": "SMD 1206 SMD LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "60°",
+    "notes": "Even light distribution through frosted lens."
+  }
+}

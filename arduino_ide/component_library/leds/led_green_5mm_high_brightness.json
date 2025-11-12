@@ -1,0 +1,43 @@
+{
+  "id": "led_green_5mm_high_brightness",
+  "name": "Green 5mm High Brightness LED",
+  "component_type": "led",
+  "description": "High-intensity LED for daylight visibility. This high-visibility green emission comes in a 5mm package.",
+  "width": 30,
+  "height": 50,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        15,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        15,
+        50
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Green",
+    "size": "5mm",
+    "forward_voltage": "2.9-3.3V",
+    "forward_current": "30mA",
+    "wavelength": "520-530nm",
+    "brightness": "1620-3240mcd",
+    "mounting_type": "THT",
+    "led_type": "High Brightness",
+    "package": "5mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "20°",
+    "notes": "Designed for maximum luminous output."
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "id": "led_rgb_3528_bi_color",
+  "name": "RGB SMD 3528 Bi-Color LED",
+  "component_type": "led",
+  "description": "Dual-die LED allowing two colors from a shared package. This tri-color RGB package comes in a SMD 3528 package.",
+  "width": 48,
+  "height": 28,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "cathode_1",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        10,
+        28
+      ]
+    },
+    {
+      "id": "cathode_2",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        24,
+        28
+      ]
+    },
+    {
+      "id": "cathode_3",
+      "label": "B",
+      "pin_type": "ground",
+      "position": [
+        38,
+        28
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "RGB",
+    "size": "SMD 3528",
+    "forward_voltage": "R: 1.8-2.2V / G: 2.9-3.2V / B: 3.0-3.3V",
+    "forward_current": "20mA per channel",
+    "wavelength": "R: 620-630nm / G: 520-530nm / B: 460-470nm",
+    "brightness": "R: 595-935mcd / G: 1020-1530mcd / B: 340-595mcd",
+    "mounting_type": "SMD",
+    "led_type": "Bi-Color",
+    "package": "SMD 3528 SMD LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "45°",
+    "notes": "Common anode dual-color configuration."
+  }
+}

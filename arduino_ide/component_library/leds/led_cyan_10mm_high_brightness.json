@@ -1,0 +1,43 @@
+{
+  "id": "led_cyan_10mm_high_brightness",
+  "name": "Cyan 10mm High Brightness LED",
+  "component_type": "led",
+  "description": "High-intensity LED for daylight visibility. This cyan indicator output comes in a 10mm package.",
+  "width": 44,
+  "height": 64,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        22,
+        64
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Cyan",
+    "size": "10mm",
+    "forward_voltage": "3.0-3.4V",
+    "forward_current": "30mA",
+    "wavelength": "500-510nm",
+    "brightness": "1440-2880mcd",
+    "mounting_type": "THT",
+    "led_type": "High Brightness",
+    "package": "10mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "20°",
+    "notes": "Designed for maximum luminous output."
+  }
+}

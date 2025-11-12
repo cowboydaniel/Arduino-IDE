@@ -1,0 +1,52 @@
+{
+  "id": "led_warm_white_1206_bi_color",
+  "name": "Warm White SMD 1206 Bi-Color LED",
+  "component_type": "led",
+  "description": "Dual-die LED allowing two colors from a shared package. This warm white illumination comes in a SMD 1206 package.",
+  "width": 42,
+  "height": 24,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        21,
+        0
+      ]
+    },
+    {
+      "id": "cathode_a",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        10,
+        24
+      ]
+    },
+    {
+      "id": "cathode_b",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        32,
+        24
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Warm White",
+    "size": "SMD 1206",
+    "forward_voltage": "2.9-3.3V",
+    "forward_current": "20mA per channel",
+    "wavelength": "CCT 3000K",
+    "brightness": "2720-4250mcd",
+    "mounting_type": "SMD",
+    "led_type": "Bi-Color",
+    "package": "SMD 1206 SMD LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "45°",
+    "notes": "Common anode dual-color configuration."
+  }
+}

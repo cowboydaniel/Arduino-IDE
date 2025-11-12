@@ -1,0 +1,43 @@
+{
+  "id": "led_blue_8mm_diffused",
+  "name": "Blue 8mm Diffused LED",
+  "component_type": "led",
+  "description": "Diffused epoxy lens LED with wide viewing angle. This deep blue output comes in a 8mm package.",
+  "width": 36,
+  "height": 56,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        18,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        18,
+        56
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Blue",
+    "size": "8mm",
+    "forward_voltage": "3.0-3.4V",
+    "forward_current": "20mA",
+    "wavelength": "460-470nm",
+    "brightness": "390-910mcd",
+    "mounting_type": "THT",
+    "led_type": "Diffused",
+    "package": "8mm THT LED",
+    "lens_type": "Diffused",
+    "viewing_angle": "60°",
+    "notes": "Even light distribution through frosted lens."
+  }
+}

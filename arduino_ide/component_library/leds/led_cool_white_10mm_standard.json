@@ -1,0 +1,43 @@
+{
+  "id": "led_cool_white_10mm_standard",
+  "name": "Cool White 10mm Standard LED",
+  "component_type": "led",
+  "description": "Standard clear lens indicator LED. This cool white output comes in a 10mm package.",
+  "width": 44,
+  "height": 64,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        22,
+        64
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Cool White",
+    "size": "10mm",
+    "forward_voltage": "3.0-3.4V",
+    "forward_current": "20mA",
+    "wavelength": "CCT 6500K",
+    "brightness": "3600-5600mcd",
+    "mounting_type": "THT",
+    "led_type": "Standard",
+    "package": "10mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "25°",
+    "notes": "General-purpose indicator LED."
+  }
+}

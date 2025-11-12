@@ -1,0 +1,61 @@
+{
+  "id": "led_white_10mm_rgb",
+  "name": "White 10mm RGB LED",
+  "component_type": "led",
+  "description": "Multi-die LED with separate red, green, and blue channels. This neutral white phosphor LED comes in a 10mm package.",
+  "width": 44,
+  "height": 64,
+  "pins": [
+    {
+      "id": "common_anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "cathode_1",
+      "label": "R",
+      "pin_type": "ground",
+      "position": [
+        9,
+        64
+      ]
+    },
+    {
+      "id": "cathode_2",
+      "label": "G",
+      "pin_type": "ground",
+      "position": [
+        22,
+        64
+      ]
+    },
+    {
+      "id": "cathode_3",
+      "label": "B",
+      "pin_type": "ground",
+      "position": [
+        35,
+        64
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "White",
+    "size": "10mm",
+    "forward_voltage": "3.0-3.4V",
+    "forward_current": "20mA per channel",
+    "wavelength": "CCT 5600K",
+    "brightness": "3500-5500mcd",
+    "mounting_type": "THT",
+    "led_type": "RGB",
+    "package": "10mm THT LED",
+    "lens_type": "Clear",
+    "viewing_angle": "40°",
+    "notes": "Common anode tri-color LED."
+  }
+}
