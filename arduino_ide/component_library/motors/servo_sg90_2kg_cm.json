@@ -1,0 +1,46 @@
+{
+  "id": "servo_sg90_2kg_cm",
+  "name": "SG90 Micro Servo Motor",
+  "component_type": "servo",
+  "description": "SG90 9g micro servo motor with 2kg-cm torque for robotics and hobby projects",
+  "width": 60,
+  "height": 70,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [15, 0]
+    },
+    {
+      "id": "signal",
+      "label": "SIG",
+      "pin_type": "pwm",
+      "position": [30, 0]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [45, 0]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "TowerPro",
+    "part_number": "SG90",
+    "motor_type": "Micro Servo",
+    "weight": "9g",
+    "torque": "1.8kg-cm (4.8V)",
+    "torque_max": "2.5kg-cm (6V)",
+    "operating_voltage": "4.8-6V",
+    "operating_current_no_load": "100mA",
+    "operating_current_stall": "650mA",
+    "rotation_range": "180°",
+    "pulse_width_range": "1000-2000μs",
+    "neutral_pulse_width": "1500μs",
+    "operating_speed": "0.1s/60° (4.8V)",
+    "dead_band_width": "10μs",
+    "operating_temperature": "-30°C to 60°C",
+    "connector_type": "JR (Universal)"
+  }
+}
