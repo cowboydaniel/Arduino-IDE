@@ -639,6 +639,8 @@ class BoardManagerDialog(QDialog):
             # Connect worker signals for this specific operation
             worker.progress.connect(self.progress_bar.setValue)
             worker.status.connect(self.status_label.setText)
+            # Immediately refresh to show "In Progress" status
+            self.refresh_packages()
 
     def uninstall_package(self, name: str):
         """Uninstall a package"""
@@ -654,6 +656,8 @@ class BoardManagerDialog(QDialog):
             worker = self.board_manager.uninstall_package_async(name)
             if worker:
                 worker.status.connect(self.status_label.setText)
+                # Immediately refresh to show "In Progress" status
+                self.refresh_packages()
 
     def update_package(self, name: str):
         """Update a package"""
@@ -663,6 +667,8 @@ class BoardManagerDialog(QDialog):
         if worker:
             worker.progress.connect(self.progress_bar.setValue)
             worker.status.connect(self.status_label.setText)
+            # Immediately refresh to show "In Progress" status
+            self.refresh_packages()
 
     def cancel_operation(self, name: str):
         """Cancel an ongoing operation"""
