@@ -459,6 +459,11 @@ class BoardManagerDialog(QDialog):
         self.board_list.setHeaderLabels(["Board", "Architecture", ""])
         self.board_list.itemClicked.connect(self.on_board_clicked)
         self.board_list.itemDoubleClicked.connect(self.on_board_double_clicked)
+
+        # Adjust column widths - make Board column 3x wider
+        self.board_list.setColumnWidth(0, 400)  # Board column (3x wider)
+        self.board_list.setColumnWidth(1, 150)  # Architecture column
+
         right_layout.addWidget(self.board_list)
 
         # Board detail view
