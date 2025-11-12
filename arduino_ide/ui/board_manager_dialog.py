@@ -408,7 +408,7 @@ class BoardManagerDialog(QDialog):
 
         # Package list
         self.package_list = QTreeWidget()
-        self.package_list.setHeaderLabels(["Package", "Version", "Boards"])
+        self.package_list.setHeaderLabels(["Package", "Version", "Boards", "Status"])
         self.package_list.itemClicked.connect(self.on_package_clicked)
         self.package_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.package_list.customContextMenuRequested.connect(self.show_package_context_menu)
@@ -493,6 +493,12 @@ class BoardManagerDialog(QDialog):
             # Get board count from package metadata (works for both installed and non-installed)
             board_count = self._get_package_board_count(package)
             item.setText(2, str(board_count))
+
+            # Show operation status
+            if self.board_manager.is_operation_in_progress(package.name):
+                item.setText(3, "⏳ In progress...")
+            else:
+                item.setText(3, "")
 
             item.setData(0, Qt.UserRole, package)
             self.package_list.addTopLevelItem(item)
@@ -596,26 +602,41 @@ class BoardManagerDialog(QDialog):
 
         menu = QMenu(self)
 
-        if package.installed_version:
-            if package.has_update():
-                update_action = QAction("Update", self)
-                update_action.triggered.connect(lambda: self.update_package(package.name))
-                menu.addAction(update_action)
+        # Check if operation is in progress
+        in_progress = self.board_manager.is_operation_in_progress(package.name)
 
-            uninstall_action = QAction("Uninstall", self)
-            uninstall_action.triggered.connect(lambda: self.uninstall_package(package.name))
-            menu.addAction(uninstall_action)
+        if in_progress:
+            # Only show cancel option if operation is in progress
+            cancel_action = QAction("❌ Cancel", self)
+            cancel_action.triggered.connect(lambda: self.cancel_operation(package.name))
+            menu.addAction(cancel_action)
         else:
-            install_action = QAction("Install", self)
-            install_action.triggered.connect(lambda: self.install_package(package.name, package.latest_version))
-            menu.addAction(install_action)
+            # Show normal options only when no operation is in progress
+            if package.installed_version:
+                if package.has_update():
+                    update_action = QAction("Update", self)
+                    update_action.triggered.connect(lambda: self.update_package(package.name))
+                    menu.addAction(update_action)
+
+                uninstall_action = QAction("Uninstall", self)
+                uninstall_action.triggered.connect(lambda: self.uninstall_package(package.name))
+                menu.addAction(uninstall_action)
+            else:
+                install_action = QAction("Install", self)
+                install_action.triggered.connect(lambda: self.install_package(package.name, package.latest_version))
+                menu.addAction(install_action)
 
         menu.exec_(self.package_list.viewport().mapToGlobal(position))
 
     def install_package(self, name: str, version: str):
         """Install a package"""
         self.progress_bar.setVisible(True)
-        self.board_manager.install_package(name, version)
+        self.progress_bar.setValue(0)
+        worker = self.board_manager.install_package_async(name, version)
+        if worker:
+            # Connect worker signals for this specific operation
+            worker.progress.connect(self.progress_bar.setValue)
+            worker.status.connect(self.status_label.setText)
 
     def uninstall_package(self, name: str):
         """Uninstall a package"""
@@ -626,12 +647,28 @@ class BoardManagerDialog(QDialog):
         )
 
         if reply == QMessageBox.Yes:
-            self.board_manager.uninstall_package(name)
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setValue(0)
+            worker = self.board_manager.uninstall_package_async(name)
+            if worker:
+                worker.status.connect(self.status_label.setText)
 
     def update_package(self, name: str):
         """Update a package"""
         self.progress_bar.setVisible(True)
-        self.board_manager.update_package(name)
+        self.progress_bar.setValue(0)
+        worker = self.board_manager.update_package_async(name)
+        if worker:
+            worker.progress.connect(self.progress_bar.setValue)
+            worker.status.connect(self.status_label.setText)
+
+    def cancel_operation(self, name: str):
+        """Cancel an ongoing operation"""
+        if self.board_manager.cancel_operation(name):
+            self.status_label.setText(f"Cancelled operation for {name}")
+            self.progress_bar.setVisible(False)
+            # Refresh to update status column
+            self.refresh_packages()
 
     def manage_package_urls(self):
         """Manage package URLs"""
@@ -659,9 +696,14 @@ class BoardManagerDialog(QDialog):
     def on_package_changed(self, *args):
         """Handle package installation/uninstallation/update"""
         self.progress_bar.setVisible(False)
+        self.progress_bar.setValue(0)
 
         # Discover boards from newly installed/updated packages
         # This populates package.boards so the count shows correctly
         self.board_manager.get_all_boards()
 
         self.refresh_packages()
+
+        # Update status message
+        if args:
+            self.status_label.setText(f"Operation completed")
