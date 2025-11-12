@@ -23,6 +23,58 @@ from arduino_ide.services.circuit_service import (
 logger = logging.getLogger(__name__)
 
 
+class PinGraphicsItem(QGraphicsEllipseItem):
+    """Graphics item representing a clickable pin"""
+
+    def __init__(self, pin: Pin, pin_color: QColor, parent=None):
+        super().__init__(-3, -3, 6, 6, parent)
+
+        self.pin = pin
+        self.setBrush(QBrush(pin_color))
+        self.setPen(QPen(Qt.black, 1))
+        self.setZValue(2)  # Above component
+
+        # Make clickable
+        self.setFlag(QGraphicsItem.ItemIsSelectable, False)
+        self.setAcceptHoverEvents(True)
+
+        self._is_hovered = False
+
+
+    def hoverEnterEvent(self, event):
+        """Highlight pin on hover"""
+        self._is_hovered = True
+        self.setPen(QPen(QColor("#00FF00"), 2))  # Green highlight
+        self.setZValue(3)
+        super().hoverEnterEvent(event)
+
+
+    def hoverLeaveEvent(self, event):
+        """Remove highlight on hover leave"""
+        self._is_hovered = False
+        self.setPen(QPen(Qt.black, 1))
+        self.setZValue(2)
+        super().hoverLeaveEvent(event)
+
+
+    def mousePressEvent(self, event):
+        """Handle pin click"""
+        if event.button() == Qt.LeftButton:
+            # Get parent component and notify workspace
+            component_item = self.parentItem()
+            if component_item and hasattr(component_item, 'comp_instance'):
+                scene = self.scene()
+                if scene and hasattr(scene.views()[0], 'on_pin_clicked'):
+                    scene.views()[0].on_pin_clicked(
+                        component_item.comp_instance.instance_id,
+                        self.pin.id,
+                        self.scenePos()
+                    )
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+
 class ComponentGraphicsItem(QGraphicsRectItem):
     """Graphics item representing a circuit component"""
 
@@ -62,15 +114,9 @@ class ComponentGraphicsItem(QGraphicsRectItem):
         # Draw pins
         self.pin_items = {}
         for pin in comp_def.pins:
-            pin_item = QGraphicsEllipseItem(
-                pin.position[0] - 3,
-                pin.position[1] - 3,
-                6, 6,
-                self
-            )
-            pin_item.setBrush(QBrush(self._get_pin_color(pin.pin_type)))
-            pin_item.setPen(QPen(Qt.black, 1))
-            pin_item.setZValue(1)
+            # Create clickable pin item
+            pin_item = PinGraphicsItem(pin, self._get_pin_color(pin.pin_type), self)
+            pin_item.setPos(pin.position[0], pin.position[1])
 
             # Add pin label
             pin_label = QGraphicsTextItem(self)
@@ -118,7 +164,21 @@ class ComponentGraphicsItem(QGraphicsRectItem):
             self.comp_instance.x = new_pos.x()
             self.comp_instance.y = new_pos.y()
 
+            # Update connected wires
+            if self.scene() and self.scene().views():
+                view = self.scene().views()[0]
+                if hasattr(view, '_update_component_connections'):
+                    view._update_component_connections(self.comp_instance.instance_id)
+
         return super().itemChange(change, value)
+
+
+    def get_pin_scene_pos(self, pin_id: str) -> Optional[QPointF]:
+        """Get the scene position of a pin"""
+        if pin_id in self.pin_items:
+            pin_item, _ = self.pin_items[pin_id]
+            return pin_item.scenePos()
+        return None
 
 
 class ConnectionGraphicsItem(QGraphicsLineItem):
@@ -218,6 +278,13 @@ class CircuitWorkspaceView(QGraphicsView):
         self._is_panning = False
         self._pan_start_pos = None
 
+        # Connection mode state
+        self._connection_mode = False
+        self._connection_start_component = None
+        self._connection_start_pin = None
+        self._connection_start_pos = None
+        self._rubber_band_line = None
+
         # Connect to service
         self.service.component_added.connect(self._on_component_added)
         self.service.component_removed.connect(self._on_component_removed)
@@ -268,23 +335,20 @@ class CircuitWorkspaceView(QGraphicsView):
         if not connection:
             return
 
-        # Get component positions
+        # Get component items
         from_comp_item = self.component_items.get(connection.from_component)
         to_comp_item = self.component_items.get(connection.to_component)
 
         if not from_comp_item or not to_comp_item:
             return
 
-        # Calculate pin positions (simplified - just use component centers for now)
-        from_pos = from_comp_item.scenePos() + QPointF(
-            from_comp_item.comp_def.width / 2,
-            from_comp_item.comp_def.height / 2
-        )
+        # Get actual pin positions
+        from_pos = from_comp_item.get_pin_scene_pos(connection.from_pin)
+        to_pos = to_comp_item.get_pin_scene_pos(connection.to_pin)
 
-        to_pos = to_comp_item.scenePos() + QPointF(
-            to_comp_item.comp_def.width / 2,
-            to_comp_item.comp_def.height / 2
-        )
+        if not from_pos or not to_pos:
+            logger.warning(f"Could not find pin positions for connection {connection_id}")
+            return
 
         # Create connection line
         conn_item = ConnectionGraphicsItem(connection, from_pos, to_pos)
@@ -305,6 +369,97 @@ class CircuitWorkspaceView(QGraphicsView):
             logger.debug(f"Removed connection from circuit: {connection_id}")
 
 
+    def on_pin_clicked(self, component_id: str, pin_id: str, pin_pos: QPointF):
+        """Handle pin click - start or complete connection"""
+        if not self._connection_mode:
+            # Start connection mode
+            self._start_connection(component_id, pin_id, pin_pos)
+        else:
+            # Complete connection
+            self._complete_connection(component_id, pin_id)
+
+
+    def _start_connection(self, component_id: str, pin_id: str, pin_pos: QPointF):
+        """Start connection mode"""
+        self._connection_mode = True
+        self._connection_start_component = component_id
+        self._connection_start_pin = pin_id
+        self._connection_start_pos = pin_pos
+
+        # Create rubber band line
+        self._rubber_band_line = QGraphicsLineItem()
+        self._rubber_band_line.setPen(QPen(QColor("#00FF00"), 2, Qt.DashLine))
+        self._rubber_band_line.setZValue(-0.5)
+        self._rubber_band_line.setLine(QLineF(pin_pos, pin_pos))
+        self.scene.addItem(self._rubber_band_line)
+
+        # Change cursor
+        self.setCursor(Qt.CrossCursor)
+
+        logger.debug(f"Started connection from {component_id}:{pin_id}")
+
+
+    def _complete_connection(self, to_component_id: str, to_pin_id: str):
+        """Complete connection to target pin"""
+        # Don't allow connection to same pin
+        if (self._connection_start_component == to_component_id and
+            self._connection_start_pin == to_pin_id):
+            self._cancel_connection()
+            return
+
+        # Create connection in service
+        try:
+            self.service.add_connection(
+                self._connection_start_component,
+                self._connection_start_pin,
+                to_component_id,
+                to_pin_id,
+                "#000000"  # Black wire by default
+            )
+            logger.debug(f"Connected {self._connection_start_component}:{self._connection_start_pin} to {to_component_id}:{to_pin_id}")
+        except Exception as e:
+            logger.error(f"Failed to create connection: {e}")
+
+        # Clean up connection mode
+        self._cancel_connection()
+
+
+    def _cancel_connection(self):
+        """Cancel connection mode"""
+        if self._rubber_band_line:
+            self.scene.removeItem(self._rubber_band_line)
+            self._rubber_band_line = None
+
+        self._connection_mode = False
+        self._connection_start_component = None
+        self._connection_start_pin = None
+        self._connection_start_pos = None
+        self.setCursor(Qt.ArrowCursor)
+
+        logger.debug("Cancelled connection mode")
+
+
+    def _update_component_connections(self, component_id: str):
+        """Update all connections for a component when it moves"""
+        connections = self.service.get_circuit_connections()
+
+        for connection in connections:
+            # Check if this component is involved in this connection
+            if connection.from_component == component_id or connection.to_component == component_id:
+                conn_item = self.connection_items.get(connection.connection_id)
+                if conn_item:
+                    # Get updated pin positions
+                    from_comp_item = self.component_items.get(connection.from_component)
+                    to_comp_item = self.component_items.get(connection.to_component)
+
+                    if from_comp_item and to_comp_item:
+                        from_pos = from_comp_item.get_pin_scene_pos(connection.from_pin)
+                        to_pos = to_comp_item.get_pin_scene_pos(connection.to_pin)
+
+                        if from_pos and to_pos:
+                            conn_item.setLine(QLineF(from_pos, to_pos))
+
+
     def add_component_at_center(self, component_id: str):
         """Add a component at the center of the view"""
         center = self.mapToScene(self.viewport().rect().center())
@@ -321,6 +476,12 @@ class CircuitWorkspaceView(QGraphicsView):
 
     def mousePressEvent(self, event):
         """Handle mouse press - enable panning with middle button or Ctrl+left"""
+        # Right-click cancels connection mode
+        if event.button() == Qt.RightButton and self._connection_mode:
+            self._cancel_connection()
+            event.accept()
+            return
+
         if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() & Qt.ControlModifier):
             self._is_panning = True
             self._pan_start_pos = event.pos()
@@ -331,7 +492,7 @@ class CircuitWorkspaceView(QGraphicsView):
 
 
     def mouseMoveEvent(self, event):
-        """Handle mouse move - pan the view if panning is active"""
+        """Handle mouse move - pan the view if panning is active or update rubber band"""
         if self._is_panning and self._pan_start_pos:
             delta = event.pos() - self._pan_start_pos
             self._pan_start_pos = event.pos()
@@ -339,6 +500,11 @@ class CircuitWorkspaceView(QGraphicsView):
             # Pan by adjusting scrollbars
             self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            event.accept()
+        elif self._connection_mode and self._rubber_band_line and self._connection_start_pos:
+            # Update rubber band line to follow mouse
+            mouse_pos = self.mapToScene(event.pos())
+            self._rubber_band_line.setLine(QLineF(self._connection_start_pos, mouse_pos))
             event.accept()
         else:
             super().mouseMoveEvent(event)
@@ -368,6 +534,15 @@ class CircuitWorkspaceView(QGraphicsView):
         else:
             # Normal scrolling
             super().wheelEvent(event)
+
+
+    def keyPressEvent(self, event):
+        """Handle key press - ESC cancels connection mode"""
+        if event.key() == Qt.Key_Escape and self._connection_mode:
+            self._cancel_connection()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
     def drawBackground(self, painter, rect):
@@ -738,7 +913,9 @@ class CircuitDesignerWindow(QMainWindow):
             </ul>
             <p><b>Controls:</b></p>
             <ul>
-            <li>Left-click and drag: Move components</li>
+            <li>Left-click and drag component: Move component</li>
+            <li>Left-click pin: Start wire connection (click another pin to complete)</li>
+            <li>Right-click or ESC: Cancel wire connection</li>
             <li>Middle-click and drag or Ctrl+Left-drag: Pan view</li>
             <li>Ctrl+Mouse wheel: Zoom in/out</li>
             <li>Mouse wheel: Scroll vertically</li>
