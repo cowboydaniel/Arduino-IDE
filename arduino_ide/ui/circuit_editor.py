@@ -208,11 +208,15 @@ class CircuitWorkspaceView(QGraphicsView):
 
         # Setup view
         self.setRenderHint(QPainter.Antialiasing)
-        self.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.setDragMode(QGraphicsView.NoDrag)  # Allow component dragging
         self.setSceneRect(-2000, -2000, 4000, 4000)
 
         # Grid background
         self.setBackgroundBrush(QBrush(QColor("#FFFFFF")))
+
+        # Enable panning with middle mouse button
+        self._is_panning = False
+        self._pan_start_pos = None
 
         # Connect to service
         self.service.component_added.connect(self._on_component_added)
@@ -313,6 +317,57 @@ class CircuitWorkspaceView(QGraphicsView):
         self.scene.clear()
         self.component_items.clear()
         self.connection_items.clear()
+
+
+    def mousePressEvent(self, event):
+        """Handle mouse press - enable panning with middle button or Ctrl+left"""
+        if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() & Qt.ControlModifier):
+            self._is_panning = True
+            self._pan_start_pos = event.pos()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move - pan the view if panning is active"""
+        if self._is_panning and self._pan_start_pos:
+            delta = event.pos() - self._pan_start_pos
+            self._pan_start_pos = event.pos()
+
+            # Pan by adjusting scrollbars
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release - stop panning"""
+        if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and self._is_panning):
+            self._is_panning = False
+            self._pan_start_pos = None
+            self.setCursor(Qt.ArrowCursor)
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+
+    def wheelEvent(self, event):
+        """Handle mouse wheel - zoom in/out"""
+        if event.modifiers() & Qt.ControlModifier:
+            # Zoom with Ctrl+Wheel
+            zoom_factor = 1.15
+            if event.angleDelta().y() > 0:
+                self.scale(zoom_factor, zoom_factor)
+            else:
+                self.scale(1 / zoom_factor, 1 / zoom_factor)
+            event.accept()
+        else:
+            # Normal scrolling
+            super().wheelEvent(event)
 
 
     def drawBackground(self, painter, rect):
@@ -680,6 +735,13 @@ class CircuitDesignerWindow(QMainWindow):
             <li>Circuit validation</li>
             <li>100+ electronic components</li>
             <li>Save/load circuits</li>
+            </ul>
+            <p><b>Controls:</b></p>
+            <ul>
+            <li>Left-click and drag: Move components</li>
+            <li>Middle-click and drag or Ctrl+Left-drag: Pan view</li>
+            <li>Ctrl+Mouse wheel: Zoom in/out</li>
+            <li>Mouse wheel: Scroll vertically</li>
             </ul>
             <p>Part of Arduino IDE Modern</p>"""
         )
