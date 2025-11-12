@@ -1,0 +1,309 @@
+{
+  "id": "ic_mcu_mcu07_tqfp32",
+  "name": "Orion Gateway28X MCU (TQFP-32)",
+  "component_type": "ic",
+  "description": "Template for Orion Gateway28X MCU with TQFP-32 footprint",
+  "width": 260,
+  "height": 260,
+  "pins": [
+    {
+      "id": "PA0",
+      "label": "PA0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PA1",
+      "label": "PA1",
+      "pin_type": "digital",
+      "position": [
+        24,
+        0
+      ]
+    },
+    {
+      "id": "PA2",
+      "label": "PA2",
+      "pin_type": "digital",
+      "position": [
+        48,
+        0
+      ]
+    },
+    {
+      "id": "PA3",
+      "label": "PA3",
+      "pin_type": "digital",
+      "position": [
+        72,
+        0
+      ]
+    },
+    {
+      "id": "PA4",
+      "label": "PA4",
+      "pin_type": "digital",
+      "position": [
+        96,
+        0
+      ]
+    },
+    {
+      "id": "PA5",
+      "label": "PA5",
+      "pin_type": "digital",
+      "position": [
+        120,
+        0
+      ]
+    },
+    {
+      "id": "PA6",
+      "label": "PA6",
+      "pin_type": "digital",
+      "position": [
+        144,
+        0
+      ]
+    },
+    {
+      "id": "PA7",
+      "label": "PA7",
+      "pin_type": "digital",
+      "position": [
+        168,
+        0
+      ]
+    },
+    {
+      "id": "PB0",
+      "label": "PB0",
+      "pin_type": "digital",
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "id": "PB1",
+      "label": "PB1",
+      "pin_type": "digital",
+      "position": [
+        240,
+        24
+      ]
+    },
+    {
+      "id": "PB2",
+      "label": "PB2",
+      "pin_type": "digital",
+      "position": [
+        240,
+        48
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        240,
+        72
+      ]
+    },
+    {
+      "id": "PB4",
+      "label": "PB4",
+      "pin_type": "digital",
+      "position": [
+        240,
+        96
+      ]
+    },
+    {
+      "id": "PB5",
+      "label": "PB5",
+      "pin_type": "digital",
+      "position": [
+        240,
+        120
+      ]
+    },
+    {
+      "id": "PB6",
+      "label": "PB6",
+      "pin_type": "digital",
+      "position": [
+        240,
+        144
+      ]
+    },
+    {
+      "id": "PB7",
+      "label": "PB7",
+      "pin_type": "digital",
+      "position": [
+        240,
+        168
+      ]
+    },
+    {
+      "id": "PC0",
+      "label": "PC0",
+      "pin_type": "digital",
+      "position": [
+        240,
+        240
+      ]
+    },
+    {
+      "id": "PC1",
+      "label": "PC1",
+      "pin_type": "digital",
+      "position": [
+        216,
+        240
+      ]
+    },
+    {
+      "id": "PC2",
+      "label": "PC2",
+      "pin_type": "digital",
+      "position": [
+        192,
+        240
+      ]
+    },
+    {
+      "id": "PC3",
+      "label": "PC3",
+      "pin_type": "digital",
+      "position": [
+        168,
+        240
+      ]
+    },
+    {
+      "id": "PC4",
+      "label": "PC4",
+      "pin_type": "digital",
+      "position": [
+        144,
+        240
+      ]
+    },
+    {
+      "id": "PC5",
+      "label": "PC5",
+      "pin_type": "digital",
+      "position": [
+        120,
+        240
+      ]
+    },
+    {
+      "id": "PC6",
+      "label": "PC6",
+      "pin_type": "digital",
+      "position": [
+        96,
+        240
+      ]
+    },
+    {
+      "id": "PC7",
+      "label": "PC7",
+      "pin_type": "digital",
+      "position": [
+        72,
+        240
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        0,
+        216
+      ]
+    },
+    {
+      "id": "AVCC",
+      "label": "AVCC",
+      "pin_type": "power",
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "id": "AREF",
+      "label": "AREF",
+      "pin_type": "analog",
+      "position": [
+        0,
+        168
+      ]
+    },
+    {
+      "id": "PD0",
+      "label": "PD0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        144
+      ]
+    },
+    {
+      "id": "PD1",
+      "label": "PD1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        120
+      ]
+    },
+    {
+      "id": "PD2",
+      "label": "PD2",
+      "pin_type": "digital",
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "id": "PD3",
+      "label": "PD3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        72
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU07-TQFP32",
+    "package": "TQFP-32",
+    "operating_limits": {
+      "supply_voltage": "2.7V to 5.5V",
+      "temperature": "-40\u00b0C to 105\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu07.pdf",
+    "flash_size_kb": 64
+  }
+}

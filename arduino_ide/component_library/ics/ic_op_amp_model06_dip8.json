@@ -1,0 +1,93 @@
+{
+  "id": "ic_op_amp_model06_dip8",
+  "name": "Atlas 746 Precision Op Amp (PDIP-8)",
+  "component_type": "ic",
+  "description": "Template for Atlas 746 Precision Op Amp in PDIP-8",
+  "width": 200,
+  "height": 280,
+  "pins": [
+    {
+      "id": "OFFSET1",
+      "label": "Offset",
+      "pin_type": "analog",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "IN-",
+      "label": "-",
+      "pin_type": "analog",
+      "position": [
+        0,
+        40
+      ]
+    },
+    {
+      "id": "IN+",
+      "label": "+",
+      "pin_type": "analog",
+      "position": [
+        0,
+        80
+      ]
+    },
+    {
+      "id": "V-",
+      "label": "V-",
+      "pin_type": "power",
+      "position": [
+        0,
+        120
+      ]
+    },
+    {
+      "id": "OFFSET2",
+      "label": "Offset",
+      "pin_type": "analog",
+      "position": [
+        200,
+        120
+      ]
+    },
+    {
+      "id": "OUT",
+      "label": "OUT",
+      "pin_type": "analog",
+      "position": [
+        200,
+        80
+      ]
+    },
+    {
+      "id": "V+",
+      "label": "V+",
+      "pin_type": "power",
+      "position": [
+        200,
+        40
+      ]
+    },
+    {
+      "id": "NC",
+      "label": "NC",
+      "pin_type": "digital",
+      "position": [
+        200,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Atlas Analog",
+    "part_number": "Atlas-MODEL06-DIP8",
+    "package": "PDIP-8",
+    "operating_limits": {
+      "supply_voltage": "\u00b15V to \u00b118V",
+      "temperature": "-40\u00b0C to 85\u00b0C"
+    },
+    "datasheet_url": "https://example.com/datasheets/model06.pdf",
+    "channels": 1
+  }
+}

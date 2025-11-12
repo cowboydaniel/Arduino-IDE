@@ -1,0 +1,93 @@
+{
+  "id": "ic_op_amp_model05_soic8",
+  "name": "Atlas 745 Precision Op Amp (SOIC-8)",
+  "component_type": "ic",
+  "description": "Template for Atlas 745 Precision Op Amp in SOIC-8",
+  "width": 180,
+  "height": 240,
+  "pins": [
+    {
+      "id": "OFFSET1",
+      "label": "Offset",
+      "pin_type": "analog",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "IN-",
+      "label": "-",
+      "pin_type": "analog",
+      "position": [
+        0,
+        32
+      ]
+    },
+    {
+      "id": "IN+",
+      "label": "+",
+      "pin_type": "analog",
+      "position": [
+        0,
+        64
+      ]
+    },
+    {
+      "id": "V-",
+      "label": "V-",
+      "pin_type": "power",
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "id": "OFFSET2",
+      "label": "Offset",
+      "pin_type": "analog",
+      "position": [
+        180,
+        96
+      ]
+    },
+    {
+      "id": "OUT",
+      "label": "OUT",
+      "pin_type": "analog",
+      "position": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "V+",
+      "label": "V+",
+      "pin_type": "power",
+      "position": [
+        180,
+        32
+      ]
+    },
+    {
+      "id": "NC",
+      "label": "NC",
+      "pin_type": "digital",
+      "position": [
+        180,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Atlas Analog",
+    "part_number": "Atlas-MODEL05-SOIC8",
+    "package": "SOIC-8",
+    "operating_limits": {
+      "supply_voltage": "\u00b15V to \u00b118V",
+      "temperature": "-40\u00b0C to 85\u00b0C"
+    },
+    "datasheet_url": "https://example.com/datasheets/model05.pdf",
+    "channels": 1
+  }
+}

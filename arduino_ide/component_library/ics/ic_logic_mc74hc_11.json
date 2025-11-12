@@ -1,0 +1,148 @@
+{
+  "id": "ic_logic_mc74hc_11",
+  "name": "MC74HC Triple 3-Input AND Gate",
+  "component_type": "ic",
+  "description": "Template for Triple 3-Input AND Gate in the MC74HC logic family",
+  "width": 220,
+  "height": 320,
+  "pins": [
+    {
+      "id": "1A",
+      "label": "1A",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "1B",
+      "label": "1B",
+      "pin_type": "digital",
+      "position": [
+        0,
+        32
+      ]
+    },
+    {
+      "id": "1C",
+      "label": "1C",
+      "pin_type": "digital",
+      "position": [
+        0,
+        64
+      ]
+    },
+    {
+      "id": "1Y",
+      "label": "1Y",
+      "pin_type": "digital",
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "id": "2A",
+      "label": "2A",
+      "pin_type": "digital",
+      "position": [
+        0,
+        128
+      ]
+    },
+    {
+      "id": "2B",
+      "label": "2B",
+      "pin_type": "digital",
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "id": "2Y",
+      "label": "2Y",
+      "pin_type": "digital",
+      "position": [
+        220,
+        192
+      ]
+    },
+    {
+      "id": "2C",
+      "label": "2C",
+      "pin_type": "digital",
+      "position": [
+        220,
+        160
+      ]
+    },
+    {
+      "id": "3A",
+      "label": "3A",
+      "pin_type": "digital",
+      "position": [
+        220,
+        128
+      ]
+    },
+    {
+      "id": "3B",
+      "label": "3B",
+      "pin_type": "digital",
+      "position": [
+        220,
+        96
+      ]
+    },
+    {
+      "id": "3C",
+      "label": "3C",
+      "pin_type": "digital",
+      "position": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "3Y",
+      "label": "3Y",
+      "pin_type": "digital",
+      "position": [
+        220,
+        32
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        220,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "onsemi",
+    "part_number": "MC74HC11NG",
+    "package": "PDIP-14",
+    "operating_limits": {
+      "supply_voltage": "2V to 6V",
+      "temperature": "-55\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://www.onsemi.com/pdf/datasheet/mc74hc11.pdf",
+    "logic_function": "Triple 3-Input AND Gate",
+    "logic_family": "MC74HC"
+  }
+}

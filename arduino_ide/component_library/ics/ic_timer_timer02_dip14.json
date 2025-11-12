@@ -1,0 +1,147 @@
+{
+  "id": "ic_timer_timer02_dip14",
+  "name": "Astra 556 Dual Timer (PDIP-14)",
+  "component_type": "ic",
+  "description": "Template for Astra 556 Dual Timer packaged as PDIP-14",
+  "width": 220,
+  "height": 320,
+  "pins": [
+    {
+      "id": "DIS1",
+      "label": "DIS1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "TRIG1",
+      "label": "TR1",
+      "pin_type": "analog",
+      "position": [
+        0,
+        32
+      ]
+    },
+    {
+      "id": "OUT1",
+      "label": "OUT1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        64
+      ]
+    },
+    {
+      "id": "RESET1",
+      "label": "RST1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "id": "CTRL1",
+      "label": "CTRL1",
+      "pin_type": "analog",
+      "position": [
+        0,
+        128
+      ]
+    },
+    {
+      "id": "TH1",
+      "label": "TH1",
+      "pin_type": "analog",
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "id": "TH2",
+      "label": "TH2",
+      "pin_type": "analog",
+      "position": [
+        220,
+        192
+      ]
+    },
+    {
+      "id": "CTRL2",
+      "label": "CTRL2",
+      "pin_type": "analog",
+      "position": [
+        220,
+        160
+      ]
+    },
+    {
+      "id": "RESET2",
+      "label": "RST2",
+      "pin_type": "digital",
+      "position": [
+        220,
+        128
+      ]
+    },
+    {
+      "id": "OUT2",
+      "label": "OUT2",
+      "pin_type": "digital",
+      "position": [
+        220,
+        96
+      ]
+    },
+    {
+      "id": "TRIG2",
+      "label": "TR2",
+      "pin_type": "analog",
+      "position": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "DIS2",
+      "label": "DIS2",
+      "pin_type": "digital",
+      "position": [
+        220,
+        32
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        220,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Nova Circuits",
+    "part_number": "Astra-TIMER02-DIP14",
+    "package": "PDIP-14",
+    "operating_limits": {
+      "supply_voltage": "4.5V to 18V",
+      "temperature": "-40\u00b0C to 105\u00b0C"
+    },
+    "datasheet_url": "https://example.com/datasheets/timer02.pdf",
+    "channels": 2
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "id": "ic_op_amp_model14_tssop8",
+  "name": "Atlas 763 Dual Op Amp (TSSOP-8)",
+  "component_type": "ic",
+  "description": "Template for Atlas 763 Dual Op Amp in TSSOP-8",
+  "width": 160,
+  "height": 220,
+  "pins": [
+    {
+      "id": "OUTA",
+      "label": "OUTA",
+      "pin_type": "analog",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "INA-",
+      "label": "A-",
+      "pin_type": "analog",
+      "position": [
+        0,
+        28
+      ]
+    },
+    {
+      "id": "INA+",
+      "label": "A+",
+      "pin_type": "analog",
+      "position": [
+        0,
+        56
+      ]
+    },
+    {
+      "id": "V-",
+      "label": "V-",
+      "pin_type": "power",
+      "position": [
+        0,
+        84
+      ]
+    },
+    {
+      "id": "INB+",
+      "label": "B+",
+      "pin_type": "analog",
+      "position": [
+        160,
+        84
+      ]
+    },
+    {
+      "id": "INB-",
+      "label": "B-",
+      "pin_type": "analog",
+      "position": [
+        160,
+        56
+      ]
+    },
+    {
+      "id": "OUTB",
+      "label": "OUTB",
+      "pin_type": "analog",
+      "position": [
+        160,
+        28
+      ]
+    },
+    {
+      "id": "V+",
+      "label": "V+",
+      "pin_type": "power",
+      "position": [
+        160,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Atlas Analog",
+    "part_number": "Atlas-MODEL14-TSSOP8",
+    "package": "TSSOP-8",
+    "operating_limits": {
+      "supply_voltage": "3V to 36V",
+      "temperature": "-40\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://example.com/datasheets/model14.pdf",
+    "channels": 2
+  }
+}
