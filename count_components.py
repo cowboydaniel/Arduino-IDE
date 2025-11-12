@@ -9,7 +9,10 @@ def count_components():
     counts = {}
 
     # Arduino boards
-    counts["Arduino Boards"] = 1
+    from pathlib import Path
+
+    board_dir = Path("arduino_ide/component_library/arduino_boards")
+    counts["Arduino Boards"] = sum(1 for path in board_dir.glob("*.json"))
 
     # LEDs
     led_colors = 14  # Red, Green, Blue, Yellow, White, Orange, Pink, Purple, Cyan, Amber, Infrared, UV, Cool White, Warm White

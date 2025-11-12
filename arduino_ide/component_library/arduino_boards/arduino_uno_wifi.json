@@ -1,8 +1,8 @@
 {
-  "id": "arduino_uno",
-  "name": "Arduino Uno",
+  "id": "arduino_uno_wifi",
+  "name": "Arduino Uno WiFi",
   "component_type": "arduino_board",
-  "description": "Arduino Uno R3 microcontroller board based on ATmega328P",
+  "description": "First-generation Arduino Uno with integrated ESP8266 WiFi module",
   "width": 260,
   "height": 160,
   "pins": [
@@ -251,7 +251,7 @@
     }
   ],
   "metadata": {
-    "fqbn": "arduino:avr:uno",
+    "fqbn": "arduino:avr:unoWiFi",
     "manufacturer": "Arduino",
     "microcontroller": "ATmega328P",
     "clock_speed": "16MHz",
@@ -264,8 +264,9 @@
     "flash_memory": "32KB (0.5KB bootloader)",
     "sram": "2KB",
     "eeprom": "1KB",
+    "wireless_module": "ESP8266",
     "usb_interface": "ATmega16U2",
-    "datasheet_url": "https://docs.arduino.cc/hardware/uno-rev3",
+    "datasheet_url": "https://docs.arduino.cc/hardware/uno-wifi",
     "dimensions_mm": "68.6 x 53.4"
   }
 }
