@@ -1,0 +1,201 @@
+{
+  "id": "ic_mcu_mcu04_soic20",
+  "name": "Orion Control20 MCU (SOIC-20)",
+  "component_type": "ic",
+  "description": "Template for Orion Control20 MCU with SOIC-20 footprint",
+  "width": 240,
+  "height": 360,
+  "pins": [
+    {
+      "id": "PA0",
+      "label": "PA0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PA1",
+      "label": "PA1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        24
+      ]
+    },
+    {
+      "id": "PA2",
+      "label": "PA2",
+      "pin_type": "digital",
+      "position": [
+        0,
+        48
+      ]
+    },
+    {
+      "id": "PA3",
+      "label": "PA3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        72
+      ]
+    },
+    {
+      "id": "PA4",
+      "label": "PA4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "id": "PA5",
+      "label": "PA5",
+      "pin_type": "digital",
+      "position": [
+        0,
+        120
+      ]
+    },
+    {
+      "id": "PA6",
+      "label": "PA6",
+      "pin_type": "digital",
+      "position": [
+        0,
+        144
+      ]
+    },
+    {
+      "id": "PA7",
+      "label": "PA7",
+      "pin_type": "digital",
+      "position": [
+        0,
+        168
+      ]
+    },
+    {
+      "id": "PB0",
+      "label": "PB0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "id": "PB1",
+      "label": "PB1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        216
+      ]
+    },
+    {
+      "id": "PB2",
+      "label": "PB2",
+      "pin_type": "digital",
+      "position": [
+        240,
+        216
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        240,
+        192
+      ]
+    },
+    {
+      "id": "PB4",
+      "label": "PB4",
+      "pin_type": "digital",
+      "position": [
+        240,
+        168
+      ]
+    },
+    {
+      "id": "PB5",
+      "label": "PB5",
+      "pin_type": "digital",
+      "position": [
+        240,
+        144
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        240,
+        120
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        240,
+        96
+      ]
+    },
+    {
+      "id": "PC0",
+      "label": "PC0",
+      "pin_type": "digital",
+      "position": [
+        240,
+        72
+      ]
+    },
+    {
+      "id": "PC1",
+      "label": "PC1",
+      "pin_type": "digital",
+      "position": [
+        240,
+        48
+      ]
+    },
+    {
+      "id": "PC2",
+      "label": "PC2",
+      "pin_type": "digital",
+      "position": [
+        240,
+        24
+      ]
+    },
+    {
+      "id": "PC3",
+      "label": "PC3",
+      "pin_type": "digital",
+      "position": [
+        240,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU04-SOIC20",
+    "package": "SOIC-20",
+    "operating_limits": {
+      "supply_voltage": "2.0V to 5.5V",
+      "temperature": "-40\u00b0C to 105\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu04.pdf",
+    "flash_size_kb": 64
+  }
+}

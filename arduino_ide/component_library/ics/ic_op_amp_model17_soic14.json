@@ -1,0 +1,147 @@
+{
+  "id": "ic_op_amp_model17_soic14",
+  "name": "Atlas 770 Quad Op Amp (SOIC-14)",
+  "component_type": "ic",
+  "description": "Template for Atlas 770 Quad Op Amp in SOIC-14",
+  "width": 200,
+  "height": 280,
+  "pins": [
+    {
+      "id": "OUTA",
+      "label": "OUTA",
+      "pin_type": "analog",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "INA-",
+      "label": "A-",
+      "pin_type": "analog",
+      "position": [
+        0,
+        28
+      ]
+    },
+    {
+      "id": "INA+",
+      "label": "A+",
+      "pin_type": "analog",
+      "position": [
+        0,
+        56
+      ]
+    },
+    {
+      "id": "VSS",
+      "label": "VSS",
+      "pin_type": "ground",
+      "position": [
+        0,
+        84
+      ]
+    },
+    {
+      "id": "INB+",
+      "label": "B+",
+      "pin_type": "analog",
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "id": "INB-",
+      "label": "B-",
+      "pin_type": "analog",
+      "position": [
+        0,
+        140
+      ]
+    },
+    {
+      "id": "OUTB",
+      "label": "OUTB",
+      "pin_type": "analog",
+      "position": [
+        0,
+        168
+      ]
+    },
+    {
+      "id": "OUTC",
+      "label": "OUTC",
+      "pin_type": "analog",
+      "position": [
+        200,
+        168
+      ]
+    },
+    {
+      "id": "INC-",
+      "label": "C-",
+      "pin_type": "analog",
+      "position": [
+        200,
+        140
+      ]
+    },
+    {
+      "id": "INC+",
+      "label": "C+",
+      "pin_type": "analog",
+      "position": [
+        200,
+        112
+      ]
+    },
+    {
+      "id": "VDD",
+      "label": "VDD",
+      "pin_type": "power",
+      "position": [
+        200,
+        84
+      ]
+    },
+    {
+      "id": "IND+",
+      "label": "D+",
+      "pin_type": "analog",
+      "position": [
+        200,
+        56
+      ]
+    },
+    {
+      "id": "IND-",
+      "label": "D-",
+      "pin_type": "analog",
+      "position": [
+        200,
+        28
+      ]
+    },
+    {
+      "id": "OUTD",
+      "label": "OUTD",
+      "pin_type": "analog",
+      "position": [
+        200,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Atlas Analog",
+    "part_number": "Atlas-MODEL17-SOIC14",
+    "package": "SOIC-14",
+    "operating_limits": {
+      "supply_voltage": "3V to 36V",
+      "temperature": "-40\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://example.com/datasheets/model17.pdf",
+    "channels": 4
+  }
+}

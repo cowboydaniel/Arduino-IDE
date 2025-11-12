@@ -1,0 +1,273 @@
+{
+  "id": "ic_mcu_mcu06_tssop28",
+  "name": "Orion Gateway28 MCU (TSSOP-28)",
+  "component_type": "ic",
+  "description": "Template for Orion Gateway28 MCU with TSSOP-28 footprint",
+  "width": 260,
+  "height": 400,
+  "pins": [
+    {
+      "id": "PA0",
+      "label": "PA0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PA1",
+      "label": "PA1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        18
+      ]
+    },
+    {
+      "id": "PA2",
+      "label": "PA2",
+      "pin_type": "digital",
+      "position": [
+        0,
+        36
+      ]
+    },
+    {
+      "id": "PA3",
+      "label": "PA3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        54
+      ]
+    },
+    {
+      "id": "PA4",
+      "label": "PA4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        72
+      ]
+    },
+    {
+      "id": "PA5",
+      "label": "PA5",
+      "pin_type": "digital",
+      "position": [
+        0,
+        90
+      ]
+    },
+    {
+      "id": "PA6",
+      "label": "PA6",
+      "pin_type": "digital",
+      "position": [
+        0,
+        108
+      ]
+    },
+    {
+      "id": "PA7",
+      "label": "PA7",
+      "pin_type": "digital",
+      "position": [
+        0,
+        126
+      ]
+    },
+    {
+      "id": "PB0",
+      "label": "PB0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        144
+      ]
+    },
+    {
+      "id": "PB1",
+      "label": "PB1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        162
+      ]
+    },
+    {
+      "id": "PB2",
+      "label": "PB2",
+      "pin_type": "digital",
+      "position": [
+        0,
+        180
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        198
+      ]
+    },
+    {
+      "id": "PB4",
+      "label": "PB4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        216
+      ]
+    },
+    {
+      "id": "PB5",
+      "label": "PB5",
+      "pin_type": "digital",
+      "position": [
+        0,
+        234
+      ]
+    },
+    {
+      "id": "PB6",
+      "label": "PB6",
+      "pin_type": "digital",
+      "position": [
+        260,
+        234
+      ]
+    },
+    {
+      "id": "PB7",
+      "label": "PB7",
+      "pin_type": "digital",
+      "position": [
+        260,
+        216
+      ]
+    },
+    {
+      "id": "PC0",
+      "label": "PC0",
+      "pin_type": "digital",
+      "position": [
+        260,
+        198
+      ]
+    },
+    {
+      "id": "PC1",
+      "label": "PC1",
+      "pin_type": "digital",
+      "position": [
+        260,
+        180
+      ]
+    },
+    {
+      "id": "PC2",
+      "label": "PC2",
+      "pin_type": "digital",
+      "position": [
+        260,
+        162
+      ]
+    },
+    {
+      "id": "PC3",
+      "label": "PC3",
+      "pin_type": "digital",
+      "position": [
+        260,
+        144
+      ]
+    },
+    {
+      "id": "PC4",
+      "label": "PC4",
+      "pin_type": "digital",
+      "position": [
+        260,
+        126
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        260,
+        108
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        260,
+        90
+      ]
+    },
+    {
+      "id": "AVCC",
+      "label": "AVCC",
+      "pin_type": "power",
+      "position": [
+        260,
+        72
+      ]
+    },
+    {
+      "id": "AREF",
+      "label": "AREF",
+      "pin_type": "analog",
+      "position": [
+        260,
+        54
+      ]
+    },
+    {
+      "id": "RESET",
+      "label": "RESET",
+      "pin_type": "digital",
+      "position": [
+        260,
+        36
+      ]
+    },
+    {
+      "id": "XTAL1",
+      "label": "XTAL1",
+      "pin_type": "digital",
+      "position": [
+        260,
+        18
+      ]
+    },
+    {
+      "id": "XTAL2",
+      "label": "XTAL2",
+      "pin_type": "digital",
+      "position": [
+        260,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU06-TSSOP28",
+    "package": "TSSOP-28",
+    "operating_limits": {
+      "supply_voltage": "2.7V to 5.5V",
+      "temperature": "-40\u00b0C to 105\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu06.pdf",
+    "flash_size_kb": 64
+  }
+}

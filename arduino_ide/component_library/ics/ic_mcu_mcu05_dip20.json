@@ -1,0 +1,201 @@
+{
+  "id": "ic_mcu_mcu05_dip20",
+  "name": "Orion Control20X MCU (PDIP-20)",
+  "component_type": "ic",
+  "description": "Template for Orion Control20X MCU with PDIP-20 footprint",
+  "width": 260,
+  "height": 420,
+  "pins": [
+    {
+      "id": "PA0",
+      "label": "PA0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PA1",
+      "label": "PA1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        26
+      ]
+    },
+    {
+      "id": "PA2",
+      "label": "PA2",
+      "pin_type": "digital",
+      "position": [
+        0,
+        52
+      ]
+    },
+    {
+      "id": "PA3",
+      "label": "PA3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        78
+      ]
+    },
+    {
+      "id": "PA4",
+      "label": "PA4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        104
+      ]
+    },
+    {
+      "id": "PA5",
+      "label": "PA5",
+      "pin_type": "digital",
+      "position": [
+        0,
+        130
+      ]
+    },
+    {
+      "id": "PA6",
+      "label": "PA6",
+      "pin_type": "digital",
+      "position": [
+        0,
+        156
+      ]
+    },
+    {
+      "id": "PA7",
+      "label": "PA7",
+      "pin_type": "digital",
+      "position": [
+        0,
+        182
+      ]
+    },
+    {
+      "id": "PB0",
+      "label": "PB0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        208
+      ]
+    },
+    {
+      "id": "PB1",
+      "label": "PB1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        234
+      ]
+    },
+    {
+      "id": "PB2",
+      "label": "PB2",
+      "pin_type": "digital",
+      "position": [
+        260,
+        234
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        260,
+        208
+      ]
+    },
+    {
+      "id": "PB4",
+      "label": "PB4",
+      "pin_type": "digital",
+      "position": [
+        260,
+        182
+      ]
+    },
+    {
+      "id": "PB5",
+      "label": "PB5",
+      "pin_type": "digital",
+      "position": [
+        260,
+        156
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        260,
+        130
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        260,
+        104
+      ]
+    },
+    {
+      "id": "PC0",
+      "label": "PC0",
+      "pin_type": "digital",
+      "position": [
+        260,
+        78
+      ]
+    },
+    {
+      "id": "PC1",
+      "label": "PC1",
+      "pin_type": "digital",
+      "position": [
+        260,
+        52
+      ]
+    },
+    {
+      "id": "PC2",
+      "label": "PC2",
+      "pin_type": "digital",
+      "position": [
+        260,
+        26
+      ]
+    },
+    {
+      "id": "PC3",
+      "label": "PC3",
+      "pin_type": "digital",
+      "position": [
+        260,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU05-DIP20",
+    "package": "PDIP-20",
+    "operating_limits": {
+      "supply_voltage": "2.0V to 5.5V",
+      "temperature": "-40\u00b0C to 105\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu05.pdf",
+    "flash_size_kb": 64
+  }
+}

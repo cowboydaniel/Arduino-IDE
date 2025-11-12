@@ -1,0 +1,147 @@
+{
+  "id": "ic_mcu_mcu02_soic14",
+  "name": "Orion Tiny14 MCU (SOIC-14)",
+  "component_type": "ic",
+  "description": "Template for Orion Tiny14 MCU with SOIC-14 footprint",
+  "width": 200,
+  "height": 280,
+  "pins": [
+    {
+      "id": "PA0_ADC0",
+      "label": "PA0/ADC0",
+      "pin_type": "analog",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PA1_ADC1",
+      "label": "PA1/ADC1",
+      "pin_type": "analog",
+      "position": [
+        0,
+        28
+      ]
+    },
+    {
+      "id": "PA2_ADC2",
+      "label": "PA2/ADC2",
+      "pin_type": "analog",
+      "position": [
+        0,
+        56
+      ]
+    },
+    {
+      "id": "PA3_ADC3",
+      "label": "PA3/ADC3",
+      "pin_type": "analog",
+      "position": [
+        0,
+        84
+      ]
+    },
+    {
+      "id": "PA4_SCK",
+      "label": "PA4/SCK",
+      "pin_type": "digital",
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "id": "PA5_MISO",
+      "label": "PA5/MISO",
+      "pin_type": "digital",
+      "position": [
+        0,
+        140
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        0,
+        168
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        200,
+        168
+      ]
+    },
+    {
+      "id": "PB0_MOSI",
+      "label": "PB0/MOSI",
+      "pin_type": "digital",
+      "position": [
+        200,
+        140
+      ]
+    },
+    {
+      "id": "PB1_OC0A",
+      "label": "PB1/OC0A",
+      "pin_type": "digital",
+      "position": [
+        200,
+        112
+      ]
+    },
+    {
+      "id": "PB2_OC0B",
+      "label": "PB2/OC0B",
+      "pin_type": "digital",
+      "position": [
+        200,
+        84
+      ]
+    },
+    {
+      "id": "PB3_RESET",
+      "label": "PB3/RESET",
+      "pin_type": "digital",
+      "position": [
+        200,
+        56
+      ]
+    },
+    {
+      "id": "PB4_XTAL1",
+      "label": "PB4/XTAL1",
+      "pin_type": "digital",
+      "position": [
+        200,
+        28
+      ]
+    },
+    {
+      "id": "PB5_XTAL2",
+      "label": "PB5/XTAL2",
+      "pin_type": "digital",
+      "position": [
+        200,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU02-SOIC14",
+    "package": "SOIC-14",
+    "operating_limits": {
+      "supply_voltage": "1.8V to 5.5V",
+      "temperature": "-40\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu02.pdf",
+    "flash_size_kb": 64
+  }
+}

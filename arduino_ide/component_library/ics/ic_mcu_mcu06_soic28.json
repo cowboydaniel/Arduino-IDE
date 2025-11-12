@@ -1,0 +1,273 @@
+{
+  "id": "ic_mcu_mcu06_soic28",
+  "name": "Orion Gateway28 MCU (SOIC-28)",
+  "component_type": "ic",
+  "description": "Template for Orion Gateway28 MCU with SOIC-28 footprint",
+  "width": 280,
+  "height": 440,
+  "pins": [
+    {
+      "id": "PA0",
+      "label": "PA0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PA1",
+      "label": "PA1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        20
+      ]
+    },
+    {
+      "id": "PA2",
+      "label": "PA2",
+      "pin_type": "digital",
+      "position": [
+        0,
+        40
+      ]
+    },
+    {
+      "id": "PA3",
+      "label": "PA3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        60
+      ]
+    },
+    {
+      "id": "PA4",
+      "label": "PA4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        80
+      ]
+    },
+    {
+      "id": "PA5",
+      "label": "PA5",
+      "pin_type": "digital",
+      "position": [
+        0,
+        100
+      ]
+    },
+    {
+      "id": "PA6",
+      "label": "PA6",
+      "pin_type": "digital",
+      "position": [
+        0,
+        120
+      ]
+    },
+    {
+      "id": "PA7",
+      "label": "PA7",
+      "pin_type": "digital",
+      "position": [
+        0,
+        140
+      ]
+    },
+    {
+      "id": "PB0",
+      "label": "PB0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "id": "PB1",
+      "label": "PB1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        180
+      ]
+    },
+    {
+      "id": "PB2",
+      "label": "PB2",
+      "pin_type": "digital",
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        220
+      ]
+    },
+    {
+      "id": "PB4",
+      "label": "PB4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "id": "PB5",
+      "label": "PB5",
+      "pin_type": "digital",
+      "position": [
+        0,
+        260
+      ]
+    },
+    {
+      "id": "PB6",
+      "label": "PB6",
+      "pin_type": "digital",
+      "position": [
+        280,
+        260
+      ]
+    },
+    {
+      "id": "PB7",
+      "label": "PB7",
+      "pin_type": "digital",
+      "position": [
+        280,
+        240
+      ]
+    },
+    {
+      "id": "PC0",
+      "label": "PC0",
+      "pin_type": "digital",
+      "position": [
+        280,
+        220
+      ]
+    },
+    {
+      "id": "PC1",
+      "label": "PC1",
+      "pin_type": "digital",
+      "position": [
+        280,
+        200
+      ]
+    },
+    {
+      "id": "PC2",
+      "label": "PC2",
+      "pin_type": "digital",
+      "position": [
+        280,
+        180
+      ]
+    },
+    {
+      "id": "PC3",
+      "label": "PC3",
+      "pin_type": "digital",
+      "position": [
+        280,
+        160
+      ]
+    },
+    {
+      "id": "PC4",
+      "label": "PC4",
+      "pin_type": "digital",
+      "position": [
+        280,
+        140
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        280,
+        120
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        280,
+        100
+      ]
+    },
+    {
+      "id": "AVCC",
+      "label": "AVCC",
+      "pin_type": "power",
+      "position": [
+        280,
+        80
+      ]
+    },
+    {
+      "id": "AREF",
+      "label": "AREF",
+      "pin_type": "analog",
+      "position": [
+        280,
+        60
+      ]
+    },
+    {
+      "id": "RESET",
+      "label": "RESET",
+      "pin_type": "digital",
+      "position": [
+        280,
+        40
+      ]
+    },
+    {
+      "id": "XTAL1",
+      "label": "XTAL1",
+      "pin_type": "digital",
+      "position": [
+        280,
+        20
+      ]
+    },
+    {
+      "id": "XTAL2",
+      "label": "XTAL2",
+      "pin_type": "digital",
+      "position": [
+        280,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU06-SOIC28",
+    "package": "SOIC-28",
+    "operating_limits": {
+      "supply_voltage": "2.7V to 5.5V",
+      "temperature": "-40\u00b0C to 105\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu06.pdf",
+    "flash_size_kb": 64
+  }
+}

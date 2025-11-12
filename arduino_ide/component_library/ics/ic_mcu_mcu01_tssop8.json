@@ -1,0 +1,93 @@
+{
+  "id": "ic_mcu_mcu01_tssop8",
+  "name": "Orion Tiny8 MCU (TSSOP-8)",
+  "component_type": "ic",
+  "description": "Template for Orion Tiny8 MCU with TSSOP-8 footprint",
+  "width": 160,
+  "height": 220,
+  "pins": [
+    {
+      "id": "PB5_RESET",
+      "label": "PB5/RESET",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        28
+      ]
+    },
+    {
+      "id": "PB4",
+      "label": "PB4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        56
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        0,
+        84
+      ]
+    },
+    {
+      "id": "PB0_MOSI",
+      "label": "PB0/MOSI",
+      "pin_type": "digital",
+      "position": [
+        160,
+        84
+      ]
+    },
+    {
+      "id": "PB1_MISO",
+      "label": "PB1/MISO",
+      "pin_type": "digital",
+      "position": [
+        160,
+        56
+      ]
+    },
+    {
+      "id": "PB2_SCK",
+      "label": "PB2/SCK",
+      "pin_type": "digital",
+      "position": [
+        160,
+        28
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        160,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU01-TSSOP8",
+    "package": "TSSOP-8",
+    "operating_limits": {
+      "supply_voltage": "1.8V to 5.5V",
+      "temperature": "-40\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu01.pdf",
+    "flash_size_kb": 64
+  }
+}

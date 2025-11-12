@@ -1,0 +1,165 @@
+{
+  "id": "ic_mcu_mcu03_dip16",
+  "name": "Orion Tiny16 MCU (PDIP-16)",
+  "component_type": "ic",
+  "description": "Template for Orion Tiny16 MCU with PDIP-16 footprint",
+  "width": 240,
+  "height": 360,
+  "pins": [
+    {
+      "id": "PA0",
+      "label": "PA0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PA1",
+      "label": "PA1",
+      "pin_type": "digital",
+      "position": [
+        0,
+        30
+      ]
+    },
+    {
+      "id": "PA2",
+      "label": "PA2",
+      "pin_type": "digital",
+      "position": [
+        0,
+        60
+      ]
+    },
+    {
+      "id": "PA3",
+      "label": "PA3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        90
+      ]
+    },
+    {
+      "id": "PA4",
+      "label": "PA4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        120
+      ]
+    },
+    {
+      "id": "PA5",
+      "label": "PA5",
+      "pin_type": "digital",
+      "position": [
+        0,
+        150
+      ]
+    },
+    {
+      "id": "PA6",
+      "label": "PA6",
+      "pin_type": "digital",
+      "position": [
+        0,
+        180
+      ]
+    },
+    {
+      "id": "PA7",
+      "label": "PA7",
+      "pin_type": "digital",
+      "position": [
+        0,
+        210
+      ]
+    },
+    {
+      "id": "PB0",
+      "label": "PB0",
+      "pin_type": "digital",
+      "position": [
+        240,
+        210
+      ]
+    },
+    {
+      "id": "PB1",
+      "label": "PB1",
+      "pin_type": "digital",
+      "position": [
+        240,
+        180
+      ]
+    },
+    {
+      "id": "PB2",
+      "label": "PB2",
+      "pin_type": "digital",
+      "position": [
+        240,
+        150
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        240,
+        120
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        240,
+        90
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        240,
+        60
+      ]
+    },
+    {
+      "id": "RESET",
+      "label": "RESET",
+      "pin_type": "digital",
+      "position": [
+        240,
+        30
+      ]
+    },
+    {
+      "id": "XTAL",
+      "label": "XTAL",
+      "pin_type": "digital",
+      "position": [
+        240,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU03-DIP16",
+    "package": "PDIP-16",
+    "operating_limits": {
+      "supply_voltage": "1.8V to 5.5V",
+      "temperature": "-40\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu03.pdf",
+    "flash_size_kb": 64
+  }
+}

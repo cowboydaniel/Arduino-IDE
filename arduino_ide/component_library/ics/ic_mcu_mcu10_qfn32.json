@@ -1,0 +1,309 @@
+{
+  "id": "ic_mcu_mcu10_qfn32",
+  "name": "Orion Fusion32 MCU (QFN-32)",
+  "component_type": "ic",
+  "description": "Template for Orion Fusion32 MCU with QFN-32 footprint",
+  "width": 240,
+  "height": 240,
+  "pins": [
+    {
+      "id": "PA0",
+      "label": "PA0",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PA1",
+      "label": "PA1",
+      "pin_type": "digital",
+      "position": [
+        22,
+        0
+      ]
+    },
+    {
+      "id": "PA2",
+      "label": "PA2",
+      "pin_type": "digital",
+      "position": [
+        44,
+        0
+      ]
+    },
+    {
+      "id": "PA3",
+      "label": "PA3",
+      "pin_type": "digital",
+      "position": [
+        66,
+        0
+      ]
+    },
+    {
+      "id": "PA4",
+      "label": "PA4",
+      "pin_type": "digital",
+      "position": [
+        88,
+        0
+      ]
+    },
+    {
+      "id": "PA5",
+      "label": "PA5",
+      "pin_type": "digital",
+      "position": [
+        110,
+        0
+      ]
+    },
+    {
+      "id": "PA6",
+      "label": "PA6",
+      "pin_type": "digital",
+      "position": [
+        132,
+        0
+      ]
+    },
+    {
+      "id": "PA7",
+      "label": "PA7",
+      "pin_type": "digital",
+      "position": [
+        154,
+        0
+      ]
+    },
+    {
+      "id": "PB0",
+      "label": "PB0",
+      "pin_type": "digital",
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "id": "PB1",
+      "label": "PB1",
+      "pin_type": "digital",
+      "position": [
+        220,
+        22
+      ]
+    },
+    {
+      "id": "PB2",
+      "label": "PB2",
+      "pin_type": "digital",
+      "position": [
+        220,
+        44
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        220,
+        66
+      ]
+    },
+    {
+      "id": "PB4",
+      "label": "PB4",
+      "pin_type": "digital",
+      "position": [
+        220,
+        88
+      ]
+    },
+    {
+      "id": "PB5",
+      "label": "PB5",
+      "pin_type": "digital",
+      "position": [
+        220,
+        110
+      ]
+    },
+    {
+      "id": "PB6",
+      "label": "PB6",
+      "pin_type": "digital",
+      "position": [
+        220,
+        132
+      ]
+    },
+    {
+      "id": "PB7",
+      "label": "PB7",
+      "pin_type": "digital",
+      "position": [
+        220,
+        154
+      ]
+    },
+    {
+      "id": "PC0",
+      "label": "PC0",
+      "pin_type": "digital",
+      "position": [
+        220,
+        220
+      ]
+    },
+    {
+      "id": "PC1",
+      "label": "PC1",
+      "pin_type": "digital",
+      "position": [
+        198,
+        220
+      ]
+    },
+    {
+      "id": "PC2",
+      "label": "PC2",
+      "pin_type": "digital",
+      "position": [
+        176,
+        220
+      ]
+    },
+    {
+      "id": "PC3",
+      "label": "PC3",
+      "pin_type": "digital",
+      "position": [
+        154,
+        220
+      ]
+    },
+    {
+      "id": "PC4",
+      "label": "PC4",
+      "pin_type": "digital",
+      "position": [
+        132,
+        220
+      ]
+    },
+    {
+      "id": "PC5",
+      "label": "PC5",
+      "pin_type": "digital",
+      "position": [
+        110,
+        220
+      ]
+    },
+    {
+      "id": "PC6",
+      "label": "PC6",
+      "pin_type": "digital",
+      "position": [
+        88,
+        220
+      ]
+    },
+    {
+      "id": "PC7",
+      "label": "PC7",
+      "pin_type": "digital",
+      "position": [
+        66,
+        220
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        0,
+        220
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        0,
+        198
+      ]
+    },
+    {
+      "id": "VBAT",
+      "label": "VBAT",
+      "pin_type": "power",
+      "position": [
+        0,
+        176
+      ]
+    },
+    {
+      "id": "RESET",
+      "label": "RESET",
+      "pin_type": "digital",
+      "position": [
+        0,
+        154
+      ]
+    },
+    {
+      "id": "SWDIO",
+      "label": "SWDIO",
+      "pin_type": "digital",
+      "position": [
+        0,
+        132
+      ]
+    },
+    {
+      "id": "SWCLK",
+      "label": "SWCLK",
+      "pin_type": "digital",
+      "position": [
+        0,
+        110
+      ]
+    },
+    {
+      "id": "PA8",
+      "label": "PA8",
+      "pin_type": "digital",
+      "position": [
+        0,
+        88
+      ]
+    },
+    {
+      "id": "PA9",
+      "label": "PA9",
+      "pin_type": "digital",
+      "position": [
+        0,
+        66
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU10-QFN32",
+    "package": "QFN-32",
+    "operating_limits": {
+      "supply_voltage": "1.8V to 3.6V",
+      "temperature": "-40\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu10.pdf",
+    "flash_size_kb": 64
+  }
+}

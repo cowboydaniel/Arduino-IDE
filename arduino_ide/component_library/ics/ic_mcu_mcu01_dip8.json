@@ -1,0 +1,93 @@
+{
+  "id": "ic_mcu_mcu01_dip8",
+  "name": "Orion Tiny8 MCU (PDIP-8)",
+  "component_type": "ic",
+  "description": "Template for Orion Tiny8 MCU with PDIP-8 footprint",
+  "width": 200,
+  "height": 280,
+  "pins": [
+    {
+      "id": "PB5_RESET",
+      "label": "PB5/RESET",
+      "pin_type": "digital",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "PB3",
+      "label": "PB3",
+      "pin_type": "digital",
+      "position": [
+        0,
+        40
+      ]
+    },
+    {
+      "id": "PB4",
+      "label": "PB4",
+      "pin_type": "digital",
+      "position": [
+        0,
+        80
+      ]
+    },
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        0,
+        120
+      ]
+    },
+    {
+      "id": "PB0_MOSI",
+      "label": "PB0/MOSI",
+      "pin_type": "digital",
+      "position": [
+        200,
+        120
+      ]
+    },
+    {
+      "id": "PB1_MISO",
+      "label": "PB1/MISO",
+      "pin_type": "digital",
+      "position": [
+        200,
+        80
+      ]
+    },
+    {
+      "id": "PB2_SCK",
+      "label": "PB2/SCK",
+      "pin_type": "digital",
+      "position": [
+        200,
+        40
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        200,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Celestial Microsystems",
+    "part_number": "Orion-MCU01-DIP8",
+    "package": "PDIP-8",
+    "operating_limits": {
+      "supply_voltage": "1.8V to 5.5V",
+      "temperature": "-40\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://example.com/mcus/mcu01.pdf",
+    "flash_size_kb": 64
+  }
+}

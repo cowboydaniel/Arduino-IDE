@@ -1,0 +1,93 @@
+{
+  "id": "ic_timer_timer04_soic8",
+  "name": "Astra 558 Precision Timer (SOIC-8)",
+  "component_type": "ic",
+  "description": "Template for Astra 558 Precision Timer packaged as SOIC-8",
+  "width": 180,
+  "height": 240,
+  "pins": [
+    {
+      "id": "GND",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "TRIG",
+      "label": "TRIG",
+      "pin_type": "analog",
+      "position": [
+        0,
+        32
+      ]
+    },
+    {
+      "id": "OUT",
+      "label": "OUT",
+      "pin_type": "digital",
+      "position": [
+        0,
+        64
+      ]
+    },
+    {
+      "id": "RESET",
+      "label": "RESET",
+      "pin_type": "digital",
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "id": "CTRL",
+      "label": "CTRL",
+      "pin_type": "analog",
+      "position": [
+        180,
+        96
+      ]
+    },
+    {
+      "id": "THRES",
+      "label": "TH",
+      "pin_type": "analog",
+      "position": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "DISCH",
+      "label": "DIS",
+      "pin_type": "digital",
+      "position": [
+        180,
+        32
+      ]
+    },
+    {
+      "id": "VCC",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [
+        180,
+        0
+      ]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Nova Circuits",
+    "part_number": "Astra-TIMER04-SOIC8",
+    "package": "SOIC-8",
+    "operating_limits": {
+      "supply_voltage": "3V to 18V",
+      "temperature": "-55\u00b0C to 125\u00b0C"
+    },
+    "datasheet_url": "https://example.com/datasheets/timer04.pdf",
+    "channels": 1
+  }
+}
