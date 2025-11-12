@@ -9,7 +9,8 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from arduino_ide.services.circuit_service import CircuitService, ComponentType
+from arduino_ide.services.circuit_service import CircuitService
+from arduino_ide.models.circuit_domain import ComponentType
 
 def main():
     print("Initializing Circuit Service...")
