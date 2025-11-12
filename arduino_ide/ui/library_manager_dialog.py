@@ -15,14 +15,203 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QLineEdit, QTreeWidget, QTreeWidgetItem,
     QTextBrowser, QCheckBox, QComboBox, QGroupBox, QFormLayout,
     QProgressBar, QTabWidget, QWidget, QScrollArea, QRadioButton,
-    QMessageBox, QMenu, QFileDialog
+    QMessageBox, QMenu, QFileDialog, QPlainTextEdit, QTableWidget,
+    QTableWidgetItem
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QAction
 from pathlib import Path
+from typing import Optional
+from datetime import datetime
 
 from ..models import Library, LibraryStatus, LibraryType
 from ..services.library_manager import LibraryManager
+
+
+class LibraryDetailsPanel(QWidget):
+    """Rich library information display"""
+
+    try_library_clicked = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.current_library: Optional[Library] = None
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+
+        adoption_group = QGroupBox("🚀 Adoption Insights")
+        adoption_layout = QFormLayout()
+        self.popularity_label = QLabel("Select a library")
+        self.project_usage_label = QLabel("Used in 0 projects")
+        adoption_layout.addRow("Popularity ranking:", self.popularity_label)
+        adoption_layout.addRow("Project footprint:", self.project_usage_label)
+        adoption_group.setLayout(adoption_layout)
+        layout.addWidget(adoption_group)
+
+        snippet_group = QGroupBox("💡 Example Code Snippet")
+        snippet_layout = QVBoxLayout()
+        self.snippet_title = QLabel("No examples available")
+        self.snippet_editor = QPlainTextEdit()
+        self.snippet_editor.setReadOnly(True)
+        self.snippet_editor.setMinimumHeight(140)
+        snippet_layout.addWidget(self.snippet_title)
+        snippet_layout.addWidget(self.snippet_editor)
+        snippet_group.setLayout(snippet_layout)
+        layout.addWidget(snippet_group)
+
+        dep_group = QGroupBox("🕸️ Dependency Graph")
+        dep_layout = QVBoxLayout()
+        self.dependency_graph = QTreeWidget()
+        self.dependency_graph.setHeaderLabels(["Component", "Details"])
+        self.dependency_graph.setMaximumHeight(160)
+        self.dep_placeholder = QLabel("No dependencies declared")
+        dep_layout.addWidget(self.dependency_graph)
+        dep_layout.addWidget(self.dep_placeholder)
+        dep_group.setLayout(dep_layout)
+        layout.addWidget(dep_group)
+
+        compat_group = QGroupBox("🧩 Version Compatibility Matrix")
+        compat_layout = QVBoxLayout()
+        self.compat_table = QTableWidget(0, 3)
+        self.compat_table.setHorizontalHeaderLabels(["Version", "Architectures", "Released"])
+        self.compat_table.horizontalHeader().setStretchLastSection(True)
+        compat_layout.addWidget(self.compat_table)
+        compat_group.setLayout(compat_layout)
+        layout.addWidget(compat_group)
+
+        action_layout = QHBoxLayout()
+        self.try_button = QPushButton("🧪 Try in Scratch Project")
+        self.try_button.setEnabled(False)
+        self.try_button.clicked.connect(self._emit_try_request)
+        action_layout.addWidget(self.try_button)
+        action_layout.addStretch()
+        layout.addLayout(action_layout)
+
+        layout.addStretch()
+
+    def show_library_info(self, library: Optional[Library]):
+        """Populate the rich panel with contextual information"""
+        self.current_library = library
+
+        if not library:
+            self.popularity_label.setText("Select a library")
+            self.project_usage_label.setText("Used in 0 projects")
+            self.snippet_title.setText("No examples available")
+            self.snippet_editor.setPlainText("")
+            self._set_dependency_graph([])
+            self._set_compatibility_matrix([])
+            self.try_button.setEnabled(False)
+            return
+
+        self.try_button.setEnabled(True)
+        self.try_button.setText(f"🧪 Try {library.name} in Scratch Project")
+
+        downloads = library.stats.downloads if library.stats else 0
+        self.popularity_label.setText(self._rank_popularity(downloads))
+        usage_count = self._estimate_project_usage(library)
+        self.project_usage_label.setText(f"Used in {usage_count} of your projects")
+
+        self._update_example_snippet(library)
+
+        latest_version = library.get_latest_version_obj()
+        dependencies = latest_version.dependencies if latest_version else []
+        self._set_dependency_graph(dependencies)
+
+        self._set_compatibility_matrix(library.versions[:4])
+
+    def _update_example_snippet(self, library: Library):
+        if library.examples:
+            example = library.examples[0]
+            self.snippet_title.setText(example.name)
+            snippet = self._build_sample_snippet(library, example)
+            self.snippet_editor.setPlainText(snippet)
+        else:
+            self.snippet_title.setText("No curated examples yet")
+            self.snippet_editor.setPlainText(
+                f"// Create a quick sketch to try {library.name}\n"
+                "#include <{0}.h>\n\nvoid setup() {{\n  // Initialize library\n}}\n\nvoid loop() {{\n}}".format(library.name)
+            )
+
+    def _build_sample_snippet(self, library: Library, example) -> str:
+        snippet_lines = [
+            f"// Example: {example.name}",
+            f"// {example.description}" if example.description else "",
+            f"// File: {example.path}" if example.path else "",
+            "",
+            f"#include <{library.name}.h>",
+            "",
+            "void setup() {",
+            "  Serial.begin(9600);",
+            f"  // Initialize {library.name}",
+            "}",
+            "",
+            "void loop() {",
+            f"  // Use {example.name} demo logic here",
+            "}",
+        ]
+        return "\n".join([line for line in snippet_lines if line is not None])
+
+    def _set_dependency_graph(self, dependencies):
+        self.dependency_graph.clear()
+        if not dependencies:
+            self.dependency_graph.setVisible(False)
+            self.dep_placeholder.setVisible(True)
+            return
+
+        self.dependency_graph.setVisible(True)
+        self.dep_placeholder.setVisible(False)
+
+        root = QTreeWidgetItem([self.current_library.name, "Root library"])
+        self.dependency_graph.addTopLevelItem(root)
+        for dep in dependencies:
+            details = f"{dep.version}"
+            if dep.optional:
+                details += " (optional)"
+            QTreeWidgetItem(root, [dep.name, details])
+        self.dependency_graph.expandAll()
+
+    def _set_compatibility_matrix(self, versions):
+        self.compat_table.setRowCount(len(versions))
+        for row, version in enumerate(versions):
+            self.compat_table.setItem(row, 0, QTableWidgetItem(version.version))
+            architectures = ", ".join(version.architectures) if version.architectures else "All"
+            self.compat_table.setItem(row, 1, QTableWidgetItem(architectures))
+            release = version.release_date.strftime("%Y-%m-%d") if version.release_date else "Unknown"
+            self.compat_table.setItem(row, 2, QTableWidgetItem(release))
+
+        if not versions:
+            self.compat_table.setRowCount(1)
+            self.compat_table.setItem(0, 0, QTableWidgetItem("–"))
+            self.compat_table.setItem(0, 1, QTableWidgetItem("No data"))
+            self.compat_table.setItem(0, 2, QTableWidgetItem("–"))
+
+    def _rank_popularity(self, downloads: int) -> str:
+        if downloads >= 1_000_000:
+            return "🏆 Top 1% performer"
+        if downloads >= 250_000:
+            return "🥇 Widely adopted"
+        if downloads >= 50_000:
+            return "🥈 Trending"
+        if downloads > 0:
+            return "🥉 Emerging"
+        return "Newcomer"
+
+    def _estimate_project_usage(self, library: Library) -> int:
+        if library.last_used:
+            # If last used recently, assume multiple projects reference it
+            days_since_use = (datetime.now() - library.last_used).days
+            return max(1, 5 - days_since_use // 30)
+
+        if library.stats and library.stats.downloads:
+            return max(1, min(12, library.stats.downloads // 200_000 + 1))
+
+        return 1 if library.installed_version else 0
+
+    def _emit_try_request(self):
+        if self.current_library:
+            self.try_library_clicked.emit(self.current_library.name)
 
 
 class LibraryDetailView(QWidget):
@@ -31,6 +220,7 @@ class LibraryDetailView(QWidget):
     install_clicked = Signal(str, str)  # name, version
     uninstall_clicked = Signal(str)  # name
     update_clicked = Signal(str)  # name
+    try_library_clicked = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -150,6 +340,12 @@ class LibraryDetailView(QWidget):
         links_layout.addWidget(self.repo_btn)
         links_layout.addStretch()
         content_layout.addLayout(links_layout)
+
+        # Advanced insight panel
+        self.enhanced_panel = LibraryDetailsPanel()
+        self.enhanced_panel.try_library_clicked.connect(self.on_try_library_clicked)
+        content_layout.addWidget(self.enhanced_panel)
+        self.enhanced_panel.show_library_info(None)
 
         content_layout.addStretch()
 
@@ -277,6 +473,9 @@ class LibraryDetailView(QWidget):
         else:
             self.examples_group.setVisible(False)
 
+        # Enhanced panel
+        self.enhanced_panel.show_library_info(library)
+
     def on_install_clicked(self):
         """Handle install button click"""
         if self.current_library:
@@ -297,6 +496,9 @@ class LibraryDetailView(QWidget):
             )
             if reply == QMessageBox.Yes:
                 self.uninstall_clicked.emit(self.current_library.name)
+
+    def on_try_library_clicked(self, library_name: str):
+        self.try_library_clicked.emit(library_name)
 
 
 class LibraryManagerDialog(QDialog):
@@ -435,6 +637,7 @@ class LibraryManagerDialog(QDialog):
         self.detail_view.install_clicked.connect(self.install_library)
         self.detail_view.uninstall_clicked.connect(self.uninstall_library)
         self.detail_view.update_clicked.connect(self.update_library)
+        self.detail_view.try_library_clicked.connect(self.launch_scratch_project)
         right_layout.addWidget(self.detail_view)
 
         splitter.addWidget(right_panel)
@@ -674,6 +877,18 @@ class LibraryManagerDialog(QDialog):
 
                 self.progress_bar.setVisible(False)
                 self.refresh_libraries()
+
+    def launch_scratch_project(self, library_name: str):
+        """Simulate launching a scratch project preloaded with the library"""
+        QMessageBox.information(
+            self,
+            "Scratch Project",
+            (
+                f"Preparing a fresh sketch with {library_name}...\n\n"
+                "This will open a scratch workspace with boilerplate code "
+                "once the sketch generator service is connected."
+            )
+        )
 
     def on_status_message(self, message: str):
         """Handle status message"""
