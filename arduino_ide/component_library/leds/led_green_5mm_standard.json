@@ -1,0 +1,33 @@
+{
+  "id": "led_green_5mm_standard",
+  "name": "Green 5mm LED",
+  "component_type": "led",
+  "description": "Standard green 5mm Light Emitting Diode",
+  "width": 30,
+  "height": 50,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [15, 0]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [15, 50]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Green",
+    "size": "5mm",
+    "forward_voltage": "3.0-3.4V",
+    "forward_current": "20mA",
+    "max_forward_current": "30mA",
+    "wavelength": "515-530nm",
+    "brightness": "2000-3000mcd",
+    "viewing_angle": "30°"
+  }
+}

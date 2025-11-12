@@ -1,0 +1,50 @@
+{
+  "id": "sensor_motion_hc_sr04_ultrasonic",
+  "name": "HC-SR04 Ultrasonic Distance Sensor",
+  "component_type": "sensor",
+  "description": "HC-SR04 ultrasonic ranging module for distance measurement 2cm-400cm",
+  "width": 70,
+  "height": 50,
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "pin_type": "power",
+      "position": [10, 0]
+    },
+    {
+      "id": "trig",
+      "label": "TRIG",
+      "pin_type": "digital",
+      "position": [25, 0]
+    },
+    {
+      "id": "echo",
+      "label": "ECHO",
+      "pin_type": "digital",
+      "position": [40, 0]
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "pin_type": "ground",
+      "position": [55, 0]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "part_number": "HC-SR04",
+    "sensor_type": "Ultrasonic Distance",
+    "measurement_range": "2cm to 400cm",
+    "measurement_accuracy": "3mm",
+    "measurement_angle": "15°",
+    "operating_voltage": "5V DC",
+    "operating_current": "15mA",
+    "operating_frequency": "40kHz",
+    "trigger_input_signal": "10μS TTL pulse",
+    "echo_output_signal": "TTL level",
+    "min_ranging_distance": "2cm",
+    "max_ranging_distance": "400cm",
+    "operating_temperature": "-15°C to 70°C"
+  }
+}

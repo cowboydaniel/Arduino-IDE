@@ -1,0 +1,33 @@
+{
+  "id": "led_red_5mm_standard",
+  "name": "Red 5mm LED",
+  "component_type": "led",
+  "description": "Standard red 5mm Light Emitting Diode",
+  "width": 30,
+  "height": 50,
+  "pins": [
+    {
+      "id": "anode",
+      "label": "+",
+      "pin_type": "power",
+      "position": [15, 0]
+    },
+    {
+      "id": "cathode",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [15, 50]
+    }
+  ],
+  "metadata": {
+    "manufacturer": "Generic",
+    "color": "Red",
+    "size": "5mm",
+    "forward_voltage": "2.0-2.2V",
+    "forward_current": "20mA",
+    "max_forward_current": "30mA",
+    "wavelength": "620-625nm",
+    "brightness": "1000-1500mcd",
+    "viewing_angle": "30°"
+  }
+}

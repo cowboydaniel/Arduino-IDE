@@ -1,0 +1,25 @@
+{
+  "id": "breadboard_half_white_standard",
+  "name": "Half-Size Breadboard (White)",
+  "component_type": "breadboard",
+  "description": "Standard half-size solderless breadboard with 400 tie points",
+  "width": 300,
+  "height": 100,
+  "pins": [],
+  "metadata": {
+    "manufacturer": "Generic",
+    "size": "Half-Size",
+    "tie_points": 400,
+    "power_rails": 2,
+    "dimensions": "82.5mm x 54mm",
+    "color": "White",
+    "quality": "Standard",
+    "contact_pitch": "2.54mm (0.1\")",
+    "contact_resistance": "<50mΩ",
+    "insulation_resistance": ">100MΩ",
+    "rated_voltage": "500V AC",
+    "rated_current": "3A per contact",
+    "dielectric_strength": "1500V AC/minute",
+    "operating_temperature": "-40°C to +85°C"
+  }
+}
