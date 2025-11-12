@@ -1,19 +1,33 @@
-"""
-Circuit Service
-Manages circuit components, connections, and validation
-"""
+"""Circuit Service utilities for circuit editing workflows."""
 
+import copy
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Set
 from dataclasses import dataclass, field
 from enum import Enum
 from PySide6.QtCore import QObject, Signal
 
-logger = logging.getLogger(__name__)
+from PySide6.QtCore import QObject, Signal
 
+from arduino_ide.models.circuit_domain import (
+    Bus,
+    ComponentDefinition,
+    ComponentInstance,
+    ComponentType,
+    Connection,
+    DifferentialPair,
+    ElectricalRuleDiagnostic,
+    HierarchicalPort,
+    Net,
+    NetNode,
+    Pin,
+    PinType,
+    Sheet,
+    SheetInstance,
+    SymbolUnit,
+)
 
 class CircuitSerializationError(Exception):
     """Raised when circuit data cannot be converted between formats."""
@@ -56,6 +70,9 @@ class Pin:
     label: str
     pin_type: PinType
     position: Tuple[float, float]  # Relative position on component
+    length: float = 20.0
+    orientation: str = "left"
+    decoration: str = "line"
 
 
 @dataclass
@@ -70,6 +87,8 @@ class ComponentDefinition:
     image_path: Optional[str] = None
     description: str = ""
     datasheet_url: Optional[str] = None
+    graphics: List[Dict[str, Any]] = field(default_factory=list)
+    units: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -93,6 +112,17 @@ class Connection:
     to_component: str
     to_pin: str
     wire_color: str = "#000000"
+    connection_type: str = "wire"
+
+
+@dataclass
+class Sheet:
+    """Hierarchical sheet information"""
+    sheet_id: str
+    name: str
+    parent_id: Optional[str] = None
+    file_path: Optional[str] = None
+    embedded: bool = False
 
 
 @dataclass
@@ -106,9 +136,24 @@ class Sheet:
 
 
 class CircuitService(QObject):
-    """
-    Service for managing circuit design and validation
-    """
+    """Service for managing circuit design and validation."""
+
+    _ANNOTATION_PREFIXES: Dict[ComponentType, str] = {
+        ComponentType.RESISTOR: "R",
+        ComponentType.CAPACITOR: "C",
+        ComponentType.LED: "D",
+        ComponentType.BUTTON: "S",
+        ComponentType.POTENTIOMETER: "RV",
+        ComponentType.SERVO: "M",
+        ComponentType.MOTOR: "M",
+        ComponentType.SENSOR: "U",
+        ComponentType.BREADBOARD: "BRD",
+        ComponentType.IC: "U",
+        ComponentType.TRANSISTOR: "Q",
+        ComponentType.WIRE: "W",
+        ComponentType.BATTERY: "BAT",
+        ComponentType.ARDUINO_BOARD: "A",
+    }
 
     # Signals
     component_added = Signal(str)  # instance_id
@@ -118,8 +163,10 @@ class CircuitService(QObject):
     connection_removed = Signal(str)
     circuit_validated = Signal(bool, list)  # is_valid, error_list
     circuit_changed = Signal()
+    sheets_changed = Signal()
+    active_sheet_changed = Signal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, symbol_adapter: Optional["KiCADSymbolAdapter"] = None):
         super().__init__(parent)
 
         self._component_definitions: Dict[str, ComponentDefinition] = {}
@@ -137,42 +184,68 @@ class CircuitService(QObject):
         # Initialize component library
         self._init_component_library()
 
+        self._ensure_root_sheet()
+
         logger.info("Circuit service initialized")
+
+    def _ensure_root_sheet(self):
+        """Ensure there is always at least one root sheet."""
+        if self._sheets:
+            if not self._active_sheet_id:
+                self._active_sheet_id = next(iter(self._sheets))
+            return
+
+        sheet_id = self._generate_sheet_id()
+        self._sheets[sheet_id] = Sheet(sheet_id=sheet_id, name="Root Sheet")
+        self._active_sheet_id = sheet_id
+        self.sheets_changed.emit()
+        self.active_sheet_changed.emit(sheet_id)
+
+    def _generate_sheet_id(self) -> str:
+        sheet_id = f"sheet_{self._next_sheet_id}"
+        self._next_sheet_id += 1
+        return sheet_id
+
+    # ------------------------------------------------------------------
+    # Sheet management APIs
+    # ------------------------------------------------------------------
+    def create_sheet(self, name: str, parent_id: Optional[str] = None, embedded: bool = False) -> Sheet:
+        sheet_id = self._generate_sheet_id()
+        parent = parent_id or self._active_sheet_id
+        sheet = Sheet(sheet_id=sheet_id, name=name, parent_id=parent, embedded=embedded)
+        self._sheets[sheet_id] = sheet
+        self.sheets_changed.emit()
+        return sheet
+
+    def open_sheet(self, file_path: str) -> Sheet:
+        sheet = self.create_sheet(Path(file_path).stem, None, embedded=False)
+        sheet.file_path = file_path
+        return sheet
+
+    def embed_sheet(self, file_path: str, parent_id: Optional[str] = None) -> Sheet:
+        sheet = self.create_sheet(Path(file_path).stem, parent_id, embedded=True)
+        sheet.file_path = file_path
+        return sheet
+
+    def set_active_sheet(self, sheet_id: str):
+        if sheet_id not in self._sheets:
+            return
+
+        self._active_sheet_id = sheet_id
+        self.active_sheet_changed.emit(sheet_id)
+
+    def get_active_sheet_id(self) -> str:
+        self._ensure_root_sheet()
+        return self._active_sheet_id  # type: ignore
+
+    def get_sheets(self) -> List[Sheet]:
+        return list(self._sheets.values())
 
 
     def _init_component_library(self):
-        """Initialize library of available components from JSON files"""
+        """Initialize the component library using the KiCAD symbol adapter."""
 
-        # Find component library directory
-        service_dir = Path(__file__).parent
-        component_lib_dir = service_dir.parent / "component_library"
-
-        if not component_lib_dir.exists():
-            logger.warning(f"Component library directory not found: {component_lib_dir}")
-            logger.info("Component library initialized with 0 components")
-            return
-
-        # Load all JSON component files
-        component_count = 0
-        error_count = 0
-
-        for json_file in component_lib_dir.rglob("*.json"):
-            # Skip README and other non-component files
-            if json_file.name.lower() in ["readme.json", "package.json"]:
-                continue
-
-            try:
-                component_def = self._load_component_from_json(json_file)
-                if component_def:
-                    self.register_component(component_def)
-                    component_count += 1
-            except Exception as e:
-                logger.error(f"Failed to load component from {json_file}: {e}")
-                error_count += 1
-
-        logger.info(f"Component library initialized with {component_count} components")
-        if error_count > 0:
-            logger.warning(f"Failed to load {error_count} component files")
+        self._component_definitions.clear()
 
     def _init_sheet_hierarchy(self, root_sheet_id: str, root_sheet_name: str):
         """Initialize the sheet hierarchy with a root sheet."""
@@ -269,7 +342,10 @@ class CircuitService(QObject):
                         id=pin_data["id"],
                         label=pin_data["label"],
                         pin_type=pin_type,
-                        position=(pin_data["position"][0], pin_data["position"][1])
+                        position=(pin_data["position"][0], pin_data["position"][1]),
+                        length=float(pin_data.get("length", 20.0)),
+                        orientation=pin_data.get("orientation", "left"),
+                        decoration=pin_data.get("decoration", "line"),
                     )
                     pins.append(pin)
                 except (ValueError, KeyError, IndexError) as e:
@@ -286,17 +362,18 @@ class CircuitService(QObject):
                 pins=pins,
                 image_path=data.get("image_path"),
                 description=data["description"],
-                datasheet_url=data.get("metadata", {}).get("datasheet_url")
+                datasheet_url=data.get("metadata", {}).get("datasheet_url"),
+                graphics=data.get("graphics", []),
+                units=data.get("units", []),
             )
 
-            return component_def
+        for component_def in components:
+            self.register_component(component_def)
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in {json_path}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error loading component from {json_path}: {e}")
-            return None
+        logger.info(
+            "Component library initialized with %s KiCAD symbol(s)",
+            len(self._component_definitions),
+        )
 
 
     def register_component(self, component_def: ComponentDefinition):
@@ -309,6 +386,9 @@ class CircuitService(QObject):
         """Get component definition by ID"""
         return self._component_definitions.get(component_id)
 
+    def get_component_instance(self, instance_id: str) -> Optional[ComponentInstance]:
+        return self._components.get(instance_id)
+
 
     def get_all_component_definitions(self) -> List[ComponentDefinition]:
         """Get all component definitions"""
@@ -319,6 +399,138 @@ class CircuitService(QObject):
         """Get components of a specific type"""
         return [c for c in self._component_definitions.values() if c.component_type == component_type]
 
+    # ------------------------------------------------------------------
+    # Annotation helpers
+
+    def _annotate_component(self, component: ComponentInstance) -> None:
+        """Assign or refresh the reference designator for a component."""
+
+        comp_def = self.get_component_definition(component.definition_id)
+        if not comp_def:
+            return
+
+        prefix = self._ANNOTATION_PREFIXES.get(comp_def.component_type, "U")
+        next_index = self._annotation_counters.get(comp_def.component_type, 0) + 1
+        self._annotation_counters[comp_def.component_type] = next_index
+        component.annotation = f"{prefix}{next_index}"
+
+    def renumber_annotations(self) -> None:
+        """Recalculate reference designators in KiCAD-compatible order."""
+
+        self._annotation_counters.clear()
+        sorted_components = sorted(
+            self._components.values(),
+            key=lambda comp: (
+                self.get_component_definition(comp.definition_id).component_type.value,
+                comp.instance_id,
+            ),
+        )
+
+        for component in sorted_components:
+            self._annotate_component(component)
+
+    # ------------------------------------------------------------------
+    # Net and bus management
+
+    def _generate_net_name(self, is_power: bool = False) -> str:
+        """Generate a unique net name."""
+
+        prefix = "PWR" if is_power else "NET"
+        while True:
+            candidate = f"{prefix}{self._next_net_id:03}"
+            self._next_net_id += 1
+            if candidate not in self._nets:
+                return candidate
+
+    def create_net(
+        self,
+        name: Optional[str] = None,
+        *,
+        attributes: Optional[Dict[str, str]] = None,
+        is_power: bool = False,
+    ) -> Net:
+        """Create a new net with optional metadata."""
+
+        attributes = attributes or {}
+        if not name:
+            name = self._generate_net_name(is_power=is_power)
+
+        if name in self._nets:
+            raise ValueError(f"Net '{name}' already exists")
+
+        if is_power:
+            attributes.setdefault("type", "power")
+
+        net = Net(name=name, attributes=attributes)
+        self._nets[name] = net
+        return net
+
+    def get_net(self, name: str) -> Optional[Net]:
+        """Return a net by name."""
+
+        return self._nets.get(name)
+
+    def list_nets(self) -> List[Net]:
+        """Return all nets."""
+
+        return list(self._nets.values())
+
+    def _detach_pin_from_any_net(self, component_id: str, pin_id: str) -> None:
+        for net in self._nets.values():
+            before = len(net.nodes)
+            net.nodes = [
+                node
+                for node in net.nodes
+                if not (node.component_id == component_id and node.pin_id == pin_id)
+            ]
+            if before != len(net.nodes):
+                logger.debug(
+                    "Removed %s.%s from net %s", component_id, pin_id, net.name
+                )
+
+    def _find_net_for_pin(self, component_id: str, pin_id: str) -> Optional[Net]:
+        """Return the net that contains the given pin if any."""
+
+        for net in self._nets.values():
+            for node in net.nodes:
+                if node.component_id == component_id and node.pin_id == pin_id:
+                    return net
+        return None
+
+    def assign_pin_to_net(
+        self,
+        component_id: str,
+        pin_id: str,
+        net_name: str,
+        sheet_path: Optional[Tuple[str, ...]] = None,
+        *,
+        pin_type: Optional[PinType] = None,
+        allow_virtual: bool = False,
+    ) -> bool:
+        """Assign the given pin to a net, creating the net if missing."""
+
+        if component_id not in self._components and not allow_virtual:
+            return False
+
+        sheet_path = sheet_path or tuple()
+        net = self._nets.get(net_name) or self.create_net(net_name)
+
+        self._detach_pin_from_any_net(component_id, pin_id)
+
+        comp_def = None
+        if component_id in self._components:
+            comp_def = self.get_component_definition(self._components[component_id].definition_id)
+        pin_obj = next((p for p in comp_def.pins if p.id == pin_id), None) if comp_def else None
+        resolved_pin_type = pin_type or (pin_obj.pin_type if pin_obj else PinType.DIGITAL)
+
+        node = NetNode(
+            component_id=component_id,
+            pin_id=pin_id,
+            pin_type=resolved_pin_type,
+            sheet_path=sheet_path,
+        )
+        net.nodes.append(node)
+        return True
 
     def add_component(
         self,
@@ -348,6 +560,7 @@ class CircuitService(QObject):
         )
 
         self._components[instance_id] = instance
+        self._annotate_component(instance)
         self.component_added.emit(instance_id)
         self.circuit_changed.emit()
 
@@ -369,8 +582,12 @@ class CircuitService(QObject):
         for conn_id in connections_to_remove:
             self.remove_connection(conn_id)
 
+        for net in self._nets.values():
+            net.nodes = [n for n in net.nodes if n.component_id != instance_id]
+
         del self._components[instance_id]
         self.component_removed.emit(instance_id)
+        self.renumber_annotations()
         self.circuit_changed.emit()
 
         logger.debug(f"Removed component: {instance_id}")
@@ -391,6 +608,14 @@ class CircuitService(QObject):
 
         return True
 
+    def update_component_properties(self, instance_id: str, updates: Dict[str, Any]) -> bool:
+        if instance_id not in self._components:
+            return False
+
+        self._components[instance_id].properties.update(updates)
+        self.circuit_changed.emit()
+        return True
+
 
     def rotate_component(self, instance_id: str, rotation: float) -> bool:
         """Rotate a component"""
@@ -406,7 +631,8 @@ class CircuitService(QObject):
 
     def add_connection(self, from_component: str, from_pin: str,
                       to_component: str, to_pin: str,
-                      wire_color: str = "#000000") -> Optional[Connection]:
+                      wire_color: str = "#000000",
+                      connection_type: str = "wire") -> Optional[Connection]:
         """Add a connection between two pins"""
 
         # Validate components exist
@@ -424,13 +650,23 @@ class CircuitService(QObject):
         connection_id = f"conn_{self._next_connection_id}"
         self._next_connection_id += 1
 
+        net = self._nets.get(net_name) if net_name else None
+        if net_name and net is None:
+            net = self.create_net(net_name)
+        if net is None:
+            net = self.create_net()
+
+        self.assign_pin_to_net(from_component, from_pin, net.name)
+        self.assign_pin_to_net(to_component, to_pin, net.name)
+
         connection = Connection(
             connection_id=connection_id,
             from_component=from_component,
             from_pin=from_pin,
             to_component=to_component,
             to_pin=to_pin,
-            wire_color=wire_color
+            wire_color=wire_color,
+            connection_type=connection_type,
         )
 
         self._connections[connection_id] = connection
@@ -446,7 +682,9 @@ class CircuitService(QObject):
         if connection_id not in self._connections:
             return False
 
-        del self._connections[connection_id]
+        connection = self._connections.pop(connection_id)
+        self._detach_pin_from_any_net(connection.from_component, connection.from_pin)
+        self._detach_pin_from_any_net(connection.to_component, connection.to_pin)
         self.connection_removed.emit(connection_id)
         self.circuit_changed.emit()
 
@@ -457,6 +695,10 @@ class CircuitService(QObject):
     def get_circuit_components(self) -> List[ComponentInstance]:
         """Get all components in the circuit"""
         return list(self._components.values())
+
+    def get_components_for_sheet(self, sheet_id: Optional[str] = None) -> List[ComponentInstance]:
+        target_sheet = sheet_id or self.get_active_sheet_id()
+        return [c for c in self._components.values() if c.sheet_id == target_sheet]
 
 
     def get_circuit_connections(self) -> List[Connection]:
@@ -517,52 +759,83 @@ class CircuitService(QObject):
         return True
 
 
-    def validate_circuit(self) -> Tuple[bool, List[str]]:
-        """
-        Validate the circuit for common errors
-        Returns (is_valid, list_of_errors)
-        """
-        errors = []
 
-        # Check for Arduino board
-        arduino_boards = [c for c in self._components.values()
-                         if self.get_component_definition(c.definition_id).component_type == ComponentType.ARDUINO_BOARD]
+            drive_nodes = [node for node in net.nodes if node.pin_type in drive_pin_types]
+            if len(drive_nodes) > 1:
+                diagnostics.append(
+                    ElectricalRuleDiagnostic(
+                        code="ERC_PIN_CONFLICT",
+                        message=f"Net {net.name} ties multiple driven outputs together",
+                        severity="error",
+                        related_net=net.name,
+                    )
+                )
 
-        if not arduino_boards:
-            errors.append("No Arduino board in circuit")
+            analog_nodes = [node for node in net.nodes if node.pin_type == PinType.ANALOG]
+            if analog_nodes and drive_nodes:
+                diagnostics.append(
+                    ElectricalRuleDiagnostic(
+                        code="ERC_ANALOG_DIGITAL_MIX",
+                        message=f"Analog and driven pins share net {net.name}",
+                        severity="warning",
+                        related_net=net.name,
+                    )
+                )
 
-        # Check for floating pins
-        connected_pins = set()
-        for conn in self._connections.values():
-            connected_pins.add((conn.from_component, conn.from_pin))
-            connected_pins.add((conn.to_component, conn.to_pin))
-
-        # Check power connections
         for component in self._components.values():
             comp_def = self.get_component_definition(component.definition_id)
-
-            # Skip Arduino and breadboard
-            if comp_def.component_type in (ComponentType.ARDUINO_BOARD, ComponentType.BREADBOARD):
+            if not comp_def:
                 continue
 
-            # Check if component has power connections
-            power_pins = [p for p in comp_def.pins if p.pin_type == PinType.POWER]
-            ground_pins = [p for p in comp_def.pins if p.pin_type == PinType.GROUND]
+            for pin in comp_def.pins:
+                if pin.pin_type not in (PinType.POWER, PinType.GROUND):
+                    continue
 
-            has_power = any((component.instance_id, p.id) in connected_pins for p in power_pins)
-            has_ground = any((component.instance_id, p.id) in connected_pins for p in ground_pins)
+                net = self._find_net_for_pin(component.instance_id, pin.id)
+                if net:
+                    continue
 
-            if power_pins and not has_power:
-                errors.append(f"{comp_def.name} ({component.instance_id}) has no power connection")
+                severity = "error" if pin.pin_type == PinType.POWER else "warning"
+                diagnostics.append(
+                    ElectricalRuleDiagnostic(
+                        code="ERC_UNCONNECTED_POWER",
+                        message=f"{component.annotation or component.instance_id} missing {pin.pin_type.value} connection",
+                        severity=severity,
+                        related_component=component.instance_id,
+                    )
+                )
 
-            if ground_pins and not has_ground:
-                errors.append(f"{comp_def.name} ({component.instance_id}) has no ground connection")
+        if not any(
+            self.get_component_definition(comp.definition_id).component_type == ComponentType.ARDUINO_BOARD
+            for comp in self._components.values()
+        ):
+            diagnostics.append(
+                ElectricalRuleDiagnostic(
+                    code="ERC_NO_CONTROLLER",
+                    message="Circuit has no Arduino controller",
+                    severity="warning",
+                )
+            )
 
-        is_valid = len(errors) == 0
+        return diagnostics
 
-        self.circuit_validated.emit(is_valid, errors)
+    def validate_circuit(self) -> Tuple[bool, List[ElectricalRuleDiagnostic]]:
+        """Validate the circuit for common electrical errors."""
 
-        return is_valid, errors
+        diagnostics = self.run_electrical_rules_check()
+        is_valid = not any(diag.severity == "error" for diag in diagnostics)
+        serialized = [
+            {
+                "code": diag.code,
+                "message": diag.message,
+                "severity": diag.severity,
+                "related_net": diag.related_net,
+                "related_component": diag.related_component,
+            }
+            for diag in diagnostics
+        ]
+        self.circuit_validated.emit(is_valid, serialized)
+        return is_valid, diagnostics
 
 
     def clear_circuit(self):
@@ -1099,6 +1372,97 @@ def _sexpr_collect_properties(node: List[Any]) -> Dict[str, str]:
             properties[key] = str(value)
     return properties
 
+    # ------------------------------------------------------------------
+    # State management helpers for undo/redo and tests
+    # ------------------------------------------------------------------
+    def export_circuit_state(self) -> Dict[str, Any]:
+        return {
+            "components": [
+                {
+                    "instance_id": c.instance_id,
+                    "definition_id": c.definition_id,
+                    "x": c.x,
+                    "y": c.y,
+                    "rotation": c.rotation,
+                    "properties": copy.deepcopy(c.properties),
+                    "sheet_id": c.sheet_id,
+                }
+                for c in self._components.values()
+            ],
+            "connections": [
+                {
+                    "connection_id": c.connection_id,
+                    "from_component": c.from_component,
+                    "from_pin": c.from_pin,
+                    "to_component": c.to_component,
+                    "to_pin": c.to_pin,
+                    "wire_color": c.wire_color,
+                    "connection_type": c.connection_type,
+                }
+                for c in self._connections.values()
+            ],
+            "sheets": [
+                {
+                    "sheet_id": s.sheet_id,
+                    "name": s.name,
+                    "parent_id": s.parent_id,
+                    "file_path": s.file_path,
+                    "embedded": s.embedded,
+                }
+                for s in self._sheets.values()
+            ],
+            "active_sheet": self._active_sheet_id,
+        }
+
+    def load_circuit_state(self, state: Dict[str, Any]):
+        self.clear_circuit()
+        self._sheets.clear()
+
+        for comp_data in state.get("components", []):
+            component = ComponentInstance(
+                instance_id=comp_data["instance_id"],
+                definition_id=comp_data["definition_id"],
+                x=comp_data["x"],
+                y=comp_data["y"],
+                rotation=comp_data.get("rotation", 0.0),
+                properties=copy.deepcopy(comp_data.get("properties", {})),
+                sheet_id=comp_data.get("sheet_id"),
+            )
+            self._components[component.instance_id] = component
+
+        for conn_data in state.get("connections", []):
+            connection = Connection(
+                connection_id=conn_data["connection_id"],
+                from_component=conn_data["from_component"],
+                from_pin=conn_data["from_pin"],
+                to_component=conn_data["to_component"],
+                to_pin=conn_data["to_pin"],
+                wire_color=conn_data.get("wire_color", "#000000"),
+                connection_type=conn_data.get("connection_type", "wire"),
+            )
+            self._connections[connection.connection_id] = connection
+
+        for sheet_data in state.get("sheets", []):
+            sheet = Sheet(
+                sheet_id=sheet_data["sheet_id"],
+                name=sheet_data["name"],
+                parent_id=sheet_data.get("parent_id"),
+                file_path=sheet_data.get("file_path"),
+                embedded=sheet_data.get("embedded", False),
+            )
+            self._sheets[sheet.sheet_id] = sheet
+
+        if not self._sheets:
+            self._ensure_root_sheet()
+
+        self._active_sheet_id = state.get("active_sheet", self._active_sheet_id)
+        if self._active_sheet_id not in self._sheets:
+            self._active_sheet_id = next(iter(self._sheets))
+
+        self.sheets_changed.emit()
+        self.active_sheet_changed.emit(self._active_sheet_id)
+        self.circuit_changed.emit()
+
 
     def generate_connection_list(self) -> str:
         """Generate a text description of connections"""
@@ -1111,7 +1475,8 @@ def _sexpr_collect_properties(node: List[Any]) -> Dict[str, str]:
             from_def = self.get_component_definition(from_comp.definition_id)
             to_def = self.get_component_definition(to_comp.definition_id)
 
-            line = f"{from_def.name} ({conn.from_pin}) -> {to_def.name} ({conn.to_pin})"
+            net_info = f" [{conn.net_name}]" if conn.net_name else ""
+            line = f"{from_def.name} ({conn.from_pin}) -> {to_def.name} ({conn.to_pin}){net_info}"
             lines.append(line)
 
         return "\n".join(lines)

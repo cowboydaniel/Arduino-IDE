@@ -14,6 +14,7 @@ from .output_panel import OutputPanel
 from .status_bar import StatusBar
 from .library_manager_dialog import LibraryManagerDialog
 from .board_manager_dialog import BoardManagerDialog
+from .onboarding_wizard import OnboardingWizard
 
 __all__ = [
     'MainWindow',
@@ -30,4 +31,5 @@ __all__ = [
     'StatusBar',
     'LibraryManagerDialog',
     'BoardManagerDialog',
+    'OnboardingWizard',
 ]

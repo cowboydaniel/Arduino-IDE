@@ -1,19 +1,59 @@
 """
 Circuit Editor
-Visual circuit design interface with component library and wiring
+KiCAD-inspired circuit editor with advanced tooling
 """
 
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-                               QPushButton, QGraphicsView, QGraphicsScene,
-                               QGraphicsItem, QGraphicsEllipseItem, QGraphicsLineItem,
-                               QGraphicsRectItem, QGraphicsTextItem, QListWidget,
-                               QListWidgetItem, QLabel, QMessageBox, QGroupBox,
-                               QScrollArea, QToolBox, QMainWindow, QFileDialog)
-from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QLineF, Slot
-from PySide6.QtGui import QPainter, QColor, QBrush, QPen, QFont, QPainterPath, QPolygonF, QAction, QKeySequence
+from __future__ import annotations
+
+import copy
 import logging
-from typing import Optional, Dict, List
+import math
+from enum import Enum, auto
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+from PySide6.QtCore import QPointF, QRectF, Qt, QLineF, QObject, Signal, Slot
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QCursor,
+    QFont,
+    QKeySequence,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPolygonF,
+)
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
+    QDockWidget,
+    QFileDialog,
+    QFormLayout,
+    QGraphicsItem,
+    QGraphicsPathItem,
+    QGraphicsScene,
+    QGraphicsTextItem,
+    QGraphicsView,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QComboBox,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QTabWidget,
+    QToolBox,
+    QToolButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from arduino_ide.services.circuit_service import (
     CircuitService,
@@ -29,718 +69,1102 @@ from arduino_ide.services.circuit_service import (
 logger = logging.getLogger(__name__)
 
 
-class PinGraphicsItem(QGraphicsEllipseItem):
-    """Graphics item representing a clickable pin"""
+class ToolMode(Enum):
+    """Interaction modes for the workspace"""
 
-    def __init__(self, pin: Pin, pin_color: QColor, parent=None):
-        super().__init__(-3, -3, 6, 6, parent)
+    SELECT = auto()
+    WIRE = auto()
+    BUS = auto()
+    NET_LABEL = auto()
+    POWER_SYMBOL = auto()
+    JUNCTION = auto()
+    SHEET_PIN = auto()
+    MEASURE = auto()
 
+
+class PinGraphicsItem(QGraphicsItem):
+    """Graphics representation of a schematic pin"""
+
+    def __init__(self, pin: Pin, color: QColor, parent: Optional[QGraphicsItem] = None):
+        super().__init__(parent)
         self.pin = pin
-        self.setBrush(QBrush(pin_color))
-        self.setPen(QPen(Qt.black, 1))
-        self.setZValue(2)  # Above component
-
-        # Make clickable
-        self.setFlag(QGraphicsItem.ItemIsSelectable, False)
+        self.pin_color = color
+        self._hovered = False
         self.setAcceptHoverEvents(True)
+        self.setCursor(Qt.CrossCursor)
+        self.setZValue(2)
 
-        self._is_hovered = False
+    def boundingRect(self) -> QRectF:  # type: ignore[override]
+        length = max(10.0, self.pin.length)
+        if self.pin.orientation in ("up", "down"):
+            return QRectF(-6, -length - 6, 12, length + 12)
+        return QRectF(-length - 6, -6, length + 12, 12)
 
+    def paint(self, painter: QPainter, option, widget=None):  # type: ignore[override]
+        painter.setRenderHint(QPainter.Antialiasing)
+        color = QColor("#00C853") if self._hovered else self.pin_color
+        painter.setPen(QPen(color, 1.6))
 
-    def hoverEnterEvent(self, event):
-        """Highlight pin on hover"""
-        self._is_hovered = True
-        self.setPen(QPen(QColor("#00FF00"), 2))  # Green highlight
-        self.setZValue(3)
+        start, end = self._orientation_line()
+        painter.drawLine(start, end)
+
+        if self.pin.decoration == "clock":
+            arc_rect = QRectF(end.x() - 6, end.y() - 6, 12, 12)
+            path = QPainterPath()
+            path.arcMoveTo(arc_rect, 0)
+            path.arcTo(arc_rect, 0, 270)
+            painter.drawPath(path)
+        elif self.pin.decoration == "dot":
+            painter.setBrush(color)
+            painter.drawEllipse(end, 2.5, 2.5)
+        elif self.pin.decoration == "triangle":
+            triangle = QPolygonF([end, end + QPointF(-8, -5), end + QPointF(-8, 5)])
+            painter.setBrush(color)
+            painter.drawPolygon(triangle)
+
+    def _orientation_line(self) -> Tuple[QPointF, QPointF]:
+        length = max(10.0, self.pin.length)
+        if self.pin.orientation == "right":
+            return QPointF(0, 0), QPointF(length, 0)
+        if self.pin.orientation == "up":
+            return QPointF(0, 0), QPointF(0, -length)
+        if self.pin.orientation == "down":
+            return QPointF(0, 0), QPointF(0, length)
+        return QPointF(-length, 0), QPointF(0, 0)
+
+    def hoverEnterEvent(self, event):  # type: ignore[override]
+        self._hovered = True
+        self.update()
         super().hoverEnterEvent(event)
 
-
-    def hoverLeaveEvent(self, event):
-        """Remove highlight on hover leave"""
-        self._is_hovered = False
-        self.setPen(QPen(Qt.black, 1))
-        self.setZValue(2)
+    def hoverLeaveEvent(self, event):  # type: ignore[override]
+        self._hovered = False
+        self.update()
         super().hoverLeaveEvent(event)
 
-
-    def mousePressEvent(self, event):
-        """Handle pin click"""
+    def mousePressEvent(self, event):  # type: ignore[override]
         if event.button() == Qt.LeftButton:
-            # Get parent component and notify workspace
-            component_item = self.parentItem()
-            if component_item and hasattr(component_item, 'comp_instance'):
-                scene = self.scene()
-                if scene and hasattr(scene.views()[0], 'on_pin_clicked'):
-                    scene.views()[0].on_pin_clicked(
-                        component_item.comp_instance.instance_id,
+            parent = self.parentItem()
+            if parent and hasattr(parent, "comp_instance"):
+                view = self.scene().views()[0]
+                if hasattr(view, "on_pin_clicked"):
+                    view.on_pin_clicked(
+                        parent.comp_instance.instance_id,
                         self.pin.id,
-                        self.scenePos()
+                        self.scenePos(),
                     )
             event.accept()
         else:
             super().mousePressEvent(event)
 
 
-class ComponentGraphicsItem(QGraphicsRectItem):
-    """Graphics item representing a circuit component"""
+class ComponentGraphicsItem(QGraphicsItem):
+    """KiCAD style symbol rendering"""
 
-    def __init__(self, comp_def: ComponentDefinition, comp_instance: ComponentInstance, parent=None):
+    def __init__(
+        self,
+        comp_def: ComponentDefinition,
+        comp_instance: ComponentInstance,
+        parent: Optional[QGraphicsItem] = None,
+    ):
         super().__init__(parent)
-
         self.comp_def = comp_def
         self.comp_instance = comp_instance
-
-        # Setup appearance
-        self.setRect(0, 0, comp_def.width, comp_def.height)
-        self.setPos(comp_instance.x, comp_instance.y)
-
-        # Set color based on type
-        color = self._get_component_color()
-        self.setBrush(QBrush(color))
-        self.setPen(QPen(QColor("#333333"), 2))
-
-        # Make draggable
-        self.setFlag(QGraphicsItem.ItemIsMovable)
-        self.setFlag(QGraphicsItem.ItemIsSelectable)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
-
-        # Add label
-        self.label = QGraphicsTextItem(self)
-        self.label.setPlainText(comp_def.name)
-        self.label.setDefaultTextColor(Qt.black)
+        self._resolved_pins: List[Pin] = list(comp_def.pins)
+        self._width = comp_def.width
+        self._height = comp_def.height
+        self._graphics_cache: List[Dict] = []
+        self.pin_items: Dict[str, PinGraphicsItem] = {}
+        self.label_item = QGraphicsTextItem(comp_def.name, self)
         font = QFont()
         font.setBold(True)
-        font.setPointSize(8)
-        self.label.setFont(font)
+        font.setPointSize(9)
+        self.label_item.setFont(font)
+        self.label_item.setDefaultTextColor(Qt.black)
 
-        # Center label
-        label_width = self.label.boundingRect().width()
-        self.label.setPos((comp_def.width - label_width) / 2, comp_def.height / 2 - 10)
+        self.setFlags(
+            QGraphicsItem.ItemIsSelectable
+            | QGraphicsItem.ItemIsMovable
+            | QGraphicsItem.ItemSendsGeometryChanges
+        )
+        self._rebuild_graphics()
+        self.setPos(comp_instance.x, comp_instance.y)
+        self.setRotation(comp_instance.rotation)
 
-        # Draw pins
-        self.pin_items = {}
-        for pin in comp_def.pins:
-            # Create clickable pin item
-            pin_item = PinGraphicsItem(pin, self._get_pin_color(pin.pin_type), self)
+    def boundingRect(self) -> QRectF:  # type: ignore[override]
+        return self._bounding_rect
+
+    def paint(self, painter: QPainter, option, widget=None):  # type: ignore[override]
+        painter.setRenderHint(QPainter.Antialiasing)
+        for entry in self._graphics_cache:
+            painter.setPen(entry["pen"])
+            painter.setBrush(entry.get("brush", Qt.NoBrush))
+            painter.drawPath(entry["path"])
+
+    def _rebuild_graphics(self):
+        self.prepareGeometryChange()
+        graphics = self._resolve_graphics()
+        if not graphics:
+            graphics = [
+                {
+                    "type": "rect",
+                    "rect": [0, 0, self._width, self._height],
+                    "pen": "#333333",
+                    "width": 2,
+                    "fill": "#FAFAFA",
+                }
+            ]
+
+        self._graphics_cache.clear()
+        overall_rect = QRectF()
+        for shape in graphics:
+            pen = QPen(QColor(shape.get("pen", "#333333")), float(shape.get("width", 1.5)))
+            pen.setJoinStyle(Qt.MiterJoin)
+            brush_color = shape.get("fill")
+            brush = Qt.NoBrush if not brush_color else QColor(brush_color)
+            path = QPainterPath()
+            shape_type = shape.get("type", "rect")
+            if shape_type == "rect":
+                rect = QRectF(*shape.get("rect", [0, 0, self._width, self._height]))
+                path.addRect(rect)
+            elif shape_type == "polygon":
+                points = [QPointF(p[0], p[1]) for p in shape.get("points", [])]
+                if points:
+                    path.addPolygon(QPolygonF(points))
+            elif shape_type == "arc":
+                rect = QRectF(*shape.get("rect", [0, 0, self._width, self._height]))
+                start = float(shape.get("start", 0))
+                span = float(shape.get("span", 90))
+                path.arcMoveTo(rect, start)
+                path.arcTo(rect, start, span)
+            elif shape_type == "circle":
+                cx, cy = shape.get("center", [0, 0])
+                radius = float(shape.get("radius", 10))
+                path.addEllipse(QPointF(cx, cy), radius, radius)
+
+            self._graphics_cache.append({"pen": pen, "brush": brush, "path": path})
+            if overall_rect.isNull():
+                overall_rect = path.boundingRect()
+            else:
+                overall_rect = overall_rect.united(path.boundingRect())
+
+        if overall_rect.isNull():
+            overall_rect = QRectF(0, 0, self._width, self._height)
+        self._bounding_rect = overall_rect.adjusted(-6, -6, 6, 6)
+
+        self._rebuild_pins(graphics)
+
+    def _resolve_graphics(self) -> List[Dict]:
+        unit_id = self.comp_instance.properties.get("unit")
+        if not self.comp_def.units:
+            self._resolved_pins = list(self.comp_def.pins)
+            return self.comp_def.graphics
+
+        if unit_id:
+            for unit in self.comp_def.units:
+                if unit.get("id") == unit_id:
+                    self._apply_unit_override(unit)
+                    return unit.get("graphics", self.comp_def.graphics)
+
+        default_unit = self.comp_def.units[0]
+        self.comp_instance.properties["unit"] = default_unit.get("id", "unit_1")
+        self._apply_unit_override(default_unit)
+        return default_unit.get("graphics", self.comp_def.graphics)
+
+    def _apply_unit_override(self, unit_def: Dict):
+        self._width = unit_def.get("width", self.comp_def.width)
+        self._height = unit_def.get("height", self.comp_def.height)
+        if unit_def.get("pins"):
+            pins: List[Pin] = []
+            for pin_data in unit_def["pins"]:
+                try:
+                    pin_type = PinType(pin_data.get("pin_type", PinType.DIGITAL.value))
+                except ValueError:
+                    pin_type = PinType.DIGITAL
+                pins.append(
+                    Pin(
+                        id=pin_data["id"],
+                        label=pin_data.get("label", pin_data["id"]),
+                        pin_type=pin_type,
+                        position=(pin_data.get("position", [0, 0])[0], pin_data.get("position", [0, 0])[1]),
+                        length=float(pin_data.get("length", 20)),
+                        orientation=pin_data.get("orientation", "left"),
+                        decoration=pin_data.get("decoration", "line"),
+                    )
+                )
+            self._resolved_pins = pins
+        else:
+            self._resolved_pins = list(self.comp_def.pins)
+
+    def _rebuild_pins(self, graphics: List[Dict]):
+        for pin_item in list(self.pin_items.values()):
+            pin_item.setParentItem(None)
+            pin_item.scene().removeItem(pin_item) if pin_item.scene() else None
+        self.pin_items.clear()
+
+        for pin in self._resolved_pins:
+            color = self._pin_color(pin.pin_type)
+            pin_item = PinGraphicsItem(pin, color, self)
             pin_item.setPos(pin.position[0], pin.position[1])
+            self.pin_items[pin.id] = pin_item
 
-            # Add pin label
-            pin_label = QGraphicsTextItem(self)
-            pin_label.setPlainText(pin.label)
-            pin_label.setDefaultTextColor(Qt.black)
-            pin_font = QFont()
-            pin_font.setPointSize(6)
-            pin_label.setFont(pin_font)
-            pin_label.setPos(pin.position[0] - 10, pin.position[1] - 15)
+        bounds = self.boundingRect()
+        self.label_item.setPos(bounds.center().x() - self.label_item.boundingRect().width() / 2, bounds.top() - 14)
 
-            self.pin_items[pin.id] = (pin_item, pin_label)
-
-
-    def _get_component_color(self) -> QColor:
-        """Get color for component type"""
-        color_map = {
-            ComponentType.ARDUINO_BOARD: QColor("#4A90E2"),
-            ComponentType.LED: QColor("#E74C3C"),
-            ComponentType.RESISTOR: QColor("#F39C12"),
-            ComponentType.BUTTON: QColor("#95A5A6"),
-            ComponentType.POTENTIOMETER: QColor("#3498DB"),
-            ComponentType.SERVO: QColor("#9B59B6"),
-            ComponentType.SENSOR: QColor("#1ABC9C"),
-            ComponentType.BREADBOARD: QColor("#ECF0F1"),
+    def _pin_color(self, pin_type: PinType) -> QColor:
+        mapping = {
+            PinType.POWER: QColor("#F4511E"),
+            PinType.GROUND: QColor("#5D4037"),
+            PinType.ANALOG: QColor("#00838F"),
+            PinType.PWM: QColor("#6A1B9A"),
+            PinType.SPI: QColor("#283593"),
+            PinType.I2C: QColor("#2E7D32"),
+            PinType.SERIAL: QColor("#C62828"),
         }
-        return color_map.get(self.comp_def.component_type, QColor("#BDC3C7"))
+        return mapping.get(pin_type, QColor("#424242"))
 
-
-    def _get_pin_color(self, pin_type: PinType) -> QColor:
-        """Get color for pin type"""
-        color_map = {
-            PinType.DIGITAL: QColor("#3498DB"),
-            PinType.ANALOG: QColor("#E67E22"),
-            PinType.PWM: QColor("#9B59B6"),
-            PinType.POWER: QColor("#E74C3C"),
-            PinType.GROUND: QColor("#000000"),
-        }
-        return color_map.get(pin_type, QColor("#95A5A6"))
-
-
-    def itemChange(self, change, value):
-        """Handle item changes"""
-        if change == QGraphicsItem.ItemPositionChange:
-            new_pos = value
-            self.comp_instance.x = new_pos.x()
-            self.comp_instance.y = new_pos.y()
-
-            # Update connected wires
-            if self.scene() and self.scene().views():
-                view = self.scene().views()[0]
-                if hasattr(view, '_update_component_connections'):
-                    view._update_component_connections(self.comp_instance.instance_id)
-
+    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):  # type: ignore[override]
+        if change == QGraphicsItem.ItemPositionHasChanged and self.scene():
+            view = self.scene().views()[0]
+            if hasattr(view, "on_component_moved"):
+                view.on_component_moved(self.comp_instance.instance_id, self.pos())
         return super().itemChange(change, value)
 
-
     def get_pin_scene_pos(self, pin_id: str) -> Optional[QPointF]:
-        """Get the scene position of a pin"""
-        if pin_id in self.pin_items:
-            pin_item, _ = self.pin_items[pin_id]
-            return pin_item.scenePos()
-        return None
+        if pin_id not in self.pin_items:
+            return None
+        return self.pin_items[pin_id].scenePos()
 
 
-class ConnectionGraphicsItem(QGraphicsLineItem):
-    """Graphics item representing a wire connection"""
+class ConnectionGraphicsItem(QGraphicsPathItem):
+    """Orthogonal wire/bus rendering"""
 
     def __init__(self, connection: Connection, start_pos: QPointF, end_pos: QPointF, parent=None):
         super().__init__(parent)
-
         self.connection = connection
-
-        self.setLine(QLineF(start_pos, end_pos))
-        self.setPen(QPen(QColor(connection.wire_color), 3))
+        path = QPainterPath(start_pos)
+        mid = QPointF(start_pos.x(), end_pos.y())
+        if abs(start_pos.x() - end_pos.x()) < abs(start_pos.y() - end_pos.y()):
+            mid = QPointF(end_pos.x(), start_pos.y())
+        path.lineTo(mid)
+        path.lineTo(end_pos)
+        self.setPath(path)
+        color = QColor(connection.wire_color)
+        width = 3 if connection.connection_type == "bus" else 2
+        pen = QPen(color, width)
+        if connection.connection_type == "bus":
+            pen.setCapStyle(Qt.RoundCap)
+        self.setPen(pen)
         self.setZValue(-1)
 
 
 class ComponentLibraryWidget(QWidget):
-    """Widget displaying available components"""
+    """Dockable widget exposing the symbol library"""
 
-    component_selected = Signal(str)  # component_id
+    component_selected = Signal(str)
 
-    def __init__(self, service: CircuitService, parent=None):
+    def __init__(self, service: CircuitService, parent: Optional[QWidget] = None):
         super().__init__(parent)
-
         self.service = service
-
-        self._setup_ui()
-
-
-    def _setup_ui(self):
-        """Setup UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-
-        # Title
-        title = QLabel("Component Library")
+        layout.setContentsMargins(4, 4, 4, 4)
+        title = QLabel("Symbol Chooser")
         title.setStyleSheet("font-weight: bold; font-size: 12pt;")
         layout.addWidget(title)
-
-        # Toolbox with component categories
         self.toolbox = QToolBox()
-
-        # Group by component type
-        type_groups = {}
-        for comp_def in self.service.get_all_component_definitions():
-            if comp_def.component_type not in type_groups:
-                type_groups[comp_def.component_type] = []
-            type_groups[comp_def.component_type].append(comp_def)
-
-        # Add each category
-        for comp_type, components in sorted(type_groups.items(), key=lambda x: x[0].value):
-            category_widget = self._create_category_widget(components)
-            self.toolbox.addItem(category_widget, comp_type.value.replace("_", " ").title())
-
         layout.addWidget(self.toolbox)
+        self._populate()
+
+    def _populate(self):
+        self.toolbox.clear()
+        grouped: Dict[str, List[ComponentDefinition]] = {}
+        for comp in self.service.get_all_component_definitions():
+            grouped.setdefault(comp.component_type.value, []).append(comp)
+        for comp_type, comps in sorted(grouped.items()):
+            category_widget = QWidget()
+            cat_layout = QVBoxLayout(category_widget)
+            for comp_def in comps:
+                button = QPushButton(comp_def.name)
+                button.setToolTip(comp_def.description)
+                button.clicked.connect(lambda checked=False, cid=comp_def.id: self.component_selected.emit(cid))
+                cat_layout.addWidget(button)
+            cat_layout.addStretch()
+            self.toolbox.addItem(category_widget, comp_type.replace("_", " ").title())
 
 
-    def _create_category_widget(self, components: List[ComponentDefinition]) -> QWidget:
-        """Create widget for a component category"""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setSpacing(5)
+class PropertyInspectorWidget(QWidget):
+    """Inspector for the currently selected symbol"""
 
-        for comp_def in components:
-            comp_button = QPushButton(comp_def.name)
-            comp_button.setToolTip(comp_def.description)
-            comp_button.clicked.connect(lambda checked, cid=comp_def.id: self.component_selected.emit(cid))
-
-            layout.addWidget(comp_button)
-
+    def __init__(self, service: CircuitService, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.service = service
+        self._current_component: Optional[str] = None
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 6, 6)
+        title = QLabel("Property Inspector")
+        title.setStyleSheet("font-weight: bold; font-size: 12pt;")
+        layout.addWidget(title)
+        self.form = QFormLayout()
+        self.ref_input = QLineEdit()
+        self.ref_input.editingFinished.connect(self._on_reference_changed)
+        self.value_input = QLineEdit()
+        self.value_input.editingFinished.connect(self._on_value_changed)
+        self.unit_combo = QComboBox()
+        self.unit_combo.currentTextChanged.connect(self._on_unit_changed)
+        self.form.addRow("Reference", self.ref_input)
+        self.form.addRow("Value", self.value_input)
+        self.form.addRow("Unit", self.unit_combo)
+        layout.addLayout(self.form)
+        self.hint_label = QLabel("Select a component to edit its properties.")
+        self.hint_label.setWordWrap(True)
+        layout.addWidget(self.hint_label)
         layout.addStretch()
-        return widget
+
+    def display_component(self, component_id: Optional[str]):
+        self._current_component = component_id
+        if not component_id:
+            self.ref_input.clear()
+            self.value_input.clear()
+            self.unit_combo.clear()
+            self.hint_label.setText("Select a component to edit its properties.")
+            return
+
+        comp = self.service.get_component_instance(component_id)
+        if not comp:
+            return
+        comp_def = self.service.get_component_definition(comp.definition_id)
+        if not comp_def:
+            return
+        self.hint_label.setText(f"Editing {comp_def.name} ({component_id})")
+        self.ref_input.setText(comp.properties.get("reference", component_id))
+        self.value_input.setText(comp.properties.get("value", ""))
+        self.unit_combo.blockSignals(True)
+        self.unit_combo.clear()
+        if comp_def.units:
+            for unit in comp_def.units:
+                unit_id = unit.get("id", "unit")
+                self.unit_combo.addItem(unit.get("name", unit_id), unit_id)
+            current_unit = comp.properties.get("unit")
+            if current_unit:
+                index = self.unit_combo.findData(current_unit)
+                if index >= 0:
+                    self.unit_combo.setCurrentIndex(index)
+        else:
+            self.unit_combo.addItem("Standard", "default")
+        self.unit_combo.blockSignals(False)
+
+    def _on_reference_changed(self):
+        if not self._current_component:
+            return
+        self.service.update_component_properties(
+            self._current_component,
+            {"reference": self.ref_input.text().strip()},
+        )
+
+    def _on_value_changed(self):
+        if not self._current_component:
+            return
+        self.service.update_component_properties(
+            self._current_component,
+            {"value": self.value_input.text().strip()},
+        )
+
+    def _on_unit_changed(self, unit_id: str):
+        if not self._current_component or not unit_id:
+            return
+        self.service.update_component_properties(self._current_component, {"unit": unit_id})
+
+
+class MessagePanelWidget(QWidget):
+    """Messages, ERC and DRC style feedback"""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        title = QLabel("Messages & ERC")
+        title.setStyleSheet("font-weight: bold; font-size: 12pt;")
+        layout.addWidget(title)
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+        self.log_view = QPlainTextEdit()
+        self.log_view.setReadOnly(True)
+        self.erc_list = QListWidget()
+        self.tabs.addTab(self.log_view, "Messages")
+        self.tabs.addTab(self.erc_list, "ERC")
+
+    def append_message(self, text: str):
+        self.log_view.appendPlainText(text)
+
+    def show_erc_results(self, errors: List[str]):
+        self.erc_list.clear()
+        if not errors:
+            self.erc_list.addItem(QListWidgetItem("No ERC violations."))
+            return
+        for error in errors:
+            item = QListWidgetItem(error)
+            item.setForeground(QColor("#C62828"))
+            self.erc_list.addItem(item)
+
+        self._refresh_groups()
+
+
+class SheetNavigatorWidget(QWidget):
+    """Hierarchical sheet browser"""
+
+    def __init__(self, service: CircuitService, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.service = service
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        title = QLabel("Sheet Navigator")
+        title.setStyleSheet("font-weight: bold; font-size: 12pt;")
+        layout.addWidget(title)
+        self.tree = QTreeWidget()
+        self.tree.setHeaderHidden(True)
+        self.tree.itemSelectionChanged.connect(self._on_selection_changed)
+        layout.addWidget(self.tree)
+        button_row = QHBoxLayout()
+        self.new_btn = QPushButton("New")
+        self.open_btn = QPushButton("Open")
+        self.embed_btn = QPushButton("Embed")
+        self.new_btn.clicked.connect(self._create_sheet)
+        self.open_btn.clicked.connect(self._open_sheet)
+        self.embed_btn.clicked.connect(self._embed_sheet)
+        button_row.addWidget(self.new_btn)
+        button_row.addWidget(self.open_btn)
+        button_row.addWidget(self.embed_btn)
+        layout.addLayout(button_row)
+        self.service.sheets_changed.connect(self.refresh)
+        self.service.active_sheet_changed.connect(self._highlight_active)
+        self.refresh()
+
+    def refresh(self):
+        self.tree.clear()
+        sheets = self.service.get_sheets()
+        items: Dict[str, QTreeWidgetItem] = {}
+        for sheet in sheets:
+            item = QTreeWidgetItem([sheet.name])
+            item.setData(0, Qt.UserRole, sheet.sheet_id)
+            items[sheet.sheet_id] = item
+            if sheet.parent_id and sheet.parent_id in items:
+                items[sheet.parent_id].addChild(item)
+            else:
+                self.tree.addTopLevelItem(item)
+        self._highlight_active(self.service.get_active_sheet_id())
+        self.tree.expandAll()
+
+    def _on_selection_changed(self):
+        selected = self.tree.selectedItems()
+        if not selected:
+            return
+        sheet_id = selected[0].data(0, Qt.UserRole)
+        if sheet_id:
+            self.service.set_active_sheet(sheet_id)
+
+    def _highlight_active(self, sheet_id: str):
+        self.tree.blockSignals(True)
+        def visit(item: QTreeWidgetItem):
+            item.setSelected(item.data(0, Qt.UserRole) == sheet_id)
+            for i in range(item.childCount()):
+                visit(item.child(i))
+
+        for idx in range(self.tree.topLevelItemCount()):
+            visit(self.tree.topLevelItem(idx))
+        self.tree.blockSignals(False)
+
+    def _create_sheet(self):
+        name, ok = QInputDialog.getText(self, "New Sheet", "Sheet name:")
+        if not ok or not name:
+            return
+        sheet = self.service.create_sheet(name)
+        self.service.set_active_sheet(sheet.sheet_id)
+
+    def _open_sheet(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open Sheet", str(Path.home()))
+        if not file_path:
+            return
+        sheet = self.service.open_sheet(file_path)
+        self.service.set_active_sheet(sheet.sheet_id)
+
+    def _embed_sheet(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Embed Sheet", str(Path.home()))
+        if not file_path:
+            return
+        sheet = self.service.embed_sheet(file_path)
+        self.service.set_active_sheet(sheet.sheet_id)
+
+    def _refresh_groups(self):
+        """Update toolbox groupings based on the current filters."""
+
+        while self.toolbox.count():
+            widget = self.toolbox.widget(0)
+            self.toolbox.removeItem(0)
+            if widget is not None:
+                widget.deleteLater()
+
+        groups = build_component_groups(
+            self.service.get_all_component_definitions(),
+            self.group_mode.currentText(),
+            self.filter_input.text(),
+        )
+
+        if not groups:
+            placeholder = QWidget()
+            placeholder_layout = QVBoxLayout(placeholder)
+            label = QLabel("No symbols match your filters.")
+            label.setWordWrap(True)
+            placeholder_layout.addWidget(label)
+            placeholder_layout.addStretch()
+            self.toolbox.addItem(placeholder, "No Results")
+            return
+
+        for group_name, components in groups:
+            category_widget = self._create_category_widget(components)
+            self.toolbox.addItem(category_widget, group_name)
 
 
 class CircuitWorkspaceView(QGraphicsView):
-    """Graphics view for circuit design workspace"""
+    """Central schematic canvas"""
 
-    def __init__(self, service: CircuitService, parent=None):
+    selection_changed = Signal(object)
+    status_message = Signal(str)
+
+    def __init__(self, service: CircuitService, parent: Optional[QWidget] = None):
         super().__init__(parent)
-
         self.service = service
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setDragMode(QGraphicsView.NoDrag)
+        self.setSceneRect(-4000, -4000, 8000, 8000)
 
-        # Component and connection items
+        self.tool_mode = ToolMode.SELECT
+        self._snap_enabled = True
+        self._grid_size = 20
         self.component_items: Dict[str, ComponentGraphicsItem] = {}
         self.connection_items: Dict[str, ConnectionGraphicsItem] = {}
-
-        # Setup view
-        self.setRenderHint(QPainter.Antialiasing)
-        self.setDragMode(QGraphicsView.NoDrag)  # Allow component dragging
-        self.setSceneRect(-2000, -2000, 4000, 4000)
-
-        # Grid background
-        self.setBackgroundBrush(QBrush(QColor("#FFFFFF")))
-
-        # Enable panning with middle mouse button
+        self._connection_lookup: Dict[str, Connection] = {}
+        self._annotations: List[Dict] = []
+        self._annotation_items: List[QGraphicsItem] = []
+        self._history: List[Dict] = []
+        self._redo_history: List[Dict] = []
+        self._is_restoring_state = False
         self._is_panning = False
-        self._pan_start_pos = None
-
-        # Connection mode state
+        self._pan_start = QPointF()
         self._connection_mode = False
-        self._connection_start_component = None
-        self._connection_start_pin = None
-        self._connection_start_pos = None
-        self._rubber_band_line = None
+        self._connection_start_component: Optional[str] = None
+        self._connection_start_pin: Optional[str] = None
+        self._connection_start_pos: Optional[QPointF] = None
+        self._rubber_band_line: Optional[QGraphicsPathItem] = None
+        self._measurement_start: Optional[QPointF] = None
+        self._suspend_scene_refresh = False
 
-        # Connect to service
-        self.service.component_added.connect(self._on_component_added)
-        self.service.component_removed.connect(self._on_component_removed)
-        self.service.connection_added.connect(self._on_connection_added)
-        self.service.connection_removed.connect(self._on_connection_removed)
+        self.scene.selectionChanged.connect(self._on_selection_changed)
+        self.service.circuit_changed.connect(self._on_service_changed)
+        self.service.active_sheet_changed.connect(lambda _: self._refresh_scene())
 
-        logger.info("Circuit workspace view initialized")
+        self._history.append(self._capture_snapshot())
+        self._refresh_scene()
 
+    # ------------------------------------------------------------------
+    # Scene / state management
+    # ------------------------------------------------------------------
+    def _capture_snapshot(self) -> Dict:
+        snapshot = self.service.export_circuit_state()
+        snapshot["annotations"] = copy.deepcopy(self._annotations)
+        return snapshot
 
-    @Slot(str)
-    def _on_component_added(self, instance_id: str):
-        """Handle component added"""
-        components = self.service.get_circuit_components()
-        comp_instance = next((c for c in components if c.instance_id == instance_id), None)
+    def _restore_snapshot(self, snapshot: Dict):
+        self._is_restoring_state = True
+        self.service.load_circuit_state(snapshot)
+        self._annotations = copy.deepcopy(snapshot.get("annotations", []))
+        self._is_restoring_state = False
+        self._refresh_scene()
 
-        if not comp_instance:
+    def _on_service_changed(self):
+        if self._suspend_scene_refresh:
+            self._suspend_scene_refresh = False
+        else:
+            self._refresh_scene()
+        if self._is_restoring_state:
             return
+        self._history.append(self._capture_snapshot())
+        if len(self._history) > 50:
+            self._history.pop(0)
+        self._redo_history.clear()
 
-        comp_def = self.service.get_component_definition(comp_instance.definition_id)
-        if not comp_def:
+    def _refresh_scene(self):
+        self.scene.clear()
+        self.component_items.clear()
+        self.connection_items.clear()
+        self._connection_lookup.clear()
+        self._annotation_items.clear()
+        active_sheet = self.service.get_active_sheet_id()
+        for comp in self.service.get_components_for_sheet(active_sheet):
+            comp_def = self.service.get_component_definition(comp.definition_id)
+            if not comp_def:
+                continue
+            item = ComponentGraphicsItem(comp_def, comp)
+            self.scene.addItem(item)
+            self.component_items[comp.instance_id] = item
+        for conn in self.service.get_connections_for_sheet(active_sheet):
+            self._add_connection_item(conn)
+        for annotation in self._annotations:
+            self._create_annotation_item(annotation)
+
+    def _add_connection_item(self, connection: Connection):
+        from_item = self.component_items.get(connection.from_component)
+        to_item = self.component_items.get(connection.to_component)
+        if not from_item or not to_item:
             return
-
-        # Create graphics item
-        item = ComponentGraphicsItem(comp_def, comp_instance)
+        start = from_item.get_pin_scene_pos(connection.from_pin)
+        end = to_item.get_pin_scene_pos(connection.to_pin)
+        if not start or not end:
+            return
+        item = ConnectionGraphicsItem(connection, start, end)
         self.scene.addItem(item)
-        self.component_items[instance_id] = item
+        self.connection_items[connection.connection_id] = item
+        self._connection_lookup[connection.connection_id] = connection
+        return item
 
-        logger.debug(f"Added component to circuit: {instance_id}")
+    def _create_wire_path(self, start: QPointF, end: QPointF) -> QPainterPath:
+        path = QPainterPath(start)
+        mid = QPointF(start.x(), end.y())
+        if abs(start.x() - end.x()) < abs(start.y() - end.y()):
+            mid = QPointF(end.x(), start.y())
+        path.lineTo(mid)
+        path.lineTo(end)
+        return path
 
+    # ------------------------------------------------------------------
+    # Interaction helpers
+    # ------------------------------------------------------------------
+    def set_tool_mode(self, mode: ToolMode):
+        self.tool_mode = mode
+        cursor = Qt.CrossCursor if mode != ToolMode.SELECT else Qt.ArrowCursor
+        self.setCursor(cursor)
+        self.status_message.emit(f"Tool: {mode.name.title()}")
 
-    @Slot(str)
-    def _on_component_removed(self, instance_id: str):
-        """Handle component removed"""
-        if instance_id in self.component_items:
-            item = self.component_items[instance_id]
-            self.scene.removeItem(item)
-            del self.component_items[instance_id]
+    def set_snapping(self, enabled: bool):
+        self._snap_enabled = enabled
+        self.status_message.emit(f"Grid snapping {'enabled' if enabled else 'disabled'}")
 
-            logger.debug(f"Removed component from circuit: {instance_id}")
+    def undo(self):
+        if len(self._history) <= 1:
+            return
+        current = self._history.pop()
+        self._redo_history.append(current)
+        snapshot = self._history[-1]
+        self._restore_snapshot(snapshot)
+        self.status_message.emit("Undo")
 
+    def redo(self):
+        if not self._redo_history:
+            return
+        snapshot = self._redo_history.pop()
+        self._history.append(snapshot)
+        self._restore_snapshot(snapshot)
+        self.status_message.emit("Redo")
 
-    @Slot(str)
-    def _on_connection_added(self, connection_id: str):
-        """Handle connection added"""
-        connections = self.service.get_circuit_connections()
-        connection = next((c for c in connections if c.connection_id == connection_id), None)
+    def add_component_at_center(self, component_id: str):
+        center = self.mapToScene(self.viewport().rect().center())
+        snapped = self._snap(center)
+        self.service.add_component(component_id, snapped.x(), snapped.y())
 
-        if not connection:
+    def clear_circuit(self):
+        self._annotations.clear()
+        self.service.clear_circuit()
+        self._refresh_scene()
+
+    # ------------------------------------------------------------------
+    # Event handlers
+    # ------------------------------------------------------------------
+    def keyPressEvent(self, event):  # type: ignore[override]
+        mapping = {
+            Qt.Key_Escape: ToolMode.SELECT,
+            Qt.Key_W: ToolMode.WIRE,
+            Qt.Key_B: ToolMode.BUS,
+            Qt.Key_L: ToolMode.NET_LABEL,
+            Qt.Key_P: ToolMode.POWER_SYMBOL,
+            Qt.Key_J: ToolMode.JUNCTION,
+            Qt.Key_S: ToolMode.SHEET_PIN,
+            Qt.Key_M: ToolMode.MEASURE,
+        }
+        if event.key() in mapping:
+            self.set_tool_mode(mapping[event.key()])
+            event.accept()
+            return
+        if event.matches(QKeySequence.Undo):
+            self.undo()
+            event.accept()
+            return
+        if event.matches(QKeySequence.Redo):
+            self.redo()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def mousePressEvent(self, event):  # type: ignore[override]
+        scene_pos = self.mapToScene(event.pos())
+        if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() & Qt.ShiftModifier):
+            self._is_panning = True
+            self._pan_start = event.pos()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
             return
 
-        # Get component items
-        from_comp_item = self.component_items.get(connection.from_component)
-        to_comp_item = self.component_items.get(connection.to_component)
+        if event.button() == Qt.LeftButton and self.tool_mode != ToolMode.SELECT and self.tool_mode not in (ToolMode.WIRE, ToolMode.BUS):
+            handled = self._handle_annotation_tool(scene_pos)
+            if handled:
+                event.accept()
+                return
 
-        if not from_comp_item or not to_comp_item:
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):  # type: ignore[override]
+        if self._is_panning:
+            delta = event.pos() - self._pan_start
+            self._pan_start = event.pos()
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
+            event.accept()
             return
-
-        # Get actual pin positions
-        from_pos = from_comp_item.get_pin_scene_pos(connection.from_pin)
-        to_pos = to_comp_item.get_pin_scene_pos(connection.to_pin)
-
-        if not from_pos or not to_pos:
-            logger.warning(f"Could not find pin positions for connection {connection_id}")
+        if self._connection_mode and self._rubber_band_line and self._connection_start_pos:
+            path = QPainterPath(self._connection_start_pos)
+            current = self._snap(self.mapToScene(event.pos()))
+            path.lineTo(current)
+            self._rubber_band_line.setPath(path)
+            event.accept()
             return
+        super().mouseMoveEvent(event)
 
-        # Create connection line
-        conn_item = ConnectionGraphicsItem(connection, from_pos, to_pos)
-        self.scene.addItem(conn_item)
-        self.connection_items[connection_id] = conn_item
+    def mouseReleaseEvent(self, event):  # type: ignore[override]
+        if self._is_panning and event.button() in (Qt.MiddleButton, Qt.LeftButton):
+            self._is_panning = False
+            self.setCursor(Qt.ArrowCursor if self.tool_mode == ToolMode.SELECT else Qt.CrossCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
-        logger.debug(f"Added connection to circuit: {connection_id}")
-
-
-    @Slot(str)
-    def _on_connection_removed(self, connection_id: str):
-        """Handle connection removed"""
-        if connection_id in self.connection_items:
-            item = self.connection_items[connection_id]
-            self.scene.removeItem(item)
-            del self.connection_items[connection_id]
-
-            logger.debug(f"Removed connection from circuit: {connection_id}")
-
-
+    # ------------------------------------------------------------------
+    # Pin/connection handling
+    # ------------------------------------------------------------------
     def on_pin_clicked(self, component_id: str, pin_id: str, pin_pos: QPointF):
-        """Handle pin click - start or complete connection"""
+        if self.tool_mode not in (ToolMode.WIRE, ToolMode.BUS):
+            self.status_message.emit("Switch to wire/bus tool to route connections.")
+            return
         if not self._connection_mode:
-            # Start connection mode
             self._start_connection(component_id, pin_id, pin_pos)
         else:
-            # Complete connection
             self._complete_connection(component_id, pin_id)
 
-
     def _start_connection(self, component_id: str, pin_id: str, pin_pos: QPointF):
-        """Start connection mode"""
         self._connection_mode = True
         self._connection_start_component = component_id
         self._connection_start_pin = pin_id
         self._connection_start_pos = pin_pos
-
-        # Create rubber band line
-        self._rubber_band_line = QGraphicsLineItem()
-        self._rubber_band_line.setPen(QPen(QColor("#00FF00"), 2, Qt.DashLine))
-        self._rubber_band_line.setZValue(-0.5)
-        self._rubber_band_line.setLine(QLineF(pin_pos, pin_pos))
+        self._rubber_band_line = QGraphicsPathItem()
+        pen = QPen(QColor("#00C853"), 2, Qt.DashLine)
+        self._rubber_band_line.setPen(pen)
         self.scene.addItem(self._rubber_band_line)
+        self.status_message.emit("Select destination pin")
 
-        # Change cursor
-        self.setCursor(Qt.CrossCursor)
-
-        logger.debug(f"Started connection from {component_id}:{pin_id}")
-
-
-    def _complete_connection(self, to_component_id: str, to_pin_id: str):
-        """Complete connection to target pin"""
-        # Don't allow connection to same pin
-        if (self._connection_start_component == to_component_id and
-            self._connection_start_pin == to_pin_id):
+    def _complete_connection(self, component_id: str, pin_id: str):
+        if component_id == self._connection_start_component and pin_id == self._connection_start_pin:
             self._cancel_connection()
             return
-
-        # Create connection in service
-        try:
-            self.service.add_connection(
-                self._connection_start_component,
-                self._connection_start_pin,
-                to_component_id,
-                to_pin_id,
-                "#000000"  # Black wire by default
-            )
-            logger.debug(f"Connected {self._connection_start_component}:{self._connection_start_pin} to {to_component_id}:{to_pin_id}")
-        except Exception as e:
-            logger.error(f"Failed to create connection: {e}")
-
-        # Clean up connection mode
+        connection_type = "bus" if self.tool_mode == ToolMode.BUS else "wire"
+        self.service.add_connection(
+            self._connection_start_component,
+            self._connection_start_pin,
+            component_id,
+            pin_id,
+            wire_color="#263238" if connection_type == "bus" else "#424242",
+            connection_type=connection_type,
+        )
         self._cancel_connection()
 
-
     def _cancel_connection(self):
-        """Cancel connection mode"""
         if self._rubber_band_line:
             self.scene.removeItem(self._rubber_band_line)
             self._rubber_band_line = None
-
         self._connection_mode = False
         self._connection_start_component = None
         self._connection_start_pin = None
         self._connection_start_pos = None
-        self.setCursor(Qt.ArrowCursor)
+        self.status_message.emit("Connection cancelled")
 
-        logger.debug("Cancelled connection mode")
-
+    def on_component_moved(self, component_id: str, pos: QPointF):
+        self._suspend_scene_refresh = True
+        self.service.move_component(component_id, pos.x(), pos.y())
+        self._update_component_connections(component_id)
 
     def _update_component_connections(self, component_id: str):
-        """Update all connections for a component when it moves"""
-        connections = self.service.get_circuit_connections()
+        for conn_id, connection in self._connection_lookup.items():
+            if connection.from_component != component_id and connection.to_component != component_id:
+                continue
+            item = self.connection_items.get(conn_id)
+            if not item:
+                continue
+            from_item = self.component_items.get(connection.from_component)
+            to_item = self.component_items.get(connection.to_component)
+            if not from_item or not to_item:
+                continue
+            start = from_item.get_pin_scene_pos(connection.from_pin)
+            end = to_item.get_pin_scene_pos(connection.to_pin)
+            if not start or not end:
+                continue
+            item.setPath(self._create_wire_path(start, end))
 
-        for connection in connections:
-            # Check if this component is involved in this connection
-            if connection.from_component == component_id or connection.to_component == component_id:
-                conn_item = self.connection_items.get(connection.connection_id)
-                if conn_item:
-                    # Get updated pin positions
-                    from_comp_item = self.component_items.get(connection.from_component)
-                    to_comp_item = self.component_items.get(connection.to_component)
-
-                    if from_comp_item and to_comp_item:
-                        from_pos = from_comp_item.get_pin_scene_pos(connection.from_pin)
-                        to_pos = to_comp_item.get_pin_scene_pos(connection.to_pin)
-
-                        if from_pos and to_pos:
-                            conn_item.setLine(QLineF(from_pos, to_pos))
-
-
-    def add_component_at_center(self, component_id: str):
-        """Add a component at the center of the view"""
-        center = self.mapToScene(self.viewport().rect().center())
-        self.service.add_component(component_id, center.x(), center.y())
-
-
-    def clear_circuit(self):
-        """Clear all components and connections"""
-        self.service.clear_circuit()
-        self.scene.clear()
-        self.component_items.clear()
-        self.connection_items.clear()
-
-
-    def mousePressEvent(self, event):
-        """Handle mouse press - enable panning with middle button or Ctrl+left"""
-        # Right-click cancels connection mode
-        if event.button() == Qt.RightButton and self._connection_mode:
-            self._cancel_connection()
-            event.accept()
-            return
-
-        if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and event.modifiers() & Qt.ControlModifier):
-            self._is_panning = True
-            self._pan_start_pos = event.pos()
-            self.setCursor(Qt.ClosedHandCursor)
-            event.accept()
+    # ------------------------------------------------------------------
+    # Selection & annotations
+    # ------------------------------------------------------------------
+    def _on_selection_changed(self):
+        selected_items = [item for item in self.scene.selectedItems() if isinstance(item, ComponentGraphicsItem)]
+        if selected_items:
+            comp_id = selected_items[0].comp_instance.instance_id
         else:
-            super().mousePressEvent(event)
+            comp_id = None
+        self.selection_changed.emit(comp_id)
 
-
-    def mouseMoveEvent(self, event):
-        """Handle mouse move - pan the view if panning is active or update rubber band"""
-        if self._is_panning and self._pan_start_pos:
-            delta = event.pos() - self._pan_start_pos
-            self._pan_start_pos = event.pos()
-
-            # Pan by adjusting scrollbars
-            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
-            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
-            event.accept()
-        elif self._connection_mode and self._rubber_band_line and self._connection_start_pos:
-            # Update rubber band line to follow mouse
-            mouse_pos = self.mapToScene(event.pos())
-            self._rubber_band_line.setLine(QLineF(self._connection_start_pos, mouse_pos))
-            event.accept()
-        else:
-            super().mouseMoveEvent(event)
-
-
-    def mouseReleaseEvent(self, event):
-        """Handle mouse release - stop panning"""
-        if event.button() == Qt.MiddleButton or (event.button() == Qt.LeftButton and self._is_panning):
-            self._is_panning = False
-            self._pan_start_pos = None
-            self.setCursor(Qt.ArrowCursor)
-            event.accept()
-        else:
-            super().mouseReleaseEvent(event)
-
-
-    def wheelEvent(self, event):
-        """Handle mouse wheel - zoom in/out"""
-        if event.modifiers() & Qt.ControlModifier:
-            # Zoom with Ctrl+Wheel
-            zoom_factor = 1.15
-            if event.angleDelta().y() > 0:
-                self.scale(zoom_factor, zoom_factor)
+    def _handle_annotation_tool(self, pos: QPointF) -> bool:
+        snapped = self._snap(pos)
+        if self.tool_mode == ToolMode.NET_LABEL:
+            text, ok = QInputDialog.getText(self, "Net Label", "Net name:")
+            if ok and text:
+                data = {"type": "net_label", "text": text, "pos": (snapped.x(), snapped.y())}
+                self._annotations.append(data)
+                self._create_annotation_item(data)
+                self._record_manual_change()
+                return True
+        elif self.tool_mode == ToolMode.POWER_SYMBOL:
+            text, ok = QInputDialog.getText(self, "Power Symbol", "Symbol name:", text="VCC")
+            if ok and text:
+                data = {"type": "power", "text": text, "pos": (snapped.x(), snapped.y())}
+                self._annotations.append(data)
+                self._create_annotation_item(data)
+                self._record_manual_change()
+                return True
+        elif self.tool_mode == ToolMode.JUNCTION:
+            data = {"type": "junction", "pos": (snapped.x(), snapped.y())}
+            self._annotations.append(data)
+            self._create_annotation_item(data)
+            self._record_manual_change()
+            return True
+        elif self.tool_mode == ToolMode.SHEET_PIN:
+            text, ok = QInputDialog.getText(self, "Sheet Pin", "Pin label:")
+            if ok and text:
+                data = {"type": "sheet_pin", "text": text, "pos": (snapped.x(), snapped.y())}
+                self._annotations.append(data)
+                self._create_annotation_item(data)
+                self._record_manual_change()
+                return True
+        elif self.tool_mode == ToolMode.MEASURE:
+            if not self._measurement_start:
+                self._measurement_start = snapped
+                self.status_message.emit("Select measurement end point")
             else:
-                self.scale(1 / zoom_factor, 1 / zoom_factor)
-            event.accept()
-        else:
-            # Normal scrolling
-            super().wheelEvent(event)
+                dx = snapped.x() - self._measurement_start.x()
+                dy = snapped.y() - self._measurement_start.y()
+                dist = math.hypot(dx, dy)
+                label = f"{dist:.1f} mm"
+                data = {
+                    "type": "measurement",
+                    "text": label,
+                    "pos": (self._measurement_start.x(), self._measurement_start.y()),
+                    "target": (snapped.x(), snapped.y()),
+                }
+                self._annotations.append(data)
+                self._create_annotation_item(data)
+                self._measurement_start = None
+                self._record_manual_change()
+            return True
+        return False
 
+    def _create_annotation_item(self, data: Dict):
+        annotation_type = data.get("type")
+        pos = QPointF(data.get("pos", (0, 0))[0], data.get("pos", (0, 0))[1])
+        if annotation_type == "net_label":
+            item = QGraphicsTextItem(data.get("text", "NET"))
+            item.setDefaultTextColor(QColor("#0277BD"))
+            item.setFont(QFont("Monospace", 9))
+            item.setPos(pos)
+            self.scene.addItem(item)
+            self._annotation_items.append(item)
+        elif annotation_type == "power":
+            text_item = QGraphicsTextItem(data.get("text", "VCC"))
+            text_item.setDefaultTextColor(QColor("#FF6F00"))
+            text_item.setFont(QFont("Monospace", 9, QFont.Bold))
+            text_item.setPos(pos)
+            triangle = QGraphicsPathItem()
+            path = QPainterPath(pos)
+            path.moveTo(pos)
+            path.lineTo(pos + QPointF(10, 12))
+            path.lineTo(pos + QPointF(-10, 12))
+            path.closeSubpath()
+            triangle.setPath(path)
+            triangle.setBrush(QColor("#FF6F00"))
+            triangle.setPen(QPen(Qt.NoPen))
+            self.scene.addItem(triangle)
+            self.scene.addItem(text_item)
+            self._annotation_items.extend([triangle, text_item])
+        elif annotation_type == "junction":
+            item = QGraphicsPathItem()
+            path = QPainterPath()
+            path.addEllipse(pos, 4, 4)
+            item.setPath(path)
+            item.setBrush(QColor("#1B5E20"))
+            item.setPen(QPen(Qt.NoPen))
+            self.scene.addItem(item)
+            self._annotation_items.append(item)
+        elif annotation_type == "sheet_pin":
+            item = QGraphicsTextItem(data.get("text", "PIN"))
+            item.setDefaultTextColor(QColor("#4E342E"))
+            item.setFont(QFont("Monospace", 9))
+            item.setPos(pos)
+            rect = QGraphicsPathItem()
+            path = QPainterPath()
+            path.addRect(QRectF(pos.x() - 10, pos.y() - 6, 20, 12))
+            rect.setPath(path)
+            rect.setPen(QPen(QColor("#4E342E"), 1.2))
+            self.scene.addItem(rect)
+            self.scene.addItem(item)
+            self._annotation_items.extend([rect, item])
+        elif annotation_type == "measurement":
+            text_item = QGraphicsTextItem(data.get("text", ""))
+            text_item.setDefaultTextColor(QColor("#D81B60"))
+            text_item.setFont(QFont("Monospace", 9))
+            text_item.setPos(pos)
+            target = data.get("target", (pos.x(), pos.y()))
+            path = QPainterPath(QPointF(pos.x(), pos.y()))
+            path.lineTo(QPointF(target[0], target[1]))
+            line_item = QGraphicsPathItem()
+            line_item.setPath(path)
+            line_item.setPen(QPen(QColor("#D81B60"), 1, Qt.DashLine))
+            self.scene.addItem(line_item)
+            self.scene.addItem(text_item)
+            self._annotation_items.extend([line_item, text_item])
 
-    def keyPressEvent(self, event):
-        """Handle key press - ESC cancels connection mode"""
-        if event.key() == Qt.Key_Escape and self._connection_mode:
-            self._cancel_connection()
-            event.accept()
-        else:
-            super().keyPressEvent(event)
+    def _record_manual_change(self):
+        snapshot = self._capture_snapshot()
+        self._history.append(snapshot)
+        if len(self._history) > 50:
+            self._history.pop(0)
+        self._redo_history.clear()
 
-
-    def drawBackground(self, painter, rect):
-        """Draw grid background"""
-        super().drawBackground(painter, rect)
-
-        # Draw grid
-        grid_size = 10
-        left = int(rect.left()) - (int(rect.left()) % grid_size)
-        top = int(rect.top()) - (int(rect.top()) % grid_size)
-
-        painter.setPen(QPen(QColor("#E0E0E0"), 0.5, Qt.DotLine))
-
-        # Vertical lines
-        x = left
-        while x < rect.right():
-            painter.drawLine(x, int(rect.top()), x, int(rect.bottom()))
-            x += grid_size
-
-        # Horizontal lines
-        y = top
-        while y < rect.bottom():
-            painter.drawLine(int(rect.left()), y, int(rect.right()), y)
-            y += grid_size
+    def _snap(self, pos: QPointF) -> QPointF:
+        if not self._snap_enabled:
+            return pos
+        grid = self._grid_size
+        x = round(pos.x() / grid) * grid
+        y = round(pos.y() / grid) * grid
+        return QPointF(x, y)
 
 
 class CircuitEditor(QWidget):
-    """
-    Main circuit editor widget
-    Combines component library and circuit workspace
-    """
+    """Circuit editor widget that hosts the workspace"""
 
-    circuit_validated = Signal(bool, list)  # is_valid, errors
+    circuit_validated = Signal(bool, list)
 
-    def __init__(self, service: Optional[CircuitService] = None, parent=None):
+    def __init__(self, service: Optional[CircuitService] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
-
         self.service = service or CircuitService()
+        self.workspace = CircuitWorkspaceView(self.service, self)
+        self.workspace.status_message.connect(self._set_status)
 
-        self._setup_ui()
-        self._setup_connections()
+        self._status_label = QLabel("Ready")
+        self._status_label.setStyleSheet("padding: 4px; background-color: #F5F5F5;")
 
-        logger.info("Circuit editor initialized")
-
-
-    def _setup_ui(self):
-        """Setup UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(self._build_toolbar())
+        layout.addWidget(self.workspace)
+        layout.addWidget(self._status_label)
 
-        # Toolbar
+        self.service.circuit_validated.connect(self._on_circuit_validated)
+        logger.info("Circuit editor initialized")
+
+    def _build_toolbar(self) -> QHBoxLayout:
         toolbar = QHBoxLayout()
+        toolbar.setSpacing(6)
 
         self.new_btn = QPushButton("New")
-        self.new_btn.setToolTip("Clear circuit")
-
+        self.new_btn.clicked.connect(self._on_new_clicked)
         self.load_btn = QPushButton("Load")
-        self.load_btn.setToolTip("Load circuit from file")
-
         self.save_btn = QPushButton("Save")
-        self.save_btn.setToolTip("Save circuit to file")
-
         self.validate_btn = QPushButton("Validate")
-        self.validate_btn.setToolTip("Validate circuit connections")
-        self.validate_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                font-weight: bold;
-                padding: 5px 15px;
-                border-radius: 3px;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-        """)
-
-        self.export_connections_btn = QPushButton("Export Connections")
-        self.export_connections_btn.setToolTip("Export connection list")
+        self.validate_btn.clicked.connect(self._on_validate_clicked)
+        self.export_connections_btn = QPushButton("Export Nets")
+        self.export_connections_btn.clicked.connect(self._on_export_connections)
+        self.undo_btn = QPushButton("Undo")
+        self.undo_btn.clicked.connect(self.workspace.undo)
+        self.redo_btn = QPushButton("Redo")
+        self.redo_btn.clicked.connect(self.workspace.redo)
 
         toolbar.addWidget(self.new_btn)
         toolbar.addWidget(self.load_btn)
         toolbar.addWidget(self.save_btn)
+        toolbar.addWidget(self.undo_btn)
+        toolbar.addWidget(self.redo_btn)
         toolbar.addStretch()
+
+        self.tool_buttons = QButtonGroup(self)
+        for mode, label in [
+            (ToolMode.SELECT, "Select (Esc)"),
+            (ToolMode.WIRE, "Wire (W)"),
+            (ToolMode.BUS, "Bus (B)"),
+            (ToolMode.NET_LABEL, "Net Label (L)"),
+            (ToolMode.POWER_SYMBOL, "Power (P)"),
+            (ToolMode.JUNCTION, "Junction (J)"),
+            (ToolMode.SHEET_PIN, "Sheet Pin (S)"),
+            (ToolMode.MEASURE, "Measure (M)"),
+        ]:
+            btn = QToolButton()
+            btn.setText(label)
+            btn.setCheckable(True)
+            if mode == ToolMode.SELECT:
+                btn.setChecked(True)
+            self.tool_buttons.addButton(btn, mode.value)
+            btn.clicked.connect(lambda checked=False, m=mode: self.workspace.set_tool_mode(m))
+            toolbar.addWidget(btn)
+
+        self.snap_checkbox = QCheckBox("Snap")
+        self.snap_checkbox.setChecked(True)
+        self.snap_checkbox.stateChanged.connect(lambda state: self.workspace.set_snapping(state == Qt.Checked))
+        toolbar.addWidget(self.snap_checkbox)
         toolbar.addWidget(self.validate_btn)
         toolbar.addWidget(self.export_connections_btn)
+        return toolbar
 
-        layout.addLayout(toolbar)
-
-        # Main content - splitter
-        splitter = QSplitter(Qt.Horizontal)
-
-        # Left: Component library
-        self.library = ComponentLibraryWidget(self.service)
-        self.library.setMaximumWidth(250)
-        splitter.addWidget(self.library)
-
-        # Right: Circuit workspace
-        self.workspace = CircuitWorkspaceView(self.service)
-        splitter.addWidget(self.workspace)
-
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-
-        layout.addWidget(splitter)
-
-        # Status bar
-        self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("padding: 5px; background-color: #F0F0F0;")
-        layout.addWidget(self.status_label)
-
-
-    def _setup_connections(self):
-        """Setup signal connections"""
-        self.new_btn.clicked.connect(self._on_new_clicked)
-        self.validate_btn.clicked.connect(self._on_validate_clicked)
-        self.export_connections_btn.clicked.connect(self._on_export_connections)
-
-        self.library.component_selected.connect(self._on_component_selected)
-
-        self.service.circuit_changed.connect(self._on_circuit_changed)
-        self.service.circuit_validated.connect(self._on_circuit_validated)
-
-
+    # ------------------------------------------------------------------
+    # UI actions
+    # ------------------------------------------------------------------
     @Slot()
     def _on_new_clicked(self):
-        """Handle new circuit"""
-        reply = QMessageBox.question(
-            self,
-            "New Circuit",
-            "Clear current circuit?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
+        if QMessageBox.question(self, "New Circuit", "Clear current circuit?", QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
             self.workspace.clear_circuit()
-            self.status_label.setText("Circuit cleared")
-
-
-    @Slot(str)
-    def _on_component_selected(self, component_id: str):
-        """Handle component selected from library"""
-        self.workspace.add_component_at_center(component_id)
-        comp_def = self.service.get_component_definition(component_id)
-        self.status_label.setText(f"Added: {comp_def.name}")
-
-
-    @Slot()
-    def _on_circuit_changed(self):
-        """Handle circuit change"""
-        component_count = len(self.service.get_circuit_components())
-        connection_count = len(self.service.get_circuit_connections())
-        self.status_label.setText(f"Components: {component_count}, Connections: {connection_count}")
-
+            self._set_status("Circuit cleared")
 
     @Slot()
     def _on_validate_clicked(self):
-        """Handle validate button"""
         is_valid, errors = self.service.validate_circuit()
-
         if is_valid:
-            QMessageBox.information(
-                self,
-                "Circuit Valid",
-                "Circuit validation passed! No errors found."
-            )
+            QMessageBox.information(self, "Circuit Valid", "No ERC violations found.")
         else:
-            error_text = "\n".join(f"• {err}" for err in errors)
-            QMessageBox.warning(
-                self,
-                "Circuit Validation Failed",
-                f"Found {len(errors)} error(s):\n\n{error_text}"
-            )
-
-
-    @Slot(bool, list)
-    def _on_circuit_validated(self, is_valid: bool, errors: List[str]):
-        """Handle circuit validated"""
-        self.circuit_validated.emit(is_valid, errors)
-
+            QMessageBox.warning(self, "ERC Violations", "\n".join(errors))
 
     @Slot()
     def _on_export_connections(self):
-        """Export connection list"""
         connection_list = self.service.generate_connection_list()
+        QMessageBox.information(self, "Connection List", connection_list)
 
-        QMessageBox.information(
-            self,
-            "Connection List",
-            connection_list
-        )
+    @Slot(bool, list)
+    def _on_circuit_validated(self, is_valid: bool, errors: List[str]):
+        self.circuit_validated.emit(is_valid, errors)
 
+    def _set_status(self, text: str):
+        self._status_label.setText(text)
 
     def save_circuit_to_file(self, file_path: str):
         """Save circuit to file"""
@@ -753,88 +1177,86 @@ class CircuitEditor(QWidget):
 
 
 class CircuitDesignerWindow(QMainWindow):
-    """
-    Standalone window for Circuit Designer
-    Can be opened from main IDE or run independently
-    """
+    """Standalone window hosting docks and the circuit editor"""
 
-    def __init__(self, service: Optional[CircuitService] = None, parent=None):
+    def __init__(self, service: Optional[CircuitService] = None, parent: Optional[QObject] = None):
         super().__init__(parent)
-
         self.service = service or CircuitService()
-        self.current_file = None
-
         self.setWindowTitle("Arduino Circuit Designer")
-        self.resize(1200, 800)
-
-        # Create circuit editor as central widget
+        self.resize(1400, 900)
         self.circuit_editor = CircuitEditor(self.service, self)
         self.setCentralWidget(self.circuit_editor)
-
-        # Connect load/save buttons to file dialogs
+        self._current_file: Optional[str] = None
+        self._build_docks()
+        self._create_menus()
         self.circuit_editor.load_btn.clicked.connect(self._on_load_clicked)
         self.circuit_editor.save_btn.clicked.connect(self._on_save_clicked)
-
-        # Create menus
-        self._create_menus()
-
         logger.info("Circuit Designer window initialized")
 
+    def _build_docks(self):
+        # Symbol chooser
+        self.symbol_widget = ComponentLibraryWidget(self.service)
+        self.symbol_widget.component_selected.connect(self.circuit_editor.workspace.add_component_at_center)
+        symbol_dock = QDockWidget("Symbols", self)
+        symbol_dock.setWidget(self.symbol_widget)
+        self.addDockWidget(Qt.LeftDockWidgetArea, symbol_dock)
+
+        # Sheet navigator
+        self.sheet_widget = SheetNavigatorWidget(self.service)
+        sheet_dock = QDockWidget("Sheets", self)
+        sheet_dock.setWidget(self.sheet_widget)
+        self.addDockWidget(Qt.LeftDockWidgetArea, sheet_dock)
+        self.tabifyDockWidget(symbol_dock, sheet_dock)
+
+        # Property inspector
+        self.property_widget = PropertyInspectorWidget(self.service)
+        prop_dock = QDockWidget("Inspector", self)
+        prop_dock.setWidget(self.property_widget)
+        self.addDockWidget(Qt.RightDockWidgetArea, prop_dock)
+
+        # Message panel
+        self.message_widget = MessagePanelWidget()
+        message_dock = QDockWidget("Messages", self)
+        message_dock.setWidget(self.message_widget)
+        self.addDockWidget(Qt.BottomDockWidgetArea, message_dock)
+
+        self.circuit_editor.workspace.selection_changed.connect(self.property_widget.display_component)
+        self.circuit_editor.workspace.status_message.connect(self.message_widget.append_message)
+        self.circuit_editor.circuit_validated.connect(self._on_circuit_validated)
+
     def _create_menus(self):
-        """Create menu bar"""
         menubar = self.menuBar()
-
-        # File Menu
         file_menu = menubar.addMenu("&File")
-
         new_action = QAction("&New Circuit", self)
         new_action.setShortcut(QKeySequence.New)
         new_action.triggered.connect(self.circuit_editor._on_new_clicked)
         file_menu.addAction(new_action)
-
         load_action = QAction("&Open Circuit...", self)
         load_action.setShortcut(QKeySequence.Open)
         load_action.triggered.connect(self._on_load_clicked)
         file_menu.addAction(load_action)
-
         save_action = QAction("&Save Circuit", self)
         save_action.setShortcut(QKeySequence.Save)
         save_action.triggered.connect(self._on_save_clicked)
         file_menu.addAction(save_action)
-
         save_as_action = QAction("Save Circuit &As...", self)
         save_as_action.setShortcut(QKeySequence.SaveAs)
         save_as_action.triggered.connect(self._on_save_as_clicked)
         file_menu.addAction(save_as_action)
+        exit_action = QAction("E&xit", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
 
-        file_menu.addSeparator()
-
-        close_action = QAction("&Close", self)
-        close_action.setShortcut(QKeySequence.Close)
-        close_action.triggered.connect(self.close)
-        file_menu.addAction(close_action)
-
-        # Circuit Menu
         circuit_menu = menubar.addMenu("&Circuit")
-
         validate_action = QAction("&Validate Circuit", self)
-        validate_action.setShortcut(Qt.CTRL | Qt.Key_V)
         validate_action.triggered.connect(self.circuit_editor._on_validate_clicked)
         circuit_menu.addAction(validate_action)
 
-        export_action = QAction("&Export Connections", self)
-        export_action.setShortcut(Qt.CTRL | Qt.Key_E)
-        export_action.triggered.connect(self.circuit_editor._on_export_connections)
-        circuit_menu.addAction(export_action)
-
-        # Help Menu
         help_menu = menubar.addMenu("&Help")
-
         about_action = QAction("&About", self)
-        about_action.triggered.connect(self._show_about)
+        about_action.triggered.connect(self._show_about_dialog)
         help_menu.addAction(about_action)
 
-    @Slot()
     def _on_load_clicked(self):
         """Handle load circuit"""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -866,15 +1288,15 @@ class CircuitDesignerWindow(QMainWindow):
             f"Successfully loaded circuit from {Path(file_path).name}"
         )
 
-    @Slot()
     def _on_save_clicked(self):
-        """Handle save circuit"""
-        if self.current_file:
-            self._save_to_file(self.current_file)
-        else:
+        if not hasattr(self, "_current_file"):
+            self._current_file = None
+        if not self._current_file:
             self._on_save_as_clicked()
+            return
+        if self.circuit_editor.save_circuit_to_file(self._current_file):
+            self.statusBar().showMessage(f"Saved {self._current_file}", 4000)
 
-    @Slot()
     def _on_save_as_clicked(self):
         """Handle save circuit as"""
         file_path, _ = QFileDialog.getSaveFileName(
@@ -916,23 +1338,12 @@ class CircuitDesignerWindow(QMainWindow):
             self,
             "About Arduino Circuit Designer",
             """<h3>Arduino Circuit Designer</h3>
-            <p>Visual circuit design tool for Arduino projects</p>
-            <p><b>Features:</b></p>
-            <ul>
-            <li>Drag-and-drop component placement</li>
-            <li>Visual wire connections</li>
-            <li>Circuit validation</li>
-            <li>100+ electronic components</li>
-            <li>Save/load circuits</li>
-            </ul>
-            <p><b>Controls:</b></p>
-            <ul>
-            <li>Left-click and drag component: Move component</li>
-            <li>Left-click pin: Start wire connection (click another pin to complete)</li>
-            <li>Right-click or ESC: Cancel wire connection</li>
-            <li>Middle-click and drag or Ctrl+Left-drag: Pan view</li>
-            <li>Ctrl+Mouse wheel: Zoom in/out</li>
-            <li>Mouse wheel: Scroll vertically</li>
-            </ul>
-            <p>Part of Arduino IDE Modern</p>"""
+            <p>KiCAD-inspired schematic environment with symbol docks, ERC feedback, and hierarchical sheets.</p>""",
         )
+
+    def _on_circuit_validated(self, is_valid: bool, errors: List[str]):
+        if is_valid:
+            self.message_widget.append_message("ERC: No violations detected")
+        else:
+            self.message_widget.append_message(f"ERC: {len(errors)} violation(s)")
+        self.message_widget.show_erc_results(errors)
