@@ -356,6 +356,9 @@ class BoardManagerDialog(QDialog):
         # Initial load
         self.refresh_packages()
 
+        # Automatically update index if needed (respects 1-hour cache)
+        self.board_manager.update_index(force=False)
+
     def init_ui(self):
         """Initialize UI"""
         layout = QVBoxLayout(self)
