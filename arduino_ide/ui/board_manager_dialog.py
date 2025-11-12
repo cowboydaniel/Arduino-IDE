@@ -664,6 +664,7 @@ class BoardManagerDialog(QDialog):
             # Connect worker signals for this specific operation
             worker.progress.connect(self.progress_bar.setValue)
             worker.status.connect(self.status_label.setText)
+            worker.finished.connect(lambda success, msg: self.on_operation_complete())
             # Immediately refresh to show "In Progress" status
             self.refresh_packages()
 
@@ -681,6 +682,7 @@ class BoardManagerDialog(QDialog):
             worker = self.board_manager.uninstall_package_async(name)
             if worker:
                 worker.status.connect(self.status_label.setText)
+                worker.finished.connect(lambda success, msg: self.on_operation_complete())
                 # Immediately refresh to show "In Progress" status
                 self.refresh_packages()
 
@@ -692,6 +694,7 @@ class BoardManagerDialog(QDialog):
         if worker:
             worker.progress.connect(self.progress_bar.setValue)
             worker.status.connect(self.status_label.setText)
+            worker.finished.connect(lambda success, msg: self.on_operation_complete())
             # Immediately refresh to show "In Progress" status
             self.refresh_packages()
 
@@ -702,6 +705,26 @@ class BoardManagerDialog(QDialog):
             self.progress_bar.setVisible(False)
             # Refresh to update status column
             self.refresh_packages()
+
+    def on_operation_complete(self):
+        """Handle completion of package operation (install/uninstall/update)"""
+        # Hide progress bar
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setValue(0)
+
+        # Discover boards from newly installed/updated packages
+        # This ensures package.boards is populated
+        self.board_manager.get_all_boards()
+
+        # Refresh UI to show updated status immediately
+        self.refresh_packages()
+
+        # Update action buttons if a package is selected
+        current_item = self.package_list.currentItem()
+        if current_item:
+            package = current_item.data(0, Qt.UserRole)
+            if package:
+                self.update_action_buttons(package)
 
     def update_action_buttons(self, package: BoardPackage):
         """Update action buttons based on package state"""
