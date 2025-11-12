@@ -15,6 +15,7 @@ from PySide6.QtGui import (
 )
 import re
 from pathlib import Path
+from typing import Dict, List
 try:
     from git import Repo
 except ImportError:
@@ -27,6 +28,10 @@ sys.path.insert(0, str(PathLib(__file__).parent.parent / "services"))
 from suggestion_analyzer import SuggestionAnalyzer
 from git_diff_utils import calculate_git_changes
 from arduino_ide.data.arduino_api_reference import get_api_info
+from arduino_ide.services.contextual_help_service import (
+    ContextualHelpService,
+    InlineHint,
+)
 
 
 class BreadcrumbBar(QWidget):
@@ -839,6 +844,9 @@ class CodeEditor(QPlainTextEdit):
         self.file_path = file_path
         self.errors = []  # List of (line_number, message) tuples
         self.suggestions = []  # List of Suggestion objects
+        self.contextual_help_service = ContextualHelpService()
+        self.inline_hints: List[InlineHint] = []
+        self._editor_state: Dict[str, bool] = {"serial_monitor_open": False}
         self.folded_blocks = set()  # Set of line numbers that are folded
         self.git_changes = {}  # {line_number: 'added'|'modified'|'deleted'}
 
@@ -879,6 +887,16 @@ class CodeEditor(QPlainTextEdit):
 
         # Initialize git tracking
         self.update_git_diff()
+
+    def set_serial_monitor_open(self, is_open: bool):
+        """Update the cached Serial Monitor state for contextual help."""
+
+        if self._editor_state.get("serial_monitor_open") == bool(is_open):
+            return
+
+        self._editor_state["serial_monitor_open"] = bool(is_open)
+        # Re-run analysis so Serial hints update immediately
+        self.check_errors()
 
     def setup_autocomplete(self):
         """Setup code completion with descriptions"""
@@ -1011,6 +1029,15 @@ class CodeEditor(QPlainTextEdit):
 
         # Run suggestion analysis
         self.suggestions = self.suggestion_analyzer.analyze(text)
+
+        # Run contextual inline hint analysis
+        cursor_position = self.textCursor().position()
+        editor_state = dict(self._editor_state)
+        self.inline_hints = self.contextual_help_service.analyze_context(
+            cursor_position,
+            text,
+            editor_state=editor_state,
+        )
 
         # Track brace/paren/bracket balance
         brace_stack = []
@@ -1331,6 +1358,29 @@ class CodeEditor(QPlainTextEdit):
                 selection.format = suggestion_format
                 extra_selections.append(selection)
 
+        # Add contextual inline hint decorations
+        for hint in self.inline_hints:
+            block = self.document().findBlockByNumber(hint.line - 1)
+            if not block.isValid():
+                continue
+
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = QTextCursor(block)
+            selection.cursor.select(QTextCursor.LineUnderCursor)
+
+            hint_format = QTextCharFormat()
+            hint_format.setUnderlineStyle(QTextCharFormat.DashUnderline)
+
+            if hint.severity == "warning":
+                hint_format.setUnderlineColor(QColor("#F2C744"))
+            elif hint.severity == "tip":
+                hint_format.setUnderlineColor(QColor("#4EC9B0"))
+            else:
+                hint_format.setUnderlineColor(QColor("#569CD6"))
+
+            selection.format = hint_format
+            extra_selections.append(selection)
+
         self.setExtraSelections(extra_selections)
 
     def keyPressEvent(self, event):
@@ -1559,6 +1609,14 @@ class CodeEditor(QPlainTextEdit):
             for suggestion in self.suggestions:
                 if suggestion.line_number == block_num:
                     QToolTip.showText(event.globalPos(), suggestion.message, self)
+                    tooltip_shown = True
+                    break
+
+        # If still no tooltip, surface contextual inline hints
+        if not tooltip_shown:
+            for hint in self.inline_hints:
+                if hint.line == block_num:
+                    QToolTip.showText(event.globalPos(), hint.message, self)
                     tooltip_shown = True
                     break
 

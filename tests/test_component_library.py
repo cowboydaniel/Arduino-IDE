@@ -33,7 +33,8 @@ except ImportError:
     sys.modules['PySide6.QtCore'].QObject = QObject
     sys.modules['PySide6.QtCore'].Signal = Signal
 
-from arduino_ide.services.circuit_service import CircuitService, ComponentType
+from arduino_ide.services.circuit_service import CircuitService
+from arduino_ide.models.circuit_domain import ComponentType
 
 def main():
     print("=" * 70)

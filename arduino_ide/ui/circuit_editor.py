@@ -505,6 +505,8 @@ class MessagePanelWidget(QWidget):
             item.setForeground(QColor("#C62828"))
             self.erc_list.addItem(item)
 
+        self._refresh_groups()
+
 
 class SheetNavigatorWidget(QWidget):
     """Hierarchical sheet browser"""
@@ -590,6 +592,35 @@ class SheetNavigatorWidget(QWidget):
             return
         sheet = self.service.embed_sheet(file_path)
         self.service.set_active_sheet(sheet.sheet_id)
+
+    def _refresh_groups(self):
+        """Update toolbox groupings based on the current filters."""
+
+        while self.toolbox.count():
+            widget = self.toolbox.widget(0)
+            self.toolbox.removeItem(0)
+            if widget is not None:
+                widget.deleteLater()
+
+        groups = build_component_groups(
+            self.service.get_all_component_definitions(),
+            self.group_mode.currentText(),
+            self.filter_input.text(),
+        )
+
+        if not groups:
+            placeholder = QWidget()
+            placeholder_layout = QVBoxLayout(placeholder)
+            label = QLabel("No symbols match your filters.")
+            label.setWordWrap(True)
+            placeholder_layout.addWidget(label)
+            placeholder_layout.addStretch()
+            self.toolbox.addItem(placeholder, "No Results")
+            return
+
+        for group_name, components in groups:
+            category_widget = self._create_category_widget(components)
+            self.toolbox.addItem(category_widget, group_name)
 
 
 class CircuitWorkspaceView(QGraphicsView):
