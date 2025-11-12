@@ -1,0 +1,37 @@
+{
+  "id": "capacitor_film_100nf_16v",
+  "name": "100nF 16V Film Capacitor",
+  "component_type": "capacitor",
+  "description": "100nF Film capacitor rated for 16V with \u00b15% tolerance.",
+  "width": 42,
+  "height": 22,
+  "pins": [
+    {
+      "id": "pin1",
+      "label": "1",
+      "pin_type": "power",
+      "position": [
+        0,
+        11.0
+      ]
+    },
+    {
+      "id": "pin2",
+      "label": "2",
+      "pin_type": "power",
+      "position": [
+        42,
+        11.0
+      ]
+    }
+  ],
+  "metadata": {
+    "dielectric_type": "Polypropylene Film",
+    "capacitance": "100nF",
+    "tolerance": "\u00b15%",
+    "voltage_rating": "16V",
+    "esr": "0.03\u03a9 @ 10kHz",
+    "package": "Radial Box 7.5mm",
+    "polarized": false
+  }
+}

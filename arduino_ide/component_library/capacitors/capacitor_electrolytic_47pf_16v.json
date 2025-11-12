@@ -1,0 +1,37 @@
+{
+  "id": "capacitor_electrolytic_47pf_16v",
+  "name": "47pF 16V Aluminum Electrolytic Capacitor",
+  "component_type": "capacitor",
+  "description": "47pF Aluminum Electrolytic capacitor rated for 16V with \u00b120% tolerance.",
+  "width": 32,
+  "height": 48,
+  "pins": [
+    {
+      "id": "positive",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        16.0,
+        0
+      ]
+    },
+    {
+      "id": "negative",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        16.0,
+        48
+      ]
+    }
+  ],
+  "metadata": {
+    "dielectric_type": "Aluminum Oxide",
+    "capacitance": "47pF",
+    "tolerance": "\u00b120%",
+    "voltage_rating": "16V",
+    "esr": "0.2\u03a9 @ 120Hz",
+    "package": "Radial Can 5x11mm",
+    "polarized": true
+  }
+}

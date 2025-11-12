@@ -1,0 +1,37 @@
+{
+  "id": "capacitor_tantalum_100uf_250v",
+  "name": "100\u00b5F 250V Tantalum Capacitor",
+  "component_type": "capacitor",
+  "description": "100\u00b5F Tantalum capacitor rated for 250V with \u00b110% tolerance.",
+  "width": 34,
+  "height": 40,
+  "pins": [
+    {
+      "id": "positive",
+      "label": "+",
+      "pin_type": "power",
+      "position": [
+        17.0,
+        0
+      ]
+    },
+    {
+      "id": "negative",
+      "label": "-",
+      "pin_type": "ground",
+      "position": [
+        17.0,
+        40
+      ]
+    }
+  ],
+  "metadata": {
+    "dielectric_type": "Tantalum Pentoxide",
+    "capacitance": "100\u00b5F",
+    "tolerance": "\u00b110%",
+    "voltage_rating": "250V",
+    "esr": "0.15\u03a9 @ 100kHz",
+    "package": "SMD A-Case",
+    "polarized": true
+  }
+}
