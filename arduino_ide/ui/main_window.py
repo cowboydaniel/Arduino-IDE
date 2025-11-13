@@ -1313,9 +1313,12 @@ void loop() {
             for board in boards:
                 self.board_selector.addItem(board.name)
 
-            # Try to restore previous selection when possible
+            preferred_board_name = "Arduino Uno"
+            preferred_index = self.board_selector.findText(preferred_board_name)
+
+            # Try to restore previous selection when possible, but prefer Arduino Uno
             selected_board_name = current_selection if current_selection else boards[0].name
-            index = self.board_selector.findText(selected_board_name)
+            index = preferred_index if preferred_index >= 0 else self.board_selector.findText(selected_board_name)
             if index < 0:
                 index = 0
             self.board_selector.setCurrentIndex(index)
