@@ -16,6 +16,12 @@ class PinUsageWidget(QWidget):
 
     pin_clicked = Signal(str)  # Emitted when a pin is clicked
 
+    # Reasonable defaults when board metadata does not expose pin counts.
+    # These mirror the classic Arduino Uno which is the most common board
+    # selection in the IDE.
+    DEFAULT_DIGITAL_PIN_COUNT = 14
+    DEFAULT_ANALOG_PIN_COUNT = 6
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.pins = {}  # Dictionary to store pin information
@@ -564,32 +570,28 @@ class PinUsageWidget(QWidget):
             return (2, 0)
 
     def get_available_pins(self, used_pins):
-        """Get list of available pins from the current board
+        """Get list of available pins from the current board.
 
         Args:
             used_pins: Set of pin names already in use
 
         Returns:
-            List of available pin names
+            List of available pin names.
         """
         # If no board is set, default to Arduino Uno pins
         if not self.current_board:
             print("[PIN WIDGET DEBUG] No board set, using Arduino Uno defaults")
-            all_pins = (
-                [f'D{i}' for i in range(14)] +  # D0-D13
-                [f'A{i}' for i in range(6)]      # A0-A5
-            )
+            digital_count = self.DEFAULT_DIGITAL_PIN_COUNT
+            analog_count = self.DEFAULT_ANALOG_PIN_COUNT
         else:
-            # Use the board's pin configuration
-            digital_pins = self.current_board.specs.digital_pins
-            analog_pins = self.current_board.specs.analog_pins
+            digital_count, analog_count = self._resolve_pin_counts(used_pins)
             print(f"[PIN WIDGET DEBUG] Board: {self.current_board.name}")
-            print(f"[PIN WIDGET DEBUG] Digital pins: {digital_pins}, Analog pins: {analog_pins}")
+            print(f"[PIN WIDGET DEBUG] Digital pins: {digital_count}, Analog pins: {analog_count}")
 
-            all_pins = (
-                [f'D{i}' for i in range(digital_pins)] +
-                [f'A{i}' for i in range(analog_pins)]
-            )
+        all_pins = (
+            [f'D{i}' for i in range(digital_count)] +
+            [f'A{i}' for i in range(analog_count)]
+        )
 
         print(f"[PIN WIDGET DEBUG] Total pins generated: {len(all_pins)}")
         print(f"[PIN WIDGET DEBUG] Used pins: {used_pins}")
@@ -597,3 +599,43 @@ class PinUsageWidget(QWidget):
         print(f"[PIN WIDGET DEBUG] Available pins: {len(available)} pins")
         print(f"[PIN WIDGET DEBUG] First 10 available: {available[:10]}")
         return available
+
+    def _resolve_pin_counts(self, used_pins):
+        """Determine digital and analog pin counts with sensible fallbacks."""
+        specs = getattr(self.current_board, 'specs', None)
+        digital_pins = getattr(specs, 'digital_pins', 0) or 0
+        analog_pins = getattr(specs, 'analog_pins', 0) or 0
+
+        min_digital, min_analog = self._infer_min_pin_counts(used_pins)
+
+        if digital_pins <= 0:
+            digital_pins = max(self.DEFAULT_DIGITAL_PIN_COUNT, min_digital)
+        else:
+            digital_pins = max(digital_pins, min_digital)
+
+        if analog_pins <= 0:
+            analog_pins = max(self.DEFAULT_ANALOG_PIN_COUNT, min_analog)
+        else:
+            analog_pins = max(analog_pins, min_analog)
+
+        return digital_pins, analog_pins
+
+    def _infer_min_pin_counts(self, used_pins):
+        """Infer minimum required pin counts from currently used pins."""
+        max_digital = -1
+        max_analog = -1
+
+        for pin in used_pins:
+            if pin.startswith('D'):
+                pin_number = self._extract_pin_number(pin)
+                if pin_number is not None:
+                    max_digital = max(max_digital, pin_number + 1)
+            elif pin.startswith('A'):
+                pin_number = self._extract_pin_number(pin)
+                if pin_number is not None:
+                    max_analog = max(max_analog, pin_number + 1)
+
+        min_digital = max_digital if max_digital >= 0 else 0
+        min_analog = max_analog if max_analog >= 0 else 0
+
+        return min_digital, min_analog
