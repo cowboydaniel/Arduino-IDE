@@ -36,7 +36,7 @@ import os
 import json
 import argparse
 from pathlib import Path
-from typing import Optional, List
+from typing import Iterable, List, Optional, Set
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -512,6 +512,61 @@ class ArduinoCLI:
 
         return '\n'.join(filtered_lines)
 
+    def _is_library_directory(self, path: Path) -> bool:
+        """Return ``True`` if ``path`` appears to be an Arduino library."""
+
+        if not path.exists() or not path.is_dir():
+            return False
+
+        if (path / "library.properties").exists():
+            return True
+
+        if (path / "src").exists():
+            return True
+
+        for pattern in ("*.h", "*.hpp", "*.hh", "*.hxx", "*.c", "*.cc", "*.cxx", "*.cpp"):
+            if any(path.glob(pattern)):
+                return True
+
+        return False
+
+    def _expand_library_directories(self, library_dirs: Iterable[Path]) -> List[Path]:
+        """Expand ``--libraries`` arguments into individual library folders."""
+
+        expanded: List[Path] = []
+        seen: Set[Path] = set()
+
+        for raw_path in library_dirs:
+            try:
+                path = Path(raw_path).expanduser().resolve()
+            except TypeError:
+                continue
+
+            if not path.exists():
+                continue
+
+            candidates: List[Path] = []
+            if self._is_library_directory(path):
+                candidates = [path]
+            else:
+                try:
+                    for child in sorted(path.iterdir()):
+                        if not child.is_dir():
+                            continue
+                        if self._is_library_directory(child):
+                            candidates.append(child.resolve())
+                except OSError:
+                    continue
+
+            for candidate in candidates:
+                candidate = candidate.resolve()
+                if candidate in seen:
+                    continue
+                seen.add(candidate)
+                expanded.append(candidate)
+
+        return expanded
+
     def _generate_function_prototypes(self, source: str) -> List[str]:
         """
         Generate forward declarations for all user-defined functions in the sketch.
@@ -750,7 +805,7 @@ class ArduinoCLI:
                         print(f"Build property: {key}={value}", flush=True)
 
         # Collect library directories
-        library_dirs = []
+        library_dirs: List[Path] = []
         if libraries:
             # Parse comma-separated library directories
             library_dirs.extend([Path(lib.strip()).expanduser().resolve()
@@ -759,6 +814,8 @@ class ArduinoCLI:
             # Add high-priority library paths
             library_dirs.extend([Path(lib).expanduser().resolve()
                                for lib in library_paths])
+
+        library_dirs = self._expand_library_directories(library_dirs)
 
         if verbose and library_dirs:
             print(f"Using {len(library_dirs)} custom library directories", flush=True)
