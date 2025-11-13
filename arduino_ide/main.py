@@ -25,22 +25,55 @@ def _ensure_default_core_installed() -> None:
             [sys.executable, str(cli_path), *args],
             capture_output=True,
             text=True,
-            check=True,
         )
-        return json.loads(result.stdout) if expect_json and result.stdout.strip() else {}
+        if result.returncode != 0:
+            raise subprocess.CalledProcessError(
+                result.returncode,
+                result.args,
+                output=result.stdout,
+                stderr=result.stderr,
+            )
+
+        if expect_json and result.stdout.strip():
+            return json.loads(result.stdout)
+
+        return result.stdout
 
     try:
         cores = run_cli(["core", "list", "--format", "json"], expect_json=True)
         installed = cores.get("installed", []) if isinstance(cores, dict) else []
         if any(core.get("id") == "arduino:avr" for core in installed):
             return
-    except (json.JSONDecodeError, subprocess.CalledProcessError, OSError) as exc:
-        print(f"Failed to query installed Arduino cores: {exc}")
+    except json.JSONDecodeError as exc:
+        print(f"Failed to parse Arduino core list JSON: {exc}")
+    except (subprocess.CalledProcessError, OSError) as exc:
+        message = (
+            (exc.stderr or exc.output or str(exc))
+            if isinstance(exc, subprocess.CalledProcessError)
+            else str(exc)
+        )
+        try:
+            cores_text = run_cli(["core", "list"])
+        except subprocess.CalledProcessError:
+            if message:
+                print(f"Failed to query installed Arduino cores: {message}")
+            else:
+                print("Failed to query installed Arduino cores")
+        else:
+            if "arduino:avr" in cores_text:
+                return
+            if message:
+                print(f"Failed to query installed Arduino cores: {message}")
 
     try:
         run_cli(["core", "update-index"])
     except subprocess.CalledProcessError as exc:
-        print(f"Failed to update Arduino core index: {exc.stderr.strip() if exc.stderr else exc}")
+        error_text = (exc.stderr or exc.output or "").strip()
+        if "invalid choice" not in error_text:
+            print(
+                "Failed to update Arduino core index: "
+                f"{error_text or exc}"
+            )
 
     try:
         run_cli(["core", "install", "arduino:avr"])
