@@ -319,15 +319,25 @@ class MainWindow(QMainWindow):
         # Add left area to main splitter
         central.addWidget(left_area)
 
-        # Right column (Board/Watch/Status/Context) - full height
+        # Right column 1 (Board/Status) - full height
         self.right_column = QWidget()
         self.right_column_layout = QVBoxLayout(self.right_column)
         self.right_column_layout.setContentsMargins(0, 0, 0, 0)
         self.right_column_layout.setSpacing(0)
         self.right_column.setFixedWidth(300)
 
-        # Add right column to main splitter
+        # Add first right column to main splitter
         central.addWidget(self.right_column)
+
+        # Right column 2 (Pin Usage/Context Help) - full height
+        self.right_column_2 = QWidget()
+        self.right_column_2_layout = QVBoxLayout(self.right_column_2)
+        self.right_column_2_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_column_2_layout.setSpacing(0)
+        self.right_column_2.setFixedWidth(300)
+
+        # Add second right column to main splitter
+        central.addWidget(self.right_column_2)
 
         self.setCentralWidget(central)
 
@@ -626,19 +636,25 @@ class MainWindow(QMainWindow):
         # Add widgets to left column layout (NOT as dock widgets)
         self.left_column_layout.addWidget(self.quick_actions_panel)
 
-        # --- RIGHT COLUMN (Normal widgets, NOT docks) ---
-        # Create right-side panel widgets
+        # --- RIGHT COLUMN 1 (Normal widgets, NOT docks) ---
+        # Create first right column widgets (Board/Status)
         self.board_panel = BoardPanel()
         self.status_display = StatusDisplay()
+
+        # Add widgets to first right column layout
+        self.right_column_layout.addWidget(self.board_panel)
+        self.right_column_layout.addWidget(self.status_display)
+        self.right_column_layout.addStretch()
+
+        # --- RIGHT COLUMN 2 (Normal widgets, NOT docks) ---
+        # Create second right column widgets (Pin Usage/Context)
         self.pin_usage_panel = PinUsagePanel()
         self.context_panel = ContextPanel()
 
-        # Add widgets to right column layout (NOT as dock widgets)
-        self.right_column_layout.addWidget(self.board_panel)
-        self.right_column_layout.addWidget(self.status_display)
-        self.right_column_layout.addWidget(self.pin_usage_panel)
-        self.right_column_layout.addWidget(self.context_panel)
-        self.right_column_layout.addStretch()
+        # Add widgets to second right column layout
+        self.right_column_2_layout.addWidget(self.pin_usage_panel)
+        self.right_column_2_layout.addWidget(self.context_panel)
+        self.right_column_2_layout.addStretch()
 
         # --- BOTTOM TABS (Normal widgets in tabs, NOT docks) ---
         # Create bottom panels
