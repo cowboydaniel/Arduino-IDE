@@ -960,19 +960,50 @@ class ArduinoCLI:
                 if not lib_dir.exists():
                     continue
 
-                # Look for source files in library directory and src subdirectory
-                search_dirs = [lib_dir, lib_dir / 'src']
-                lib_sources = []
+                # Look for source files within supported directories. Prefer the
+                # conventional ``src`` folder when present (to avoid pulling in
+                # example sketches) but fall back to the library root for older
+                # layouts. Use ``rglob`` so nested utility folders are included.
+                search_dirs = [lib_dir]
+                src_dir = lib_dir / 'src'
+                if src_dir.exists():
+                    search_dirs.append(src_dir)
+
+                excluded_dirs = {"examples", "example", "extras", "docs", "doc", "tests", "test", "benchmark"}
+                lib_sources: Set[Path] = set()
                 for search_dir in search_dirs:
-                    if search_dir.exists():
-                        lib_sources.extend(search_dir.glob('*.cpp'))
-                        lib_sources.extend(search_dir.glob('*.c'))
+                    for pattern in ('*.cpp', '*.c'):
+                        for candidate in search_dir.rglob(pattern):
+                            try:
+                                relative_candidate = candidate.relative_to(lib_dir)
+                            except ValueError:
+                                relative_candidate = candidate.relative_to(search_dir)
+
+                            # Skip common non-build directories (examples, docs, tests, etc.)
+                            if any(part.lower() in excluded_dirs for part in relative_candidate.parts):
+                                continue
+
+                            lib_sources.add(candidate)
 
                 if lib_sources and verbose:
                     print(f"Found {len(lib_sources)} source files in {lib_dir.name}", flush=True)
 
                 for lib_source in lib_sources:
-                    lib_obj_file = build_dir / f"lib_{lib_source.stem}.o"
+                    try:
+                        relative_source = lib_source.relative_to(lib_dir)
+                    except ValueError:
+                        relative_source = lib_source.name
+
+                    # Sanitize the relative path so nested files like
+                    # ``src/utility/twi.c`` result in unique object file names
+                    # (``lib_src_utility_twi.o``). This prevents collisions when
+                    # different directories contain files with the same stem.
+                    if isinstance(relative_source, Path):
+                        sanitized_name = '_'.join(relative_source.with_suffix('').parts)
+                    else:
+                        sanitized_name = Path(relative_source).with_suffix('').name
+
+                    lib_obj_file = build_dir / f"lib_{sanitized_name}.o"
                     library_obj_files.append(lib_obj_file)
 
                     # Determine compilation flags based on file type
