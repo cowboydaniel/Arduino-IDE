@@ -4,7 +4,7 @@ import copy
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Set
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Set
 from dataclasses import dataclass, field
 from enum import Enum
 from PySide6.QtCore import QObject, Signal
@@ -28,6 +28,10 @@ from arduino_ide.models.circuit_domain import (
     SheetInstance,
     SymbolUnit,
 )
+
+class CircuitSerializationError(Exception):
+    """Raised when circuit data cannot be converted between formats."""
+
 
 class ComponentType(Enum):
     """Types of circuit components"""
@@ -96,7 +100,7 @@ class ComponentInstance:
     y: float
     rotation: float = 0.0  # Degrees
     properties: Dict[str, Any] = field(default_factory=dict)
-    sheet_id: Optional[str] = None
+    sheet_id: str = "root"
 
 
 @dataclass
@@ -119,6 +123,16 @@ class Sheet:
     parent_id: Optional[str] = None
     file_path: Optional[str] = None
     embedded: bool = False
+
+
+@dataclass
+class Sheet:
+    """Schematic sheet"""
+    sheet_id: str
+    name: str
+    parent_id: Optional[str] = None
+    properties: Dict[str, Any] = field(default_factory=dict)
+    children: List[str] = field(default_factory=list)
 
 
 class CircuitService(QObject):
@@ -158,18 +172,14 @@ class CircuitService(QObject):
         self._component_definitions: Dict[str, ComponentDefinition] = {}
         self._components: Dict[str, ComponentInstance] = {}
         self._connections: Dict[str, Connection] = {}
-        self._nets: Dict[str, Net] = {}
-        self._buses: Dict[str, Bus] = {}
         self._sheets: Dict[str, Sheet] = {}
-        self._sheet_instances: Dict[str, SheetInstance] = {}
-        self._differential_pairs: Dict[str, DifferentialPair] = {}
+        self._root_sheet_id = "root"
 
         self._next_component_id = 1
         self._next_connection_id = 1
-        self._next_sheet_id = 1
+        self._next_sheet_index = 1
 
-        self._sheets: Dict[str, Sheet] = {}
-        self._active_sheet_id: Optional[str] = None
+        self._reset_circuit_state()
 
         # Initialize component library
         self._init_component_library()
@@ -237,20 +247,73 @@ class CircuitService(QObject):
 
         self._component_definitions.clear()
 
-        adapter = self._symbol_adapter
-        if adapter is None:
-            try:
-                from .kicad_symbol_adapter import KiCADSymbolAdapter
-            except Exception as exc:  # pragma: no cover - defensive import guard
-                logger.warning("KiCAD symbol adapter unavailable: %s", exc)
-                logger.info("Component library initialized with 0 components")
-                return
-
-            adapter = KiCADSymbolAdapter(
-                search_paths=config.KICAD_GLOBAL_SYMBOL_LIBRARY_PATHS,
-                cache_dir=config.KICAD_PROJECT_CACHE_DIR,
+    def _init_sheet_hierarchy(self, root_sheet_id: str, root_sheet_name: str):
+        """Initialize the sheet hierarchy with a root sheet."""
+        self._root_sheet_id = root_sheet_id
+        self._sheets = {
+            root_sheet_id: Sheet(
+                sheet_id=root_sheet_id,
+                name=root_sheet_name,
+                parent_id=None,
             )
-            self._symbol_adapter = adapter
+        }
+        self._next_sheet_index = 1
+
+    def _reset_circuit_state(self, root_sheet_id: str = "root", root_sheet_name: str = "Root"):
+        """Reset the mutable state for components, connections, and sheets."""
+        self._components = {}
+        self._connections = {}
+        self._init_sheet_hierarchy(root_sheet_id, root_sheet_name)
+        self._next_component_id = 1
+        self._next_connection_id = 1
+
+    def _generate_sheet_id(self) -> str:
+        sheet_id = f"sheet_{self._next_sheet_index}"
+        self._next_sheet_index += 1
+        return sheet_id
+
+    @staticmethod
+    def _extract_numeric_suffix(value: str) -> int:
+        digits = []
+        for char in reversed(value):
+            if char.isdigit():
+                digits.append(char)
+            else:
+                break
+
+        if not digits:
+            return 0
+
+        digits.reverse()
+        return int("".join(digits))
+
+    def _next_index_from_ids(self, identifiers: Iterable[str]) -> int:
+        max_value = 0
+        has_items = False
+        for identifier in identifiers:
+            has_items = True
+            max_value = max(max_value, self._extract_numeric_suffix(identifier))
+
+        if not has_items:
+            return 1
+
+        return max_value + 1
+
+    def _refresh_counters(self):
+        """Update ID counters based on the current objects."""
+        self._next_component_id = self._next_index_from_ids(self._components.keys())
+        self._next_connection_id = self._next_index_from_ids(self._connections.keys())
+
+        sheet_numbers = [
+            self._extract_numeric_suffix(sheet_id)
+            for sheet_id in self._sheets.keys()
+            if sheet_id.startswith("sheet_")
+        ]
+        max_sheet = max(sheet_numbers) if sheet_numbers else 0
+        self._next_sheet_index = max_sheet + 1 if max_sheet > 0 else 1
+
+    def _load_component_from_json(self, json_path: Path) -> Optional[ComponentDefinition]:
+        """Load a component definition from a JSON file"""
 
         try:
             with open(json_path, 'r', encoding='utf-8') as f:
@@ -469,206 +532,21 @@ class CircuitService(QObject):
         net.nodes.append(node)
         return True
 
-    def remove_net(self, net_name: str) -> bool:
-        """Remove a net from the design."""
-
-        if net_name not in self._nets:
-            return False
-
-        del self._nets[net_name]
-        for connection in self._connections.values():
-            if connection.net_name == net_name:
-                connection.net_name = None
-        for bus in self._buses.values():
-            bus.nets.discard(net_name)
-            for pair_name, pair in list(bus.differential_pairs.items()):
-                if net_name in (pair.positive_net, pair.negative_net):
-                    del bus.differential_pairs[pair_name]
-        for pair_name, pair in list(self._differential_pairs.items()):
-            if net_name in (pair.positive_net, pair.negative_net):
-                del self._differential_pairs[pair_name]
-        return True
-
-    def renumber_nets(self) -> None:
-        """Renumber nets in a deterministic order for export."""
-
-        mapping: Dict[str, str] = {}
-        sorted_items = sorted(self._nets.items(), key=lambda item: item[0])
-        for index, (old_name, _) in enumerate(sorted_items, start=1):
-            mapping[old_name] = f"NET{index:03}"
-
-        new_nets: Dict[str, Net] = {}
-        for old_name, net in sorted_items:
-            new_name = mapping[old_name]
-            net.name = new_name
-            new_nets[new_name] = net
-
-        for connection in self._connections.values():
-            if connection.net_name in mapping:
-                connection.net_name = mapping[connection.net_name]
-
-        for bus in self._buses.values():
-            bus.nets = {mapping.get(net, net) for net in bus.nets}
-            bus.differential_pairs = {
-                name: DifferentialPair(
-                    name=pair.name,
-                    positive_net=mapping.get(pair.positive_net, pair.positive_net),
-                    negative_net=mapping.get(pair.negative_net, pair.negative_net),
-                )
-                for name, pair in bus.differential_pairs.items()
-            }
-
-        for pair_name, pair in list(self._differential_pairs.items()):
-            self._differential_pairs[pair_name] = DifferentialPair(
-                name=pair.name,
-                positive_net=mapping.get(pair.positive_net, pair.positive_net),
-                negative_net=mapping.get(pair.negative_net, pair.negative_net),
-            )
-
-        self._nets = new_nets
-        self._next_net_id = len(self._nets) + 1
-
-    def create_bus(self, name: Optional[str] = None, nets: Optional[List[str]] = None) -> Bus:
-        """Create a bus that groups nets."""
-
-        if not name:
-            name = f"BUS{self._next_bus_id:02}"
-            self._next_bus_id += 1
-
-        if name in self._buses:
-            raise ValueError(f"Bus '{name}' already exists")
-
-        bus = Bus(name=name)
-        self._buses[name] = bus
-
-        if nets:
-            for net_name in nets:
-                self.add_net_to_bus(net_name, name)
-
-        return bus
-
-    def add_net_to_bus(self, net_name: str, bus_name: str) -> bool:
-        """Associate a net with a bus."""
-
-        net = self._nets.get(net_name)
-        bus = self._buses.get(bus_name)
-        if not net or not bus:
-            return False
-
-        bus.nets.add(net.name)
-        net.bus = bus.name
-        return True
-
-    def define_differential_pair(
+    def add_component(
         self,
-        pair_name: str,
-        positive_net: str,
-        negative_net: str,
-        bus_name: Optional[str] = None,
-    ) -> DifferentialPair:
-        """Register a differential pair between two nets."""
-
-        if positive_net not in self._nets or negative_net not in self._nets:
-            raise ValueError("Both nets must exist for differential pair definition")
-
-        pair = DifferentialPair(
-            name=pair_name,
-            positive_net=positive_net,
-            negative_net=negative_net,
-        )
-        self._differential_pairs[pair_name] = pair
-        self._nets[positive_net].differential_pair = pair_name
-        self._nets[negative_net].differential_pair = pair_name
-
-        if bus_name:
-            bus = self._buses.get(bus_name) or self.create_bus(bus_name)
-            bus.differential_pairs[pair_name] = pair
-
-        return pair
-
-    # ------------------------------------------------------------------
-    # Sheet and hierarchy helpers
-
-    def define_sheet(
-        self,
-        sheet_id: str,
-        name: str,
-        *,
-        ports: Optional[List[HierarchicalPort]] = None,
-        units: Optional[List[SymbolUnit]] = None,
-    ) -> Sheet:
-        """Register a sheet definition."""
-
-        sheet = Sheet(sheet_id=sheet_id, name=name)
-        for port in ports or []:
-            sheet.ports[port.name] = port
-        for unit in units or []:
-            sheet.symbol_units[unit.unit_id] = unit
-
-        self._sheets[sheet_id] = sheet
-        return sheet
-
-    def instantiate_sheet(
-        self,
-        sheet_id: str,
-        parent_path: Optional[Tuple[str, ...]] = None,
-    ) -> SheetInstance:
-        """Instantiate a hierarchical sheet."""
-
-        if sheet_id not in self._sheets:
-            raise ValueError(f"Sheet '{sheet_id}' is not defined")
-
-        instance_id = f"sheet_{self._next_sheet_instance_id}"
-        self._next_sheet_instance_id += 1
-
-        sheet = self._sheets[sheet_id]
-        ports = {
-            name: HierarchicalPort(
-                name=port.name,
-                pin_type=port.pin_type,
-                direction=port.direction,
-                net_name=port.net_name,
-            )
-            for name, port in sheet.ports.items()
-        }
-
-        instance = SheetInstance(
-            instance_id=instance_id,
-            sheet_id=sheet_id,
-            parent_path=tuple(parent_path or tuple()),
-            ports=ports,
-        )
-        sheet.instances[instance_id] = instance
-        self._sheet_instances[instance_id] = instance
-        return instance
-
-    def bind_port_to_net(self, sheet_instance_id: str, port_name: str, net_name: str) -> bool:
-        """Bind a hierarchical port to a net."""
-
-        instance = self._sheet_instances.get(sheet_instance_id)
-        if not instance or port_name not in instance.ports:
-            return False
-
-        port = instance.ports[port_name]
-        port.net_name = net_name
-        self.assign_pin_to_net(
-            sheet_instance_id,
-            port_name,
-            net_name,
-            instance.parent_path,
-            pin_type=port.pin_type,
-            allow_virtual=True,
-        )
-        return True
-
-
-    def add_component(self, component_id: str, x: float, y: float,
-                      sheet_id: Optional[str] = None) -> Optional[ComponentInstance]:
+        component_id: str,
+        x: float,
+        y: float,
+        sheet_id: Optional[str] = None,
+    ) -> Optional[ComponentInstance]:
         """Add a component instance to the circuit"""
         comp_def = self.get_component_definition(component_id)
         if not comp_def:
             logger.error(f"Component definition not found: {component_id}")
             return None
+
+        if sheet_id is None or sheet_id not in self._sheets:
+            sheet_id = self._root_sheet_id
 
         instance_id = f"comp_{self._next_component_id}"
         self._next_component_id += 1
@@ -678,7 +556,7 @@ class CircuitService(QObject):
             definition_id=component_id,
             x=x,
             y=y,
-            sheet_id=sheet_id or self.get_active_sheet_id()
+            sheet_id=sheet_id,
         )
 
         self._components[instance_id] = instance
@@ -827,13 +705,59 @@ class CircuitService(QObject):
         """Get all connections in the circuit"""
         return list(self._connections.values())
 
-    def get_connections_for_sheet(self, sheet_id: Optional[str] = None) -> List[Connection]:
-        target_sheet = sheet_id or self.get_active_sheet_id()
-        component_ids = {c.instance_id for c in self.get_components_for_sheet(target_sheet)}
-        return [
-            conn for conn in self._connections.values()
-            if conn.from_component in component_ids and conn.to_component in component_ids
-        ]
+    def get_root_sheet(self) -> Sheet:
+        """Return the root sheet"""
+        return self._sheets[self._root_sheet_id]
+
+    def get_sheet(self, sheet_id: str) -> Optional[Sheet]:
+        """Get a sheet by ID"""
+        return self._sheets.get(sheet_id)
+
+    def get_components_in_sheet(self, sheet_id: str) -> List[ComponentInstance]:
+        """Return components that belong to the specified sheet"""
+        return [c for c in self._components.values() if c.sheet_id == sheet_id]
+
+    def add_sheet(
+        self,
+        name: str,
+        parent_id: Optional[str] = None,
+        properties: Optional[Dict[str, Any]] = None,
+        sheet_id: Optional[str] = None,
+    ) -> Sheet:
+        """Create a new sheet under the given parent."""
+        if parent_id is None:
+            parent_id = self._root_sheet_id
+
+        if parent_id not in self._sheets:
+            raise CircuitSerializationError(f"Parent sheet '{parent_id}' not found")
+
+        if sheet_id is None:
+            sheet_id = self._generate_sheet_id()
+        elif sheet_id in self._sheets:
+            raise CircuitSerializationError(f"Sheet '{sheet_id}' already exists")
+        else:
+            self._next_sheet_index = max(self._next_sheet_index, self._extract_numeric_suffix(sheet_id) + 1)
+
+        sheet = Sheet(
+            sheet_id=sheet_id,
+            name=name,
+            parent_id=parent_id,
+            properties=properties or {},
+        )
+        self._sheets[sheet_id] = sheet
+        self._sheets[parent_id].children.append(sheet_id)
+
+        return sheet
+
+    def assign_component_to_sheet(self, instance_id: str, sheet_id: str) -> bool:
+        """Assign an existing component to a sheet"""
+        if instance_id not in self._components or sheet_id not in self._sheets:
+            return False
+
+        self._components[instance_id].sheet_id = sheet_id
+        self.circuit_changed.emit()
+        return True
+
 
 
             drive_nodes = [node for node in net.nodes if node.pin_type in drive_pin_types]
@@ -916,112 +840,537 @@ class CircuitService(QObject):
 
     def clear_circuit(self):
         """Clear all components and connections"""
-        self._components.clear()
-        self._connections.clear()
-        self._nets.clear()
-        self._buses.clear()
-        self._sheets.clear()
-        self._sheet_instances.clear()
-        self._differential_pairs.clear()
-        self._annotation_counters.clear()
-        self._next_component_id = 1
-        self._next_connection_id = 1
-        self._next_net_id = 1
-        self._next_bus_id = 1
-        self._next_sheet_instance_id = 1
+        self._reset_circuit_state()
         self.circuit_changed.emit()
         logger.info("Circuit cleared")
 
 
-    def save_circuit(self, file_path: str) -> bool:
-        """Save circuit to JSON file"""
+    def save_circuit(self, file_path: str):
+        """Save the circuit to either KiCAD or legacy JSON format."""
+        path = Path(file_path)
+        suffix = path.suffix.lower()
+
         try:
-            data = self.export_circuit_state()
-
-            with open(file_path, 'w') as f:
-                json.dump(data, f, indent=2)
-
-            logger.info(f"Circuit saved to {file_path}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to save circuit: {e}")
-            return False
-
-
-    def load_circuit(self, file_path: str) -> bool:
-        """Load circuit from JSON file"""
-        try:
-            with open(file_path, 'r') as f:
-                data = json.load(f)
-
-            self.clear_circuit()
-            self._sheets.clear()
-
-            # Load components
-            for comp_data in data.get("components", []):
-                component = ComponentInstance(
-                    instance_id=comp_data["instance_id"],
-                    definition_id=comp_data["definition_id"],
-                    x=comp_data["x"],
-                    y=comp_data["y"],
-                    rotation=comp_data.get("rotation", 0.0),
-                    properties=comp_data.get("properties", {}),
-                    sheet_id=comp_data.get("sheet_id"),
+            if suffix == ".kicad_sch":
+                content = self._serialize_to_kicad()
+                path.write_text(content, encoding="utf-8")
+                logger.info(f"Circuit saved to KiCAD schematic: {file_path}")
+            elif suffix == ".json":
+                self._save_legacy_json(path)
+                logger.info(f"Circuit saved to legacy JSON: {file_path}")
+            else:
+                raise CircuitSerializationError(
+                    f"Unsupported circuit file format: {path.suffix or 'unknown'}"
                 )
-                self._components[component.instance_id] = component
+        except OSError as exc:
+            raise CircuitSerializationError(f"Failed to save circuit: {exc}") from exc
 
-            self._annotation_counters.clear()
-            for component in self._components.values():
-                comp_def = self.get_component_definition(component.definition_id)
-                if not comp_def or not component.annotation:
+    def load_circuit(self, file_path: str):
+        """Load a circuit from KiCAD schematic or legacy JSON."""
+        path = Path(file_path)
+        suffix = path.suffix.lower()
+
+        try:
+            if suffix == ".kicad_sch":
+                content = path.read_text(encoding="utf-8")
+                self._load_from_kicad(content)
+                logger.info(f"Circuit loaded from KiCAD schematic: {file_path}")
+            elif suffix == ".json":
+                self._load_legacy_json(path)
+                logger.info(f"Circuit loaded from legacy JSON: {file_path}")
+            else:
+                raise CircuitSerializationError(
+                    f"Unsupported circuit file format: {path.suffix or 'unknown'}"
+                )
+        except OSError as exc:
+            raise CircuitSerializationError(f"Failed to load circuit: {exc}") from exc
+
+    def import_legacy_json(self, file_path: str):
+        """Load a legacy JSON project for one-time migration."""
+        path = Path(file_path)
+        if path.suffix.lower() != ".json":
+            raise CircuitSerializationError("Legacy import expects a JSON file")
+
+        self._load_legacy_json(path)
+
+    def export_to_kicad(self, file_path: str):
+        """Explicit helper that always writes a KiCAD schematic."""
+        path = Path(file_path)
+        if path.suffix.lower() != ".kicad_sch":
+            raise CircuitSerializationError("KiCAD export expects a .kicad_sch file")
+
+        content = self._serialize_to_kicad()
+        try:
+            path.write_text(content, encoding="utf-8")
+        except OSError as exc:
+            raise CircuitSerializationError(f"Failed to write KiCAD schematic: {exc}") from exc
+
+    def _save_legacy_json(self, path: Path):
+        data = {
+            "root_sheet_id": self._root_sheet_id,
+            "sheets": [
+                {
+                    "sheet_id": sheet.sheet_id,
+                    "name": sheet.name,
+                    "parent_id": sheet.parent_id,
+                    "properties": sheet.properties,
+                    "children": list(sheet.children),
+                }
+                for sheet in self._sheets.values()
+            ],
+            "components": [
+                {
+                    "instance_id": c.instance_id,
+                    "definition_id": c.definition_id,
+                    "x": c.x,
+                    "y": c.y,
+                    "rotation": c.rotation,
+                    "properties": c.properties,
+                    "sheet_id": c.sheet_id,
+                }
+                for c in self._components.values()
+            ],
+            "connections": [
+                {
+                    "connection_id": c.connection_id,
+                    "from_component": c.from_component,
+                    "from_pin": c.from_pin,
+                    "to_component": c.to_component,
+                    "to_pin": c.to_pin,
+                    "wire_color": c.wire_color,
+                }
+                for c in self._connections.values()
+            ],
+        }
+
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def _load_legacy_json(self, path: Path):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise CircuitSerializationError(f"Invalid JSON: {exc}") from exc
+
+        sheets_data = data.get("sheets") or []
+
+        if sheets_data:
+            root_sheet_id = data.get("root_sheet_id") or sheets_data[0].get("sheet_id", "root")
+            root_sheet_name = next(
+                (sheet.get("name", "Root") for sheet in sheets_data if sheet.get("sheet_id") == root_sheet_id),
+                "Root",
+            )
+            root_properties = next(
+                (sheet.get("properties", {}) for sheet in sheets_data if sheet.get("sheet_id") == root_sheet_id),
+                {},
+            )
+            self._reset_circuit_state(root_sheet_id, root_sheet_name)
+            self._sheets[root_sheet_id].properties = root_properties
+        else:
+            self._reset_circuit_state()
+
+        if sheets_data:
+            for sheet in self._sheets.values():
+                sheet.children = []
+
+            for sheet_data in sheets_data:
+                sheet_id = sheet_data.get("sheet_id")
+                if not sheet_id or sheet_id == self._root_sheet_id:
                     continue
-                prefix = self._ANNOTATION_PREFIXES.get(comp_def.component_type, "U")
-                if component.annotation.startswith(prefix):
-                    suffix = component.annotation[len(prefix):]
-                    if suffix.isdigit():
-                        current = self._annotation_counters.get(comp_def.component_type, 0)
-                        self._annotation_counters[comp_def.component_type] = max(current, int(suffix))
 
-            # Load connections
-            for conn_data in data.get("connections", []):
-                connection = Connection(
-                    connection_id=conn_data["connection_id"],
-                    from_component=conn_data["from_component"],
-                    from_pin=conn_data["from_pin"],
-                    to_component=conn_data["to_component"],
-                    to_pin=conn_data["to_pin"],
-                    wire_color=conn_data.get("wire_color", "#000000"),
-                    connection_type=conn_data.get("connection_type", "wire"),
-                )
-                self._connections[connection.connection_id] = connection
-
-            for sheet_data in data.get("sheets", []):
+                parent_id = sheet_data.get("parent_id") or self._root_sheet_id
                 sheet = Sheet(
-                    sheet_id=sheet_data["sheet_id"],
-                    name=sheet_data["name"],
-                    parent_id=sheet_data.get("parent_id"),
-                    file_path=sheet_data.get("file_path"),
-                    embedded=sheet_data.get("embedded", False),
+                    sheet_id=sheet_id,
+                    name=sheet_data.get("name", sheet_id),
+                    parent_id=parent_id,
+                    properties=sheet_data.get("properties", {}),
+                    children=[],
                 )
-                self._sheets[sheet.sheet_id] = sheet
+                self._sheets[sheet_id] = sheet
 
-            if not self._sheets:
-                self._ensure_root_sheet()
+            for sheet_data in sheets_data:
+                sheet_id = sheet_data.get("sheet_id")
+                if not sheet_id or sheet_id not in self._sheets:
+                    continue
+                children = [child for child in sheet_data.get("children", []) if child in self._sheets]
+                self._sheets[sheet_id].children = children
 
-            self._active_sheet_id = data.get("active_sheet", self._active_sheet_id)
-            if self._active_sheet_id not in self._sheets:
-                self._active_sheet_id = next(iter(self._sheets))
+            for sheet in self._sheets.values():
+                if sheet.parent_id and sheet.parent_id in self._sheets:
+                    parent = self._sheets[sheet.parent_id]
+                    if sheet.sheet_id not in parent.children:
+                        parent.children.append(sheet.sheet_id)
 
-            self.sheets_changed.emit()
-            self.active_sheet_changed.emit(self._active_sheet_id)
-            self.circuit_changed.emit()
-            logger.info(f"Circuit loaded from {file_path}")
-            return True
+        self._components = {}
+        for comp_data in data.get("components", []):
+            sheet_id = comp_data.get("sheet_id", self._root_sheet_id)
+            if sheet_id not in self._sheets:
+                self._sheets[sheet_id] = Sheet(sheet_id=sheet_id, name=sheet_id, parent_id=self._root_sheet_id)
+                self._sheets[self._root_sheet_id].children.append(sheet_id)
 
-        except Exception as e:
-            logger.error(f"Failed to load circuit: {e}")
-            return False
+            component = ComponentInstance(
+                instance_id=comp_data["instance_id"],
+                definition_id=comp_data["definition_id"],
+                x=comp_data["x"],
+                y=comp_data["y"],
+                rotation=comp_data.get("rotation", 0.0),
+                properties=comp_data.get("properties", {}),
+                sheet_id=sheet_id,
+            )
+            self._components[component.instance_id] = component
+
+        self._connections = {}
+        for conn_data in data.get("connections", []):
+            connection = Connection(
+                connection_id=conn_data["connection_id"],
+                from_component=conn_data["from_component"],
+                from_pin=conn_data["from_pin"],
+                to_component=conn_data["to_component"],
+                to_pin=conn_data["to_pin"],
+                wire_color=conn_data.get("wire_color", "#000000"),
+            )
+            self._connections[connection.connection_id] = connection
+
+        self._refresh_counters()
+        self.circuit_changed.emit()
+
+    def _serialize_to_kicad(self) -> str:
+        tree: List[Any] = [
+            "kicad_sch",
+            ["version", "20211014"],
+            ["generator", "Arduino Circuit Designer"],
+            self._serialize_sheet_node(self.get_root_sheet()),
+        ]
+
+        for code, connection in enumerate(sorted(self._connections.values(), key=lambda c: c.connection_id), start=1):
+            tree.append(self._serialize_net_node(connection, code))
+
+        return _sexpr_format(tree)
+
+    def _serialize_sheet_node(self, sheet: Sheet) -> List[Any]:
+        node: List[Any] = [
+            "sheet",
+            ["id", sheet.sheet_id],
+            ["name", sheet.name],
+        ]
+
+        for key, value in sorted(sheet.properties.items()):
+            node.append(["property", key, self._stringify_property(value)])
+
+        for component in sorted(self.get_components_in_sheet(sheet.sheet_id), key=lambda c: c.instance_id):
+            node.append(self._serialize_symbol_node(component))
+
+        for child_id in sheet.children:
+            child = self._sheets.get(child_id)
+            if child:
+                node.append(self._serialize_sheet_node(child))
+
+        return node
+
+    def _serialize_symbol_node(self, component: ComponentInstance) -> List[Any]:
+        node: List[Any] = [
+            "symbol",
+            ["lib_id", component.definition_id],
+            ["reference", component.instance_id],
+            [
+                "at",
+                f"{component.x:.4f}",
+                f"{component.y:.4f}",
+                f"{component.rotation:.4f}",
+            ],
+            ["property", "sheet_id", component.sheet_id],
+        ]
+
+        comp_def = self.get_component_definition(component.definition_id)
+        if comp_def:
+            node.append(["property", "component_name", comp_def.name])
+            node.append(["property", "component_type", comp_def.component_type.value])
+
+        for key, value in sorted(component.properties.items()):
+            node.append(["property", key, self._stringify_property(value)])
+
+        return node
+
+    def _serialize_net_node(self, connection: Connection, code: int) -> List[Any]:
+        return [
+            "net",
+            ["code", str(code)],
+            ["name", connection.connection_id],
+            ["property", "connection_id", connection.connection_id],
+            ["property", "wire_color", connection.wire_color],
+            ["node", ["ref", connection.from_component], ["pin", connection.from_pin]],
+            ["node", ["ref", connection.to_component], ["pin", connection.to_pin]],
+        ]
+
+    @staticmethod
+    def _stringify_property(value: Any) -> str:
+        return json.dumps(value)
+
+    @staticmethod
+    def _parse_property_value(value: str) -> Any:
+        try:
+            return json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            return value
+
+    def _load_from_kicad(self, content: str):
+        try:
+            tree = _sexpr_parse(content)
+        except ValueError as exc:
+            raise CircuitSerializationError(f"Invalid KiCAD schematic: {exc}") from exc
+
+        if not tree or tree[0] != "kicad_sch":
+            raise CircuitSerializationError("File is not a KiCAD schematic")
+
+        sheet_node = next((child for child in tree[1:] if _sexpr_is(child, "sheet")), None)
+        if not sheet_node:
+            raise CircuitSerializationError("Schematic missing root sheet")
+
+        root_sheet_id = _sexpr_child_value(sheet_node, "id") or "root"
+        root_sheet_name = _sexpr_child_value(sheet_node, "name") or "Root"
+        raw_properties = _sexpr_collect_properties(sheet_node)
+        root_properties = {key: self._parse_property_value(value) for key, value in raw_properties.items()}
+
+        self._reset_circuit_state(root_sheet_id, root_sheet_name)
+        self._sheets[root_sheet_id].properties = root_properties
+        self._populate_sheet_from_node(sheet_node, None, is_root=True)
+
+        self._connections = {}
+        for child in tree[1:]:
+            if _sexpr_is(child, "net"):
+                self._create_connection_from_node(child)
+
+        self._refresh_counters()
+        self.circuit_changed.emit()
+
+    def _populate_sheet_from_node(
+        self,
+        node: List[Any],
+        parent_id: Optional[str],
+        is_root: bool = False,
+    ):
+        sheet_id = _sexpr_child_value(node, "id") or self._generate_sheet_id()
+        sheet_name = _sexpr_child_value(node, "name") or sheet_id
+        raw_properties = _sexpr_collect_properties(node)
+        properties = {key: self._parse_property_value(value) for key, value in raw_properties.items()}
+
+        if is_root:
+            sheet_id = self._root_sheet_id
+            sheet = self._sheets[sheet_id]
+            sheet.name = sheet_name
+            sheet.properties = properties
+            sheet.children = []
+        else:
+            parent_ref = parent_id or self._root_sheet_id
+            if sheet_id in self._sheets:
+                sheet = self._sheets[sheet_id]
+                sheet.name = sheet_name
+                sheet.parent_id = parent_ref
+                sheet.properties = properties
+                sheet.children = []
+            else:
+                sheet = self.add_sheet(sheet_name, parent_ref, properties, sheet_id=sheet_id)
+                sheet.children = []
+
+        for child in node[1:]:
+            if isinstance(child, list) and child:
+                if child[0] == "symbol":
+                    self._create_component_from_symbol(child, sheet_id)
+                elif child[0] == "sheet":
+                    self._populate_sheet_from_node(child, sheet_id)
+
+    def _create_component_from_symbol(self, node: List[Any], sheet_id: str):
+        lib_id = _sexpr_child_value(node, "lib_id")
+        if not lib_id:
+            raise CircuitSerializationError("Symbol missing lib_id")
+
+        reference = _sexpr_child_value(node, "reference") or f"comp_{self._next_component_id}"
+        at_values = _sexpr_child_values(node, "at")
+        x = float(at_values[0]) if len(at_values) >= 1 else 0.0
+        y = float(at_values[1]) if len(at_values) >= 2 else 0.0
+        rotation = float(at_values[2]) if len(at_values) >= 3 else 0.0
+        properties = _sexpr_collect_properties(node)
+        for system_key in ("sheet_id", "component_name", "component_type"):
+            properties.pop(system_key, None)
+        decoded_properties = {
+            key: self._parse_property_value(value)
+            for key, value in properties.items()
+        }
+
+        if reference in self._components:
+            raise CircuitSerializationError(f"Duplicate component reference '{reference}'")
+
+        component = ComponentInstance(
+            instance_id=reference,
+            definition_id=lib_id,
+            x=x,
+            y=y,
+            rotation=rotation,
+            properties=decoded_properties,
+            sheet_id=sheet_id,
+        )
+        self._components[component.instance_id] = component
+
+    def _create_connection_from_node(self, node: List[Any]):
+        properties = _sexpr_collect_properties(node)
+        node_entries = [child for child in node[1:] if _sexpr_is(child, "node")]
+
+        if len(node_entries) != 2:
+            raise CircuitSerializationError("Each net must describe exactly two nodes")
+
+        refs = []
+        for entry in node_entries:
+            ref = _sexpr_child_value(entry, "ref")
+            pin = _sexpr_child_value(entry, "pin")
+            if not ref or not pin:
+                raise CircuitSerializationError("Net node missing ref or pin")
+            refs.append((ref, pin))
+
+        connection_id = properties.get("connection_id") or f"conn_{self._next_connection_id}"
+        connection = Connection(
+            connection_id=connection_id,
+            from_component=refs[0][0],
+            from_pin=refs[0][1],
+            to_component=refs[1][0],
+            to_pin=refs[1][1],
+            wire_color=properties.get("wire_color", "#000000"),
+        )
+        self._connections[connection.connection_id] = connection
+
+
+def _sexpr_format(node: Any) -> str:
+    if isinstance(node, list):
+        return "(" + " ".join(_sexpr_format(child) for child in node) + ")"
+    return _sexpr_atom(node)
+
+
+def _sexpr_atom(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+
+    if isinstance(value, (int, float)):
+        return str(value)
+
+    text = str(value)
+    if not text:
+        return '""'
+
+    needs_quotes = any(ch.isspace() or ch in '()"' for ch in text)
+    if needs_quotes:
+        escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    return text
+
+
+def _sexpr_parse(text: str) -> Any:
+    tokens = _sexpr_tokenize(text)
+    if not tokens:
+        return []
+
+    node, index = _sexpr_parse_tokens(tokens, 0)
+    if index != len(tokens):
+        raise ValueError("Unexpected tokens after parsing expression")
+    return node
+
+
+def _sexpr_parse_tokens(tokens: List[str], index: int):
+    if tokens[index] != "(":
+        return tokens[index], index + 1
+
+    items: List[Any] = []
+    index += 1
+    while index < len(tokens) and tokens[index] != ")":
+        token = tokens[index]
+        if token == "(":
+            child, index = _sexpr_parse_tokens(tokens, index)
+            items.append(child)
+        else:
+            items.append(token)
+            index += 1
+
+    if index >= len(tokens):
+        raise ValueError("Missing closing parenthesis")
+
+    return items, index + 1
+
+
+def _sexpr_tokenize(text: str) -> List[str]:
+    tokens: List[str] = []
+    i = 0
+    length = len(text)
+
+    while i < length:
+        char = text[i]
+        if char in "()":
+            tokens.append(char)
+            i += 1
+        elif char.isspace():
+            i += 1
+        elif char == '"':
+            i += 1
+            buffer = []
+            while i < length:
+                if text[i] == '\\':
+                    if i + 1 >= length:
+                        raise ValueError("Invalid escape in string literal")
+                    buffer.append(text[i + 1])
+                    i += 2
+                    continue
+                if text[i] == '"':
+                    i += 1
+                    break
+                buffer.append(text[i])
+                i += 1
+            else:
+                raise ValueError("Unterminated string literal")
+            tokens.append("".join(buffer))
+        else:
+            start = i
+            while i < length and not text[i].isspace() and text[i] not in "()":
+                i += 1
+            tokens.append(text[start:i])
+
+    return tokens
+
+
+def _sexpr_child_value(node: List[Any], name: str, default=None):
+    child = _sexpr_child(node, name)
+    if child is None:
+        return default
+
+    if len(child) == 2:
+        return child[1]
+
+    return child[1:]
+
+
+def _sexpr_child_values(node: List[Any], name: str) -> List[Any]:
+    child = _sexpr_child(node, name)
+    if child is None:
+        return []
+    return child[1:]
+
+
+def _sexpr_child(node: List[Any], name: str) -> Optional[List[Any]]:
+    for child in node[1:]:
+        if isinstance(child, list) and child and child[0] == name:
+            return child
+    return None
+
+
+def _sexpr_is(node: Any, name: str) -> bool:
+    return isinstance(node, list) and bool(node) and node[0] == name
+
+
+def _sexpr_collect_properties(node: List[Any]) -> Dict[str, str]:
+    properties: Dict[str, str] = {}
+    for child in node[1:]:
+        if _sexpr_is(child, "property") and len(child) >= 3:
+            key = str(child[1])
+            value = child[2]
+            if isinstance(value, list):
+                value = " ".join(str(part) for part in value)
+            properties[key] = str(value)
+    return properties
 
     # ------------------------------------------------------------------
     # State management helpers for undo/redo and tests
