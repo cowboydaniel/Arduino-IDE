@@ -1338,7 +1338,7 @@ class CircuitDesignerWindow(QMainWindow):
             f"Successfully saved circuit to {Path(file_path).name}"
         )
 
-    def _show_about(self):
+    def _show_about_dialog(self):
         """Show about dialog"""
         QMessageBox.about(
             self,
