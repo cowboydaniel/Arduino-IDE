@@ -846,7 +846,7 @@ class ArduinoCLI:
         # Compilation flags for Arduino sketch (treated as C++)
         # Matches official Arduino AVR core platform.txt compiler.cpp.flags
         compile_flags = [
-            str(toolchain.get_avr_gcc_path()),
+            str(toolchain.get_avr_gpp_path()),
             '-c',  # Compile only, don't link
             '-g',  # Debug info
             opt_level,  # Optimization level
@@ -1008,9 +1008,12 @@ class ArduinoCLI:
                     library_obj_files.append(lib_obj_file)
 
                     # Determine compilation flags based on file type
-                    if lib_source.suffix == '.cpp':
+                    suffix_lower = lib_source.suffix.lower()
+
+                    if suffix_lower in ('.cpp', '.cxx', '.cc'):
+                        compiler_path = toolchain.get_avr_gpp_path()
                         lib_compile_flags = [
-                            str(toolchain.get_avr_gcc_path()),
+                            str(compiler_path),
                             '-c', '-g', opt_level,
                         ]
                         lib_compile_flags.extend(warning_flags)
@@ -1021,9 +1024,10 @@ class ArduinoCLI:
                             '-Wno-error=narrowing',
                             '-MMD', '-flto', f'-mmcu={mcu}',
                         ])
-                    else:  # .c file
+                    else:  # .c or other C-family file
+                        compiler_path = toolchain.get_avr_gcc_path()
                         lib_compile_flags = [
-                            str(toolchain.get_avr_gcc_path()),
+                            str(compiler_path),
                             '-c', '-g', opt_level,
                         ]
                         lib_compile_flags.extend(warning_flags)
@@ -1124,8 +1128,11 @@ class ArduinoCLI:
                 # Determine if this is an assembly file
                 is_assembly = core_source.suffix == '.S'
 
+                is_cpp_source = core_source.suffix.lower() in ('.cpp', '.cxx', '.cc')
+                compiler_path = toolchain.get_avr_gpp_path() if is_cpp_source else toolchain.get_avr_gcc_path()
+
                 core_compile_flags = [
-                    str(toolchain.get_avr_gcc_path()),
+                    str(compiler_path),
                     '-c',
                     '-g',
                 ]
@@ -1145,7 +1152,7 @@ class ArduinoCLI:
                     ])
 
                 # Apply language-specific flags
-                if core_source.suffix.lower() in ('.cpp', '.cxx', '.cc'):
+                if is_cpp_source:
                     core_compile_flags.extend([
                         '-std=gnu++11',
                         '-fpermissive',
