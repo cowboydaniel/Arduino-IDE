@@ -2,6 +2,8 @@
 Main window for Arduino IDE Modern
 """
 
+from typing import Optional
+
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget,
@@ -222,6 +224,23 @@ class MainWindow(QMainWindow):
             library_manager=self.library_manager,
             board_manager=self.board_manager
         )
+
+        # Track pending board list refreshes triggered by package changes.
+        self._board_list_refresh_reason = ""
+        self._board_list_refresh_pending = False
+        self._board_list_refresh_timer = QTimer(self)
+        self._board_list_refresh_timer.setSingleShot(True)
+        self._board_list_refresh_timer.timeout.connect(self._perform_board_list_refresh)
+
+        # Keep the board selector synchronized with board package operations.
+        if hasattr(self.board_manager, "package_installed"):
+            self.board_manager.package_installed.connect(self._on_board_package_installed)
+        if hasattr(self.board_manager, "package_uninstalled"):
+            self.board_manager.package_uninstalled.connect(self._on_board_package_uninstalled)
+        if hasattr(self.board_manager, "package_updated"):
+            self.board_manager.package_updated.connect(self._on_board_package_updated)
+        if hasattr(self.board_manager, "index_updated"):
+            self.board_manager.index_updated.connect(self._on_board_index_updated)
 
         # Initialize visual programming service
         self.visual_programming_service = VisualProgrammingService()
@@ -1107,6 +1126,9 @@ void loop() {
             self._pending_board_memory_refresh = False
             QTimer.singleShot(0, self._do_background_compile)
 
+        if self._board_list_refresh_pending and not self.cli_service.is_running():
+            self._start_board_list_refresh_timer()
+
     def _parse_and_update_memory_usage(self, output_text):
         """Parse memory usage from compilation output and update status display
 
@@ -1257,12 +1279,27 @@ void loop() {
         board_panel = getattr(self, "board_panel", None)
 
         # Get boards from arduino-cli (installed platforms only)
+        boards = []
         try:
             boards = self.board_manager.get_boards_from_cli()
             print(f"DEBUG: get_boards_from_cli() returned {len(boards)} boards")
         except Exception as e:
             print(f"DEBUG: get_boards_from_cli() raised exception: {e}")
-            boards = []
+
+        # ``arduino-cli board list`` only reports connected hardware.  When the
+        # IDE starts with no devices attached (the common case right after a
+        # fresh platform install) we still need to populate the selector with
+        # every board provided by the installed cores.  Fall back to parsing the
+        # installed ``boards.txt`` files so the toolbar updates immediately.
+        if not boards:
+            try:
+                boards = self.board_manager.get_all_boards()
+                print(
+                    "DEBUG: Falling back to get_all_boards(), "
+                    f"discovered {len(boards)} boards"
+                )
+            except Exception as e:
+                print(f"DEBUG: get_all_boards() raised exception: {e}")
 
         if boards:
             # Sort boards by name for better UX
@@ -1298,6 +1335,81 @@ void loop() {
             self.on_board_changed(self.board_selector.currentText())
         elif board_panel:
             board_panel.update_board_info(None)
+
+    def _log_board_package_event(self, message: str, *, color: Optional[str] = None):
+        """Write a message to the console if it is available."""
+
+        if hasattr(self, "console_panel") and self.console_panel:
+            self.console_panel.append_output(message, color=color)
+
+    # ------------------------------------------------------------------
+    # Board package change handling
+    # ------------------------------------------------------------------
+    def _on_board_package_installed(self, package_name: str, version: str):
+        version_display = version or "latest"
+        reason = f"{package_name} {version_display} installed"
+        self._log_board_package_event(
+            f"⬇️ Installed board package: {package_name} {version_display}"
+        )
+        self._schedule_board_list_refresh(reason)
+
+    def _on_board_package_uninstalled(self, package_name: str):
+        self._log_board_package_event(f"🗑️ Removed board package: {package_name}")
+        self._schedule_board_list_refresh(f"{package_name} removed")
+
+    def _on_board_package_updated(self, package_name: str, old_version: str, new_version: str):
+        reason = f"{package_name} updated to {new_version}" if new_version else f"{package_name} updated"
+        old_display = old_version or "?"
+        new_display = new_version or "latest"
+        self._log_board_package_event(
+            f"🔄 Updated board package: {package_name} {old_display} → {new_display}"
+        )
+        self._schedule_board_list_refresh(reason)
+
+    def _on_board_index_updated(self):
+        self._schedule_board_list_refresh("index updated")
+
+    def _schedule_board_list_refresh(self, reason: str):
+        """Queue a refresh of the board selector after package changes."""
+
+        self._board_list_refresh_reason = reason
+
+        if self.cli_service.is_running():
+            self._board_list_refresh_pending = True
+            return
+
+        self._start_board_list_refresh_timer()
+
+    def _start_board_list_refresh_timer(self):
+        """Start (or restart) the timer that performs the actual refresh."""
+
+        self._board_list_refresh_pending = False
+        if self._board_list_refresh_timer.isActive():
+            self._board_list_refresh_timer.stop()
+        self._board_list_refresh_timer.start(300)
+
+    def _perform_board_list_refresh(self):
+        """Refresh the board selector and related panels after package changes."""
+
+        reason = self._board_list_refresh_reason or "package change"
+
+        if not hasattr(self, "board_selector"):
+            self._board_list_refresh_pending = True
+            QTimer.singleShot(300, self._start_board_list_refresh_timer)
+            return
+
+        self.status_bar.set_status(f"Refreshing boards ({reason})")
+
+        try:
+            self._populate_boards()
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+        except Exception as exc:
+            self._log_board_package_event(
+                f"⚠️ Failed to refresh boards after {reason}: {exc}",
+                color="#F48771"
+            )
+            self.status_bar.set_status("Board refresh failed")
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def _get_selected_board(self):
         """Get the currently selected board object from arduino-cli.
