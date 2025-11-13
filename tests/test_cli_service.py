@@ -90,3 +90,23 @@ def test_compile_sketch_invalid_board(qt_app, tmp_path):
     assert "Board 'invalid:board' not found" in combined_error
 
     service.deleteLater()
+
+
+def test_run_compile_includes_library_paths(monkeypatch, tmp_path):
+    service = ArduinoCliService()
+
+    captured = {}
+
+    def fake_start(args):
+        captured["args"] = list(args)
+
+    monkeypatch.setattr(service, "_start_process", fake_start)
+
+    library_dir = tmp_path / "libraries"
+    library_dir.mkdir()
+    service.set_library_search_paths([library_dir])
+
+    service.run_compile(str(tmp_path / "Example.ino"), "arduino:avr:uno")
+
+    assert "--libraries" in captured["args"]
+    assert str(library_dir) in captured["args"]

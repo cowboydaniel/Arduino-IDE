@@ -30,6 +30,7 @@ from ..models import (
     LibraryType, LibraryStatus, ProjectConfig, InstallPlan, DependencyTree
 )
 from .download_manager import DownloadManager
+from .core_manager import CoreManager
 from .index_updater import IndexUpdater
 
 
@@ -69,6 +70,7 @@ class LibraryManager(QObject):
         # Library index
         self.library_index = LibraryIndex()
         self.installed_libraries: Dict[str, str] = {}  # name -> version
+        self.installed_library_paths: Dict[str, str] = {}  # name -> install path
 
         # Enhanced services
         self.download_manager = DownloadManager(self.cache_dir, parent=self)
@@ -97,24 +99,52 @@ class LibraryManager(QObject):
 
         # Also scan libraries directory
         self._scan_installed_libraries()
+        self._ensure_builtin_libraries_available()
 
     def _scan_installed_libraries(self):
         """Scan libraries directory for installed libraries"""
         if not self.libraries_dir.exists():
             return
 
-        for lib_dir in self.libraries_dir.iterdir():
-            if lib_dir.is_dir():
-                # Try to read library.properties
-                props_file = lib_dir / "library.properties"
-                if props_file.exists():
-                    try:
-                        props = self._parse_library_properties(props_file)
-                        name = props.get("name", lib_dir.name)
-                        version = props.get("version", "unknown")
-                        self.installed_libraries[name] = version
-                    except Exception as e:
-                        print(f"Error reading {props_file}: {e}")
+        # Reset the path mapping on each scan so we do not keep stale entries
+        self.installed_library_paths = {}
+
+        for lib_dir in sorted(self.libraries_dir.iterdir(), key=lambda p: p.name.lower()):
+            if not lib_dir.is_dir():
+                continue
+
+            props_file = lib_dir / "library.properties"
+            display_name = lib_dir.name
+            version = "unknown"
+
+            if props_file.exists():
+                try:
+                    props = self._parse_library_properties(props_file)
+                    display_name = props.get("name", display_name) or display_name
+                    version = props.get("version", version)
+                    self.installed_libraries[display_name] = version
+                except Exception as e:
+                    print(f"Error reading {props_file}: {e}")
+
+            # Track the actual installation path even if metadata is missing so
+            # features like example discovery can resolve the on-disk location.
+            self.installed_library_paths[display_name] = str(lib_dir)
+
+    def _ensure_builtin_libraries_available(self):
+        """Install bundled libraries from the AVR core on first run."""
+        if self.installed_libraries:
+            return
+
+        if self.libraries_dir.exists() and any(self.libraries_dir.iterdir()):
+            return
+
+        core_manager = CoreManager()
+        newly_installed = core_manager.ensure_builtin_libraries(self.libraries_dir, ensure_core=True)
+
+        if newly_installed:
+            # Rescan so the freshly installed libraries are indexed immediately
+            self._scan_installed_libraries()
+            self._save_installed_libraries()
 
     def _parse_library_properties(self, path: Path) -> Dict[str, str]:
         """Parse library.properties file"""
@@ -131,6 +161,150 @@ class LibraryManager(QObject):
         """Save installed libraries to file"""
         with open(self.installed_file, 'w', encoding='utf-8') as f:
             json.dump(self.installed_libraries, f, indent=2)
+
+    def get_library_search_paths(self) -> List[Path]:
+        """Return directories that should be exposed to ``arduino-cli``."""
+
+        search_paths: List[Path] = []
+
+        if self.libraries_dir:
+            search_paths.append(self.libraries_dir)
+
+        for path_hint in self.installed_library_paths.values():
+            candidate = Path(path_hint).parent
+            if candidate not in search_paths and candidate.exists():
+                search_paths.append(candidate)
+
+        return search_paths
+
+    def _resolve_install_root(self, library_name: str) -> Optional[Path]:
+        """Return the on-disk installation directory for a library if present."""
+
+        path_hint = self.installed_library_paths.get(library_name)
+        if path_hint:
+            path = Path(path_hint)
+            if path.exists():
+                return path
+
+        library = self.get_library(library_name)
+        if library and library.install_path:
+            path = Path(library.install_path)
+            if path.exists():
+                return path
+
+        candidate = self.libraries_dir / library_name
+        if candidate.exists():
+            return candidate
+
+        # Fall back to a case-insensitive search to handle unusual naming
+        # conventions (e.g. "Adafruit_BusIO" vs "Adafruit BusIO").
+        if self.libraries_dir.exists():
+            target = library_name.lower()
+            for lib_dir in self.libraries_dir.iterdir():
+                if lib_dir.is_dir() and lib_dir.name.lower() == target:
+                    return lib_dir
+
+        return None
+
+    def _read_library_display_name(self, lib_dir: Path) -> Optional[str]:
+        """Attempt to read the library's display name from its metadata."""
+
+        props_file = lib_dir / "library.properties"
+        if not props_file.exists():
+            return None
+
+        try:
+            props = self._parse_library_properties(props_file)
+        except Exception as exc:  # pragma: no cover - diagnostic only
+            print(f"Error reading {props_file}: {exc}")
+            return None
+
+        return props.get("name")
+
+    @staticmethod
+    def _normalise_example_identifier(relative_path: Path) -> str:
+        """Convert an example path to a stable identifier for the UI."""
+
+        if relative_path.suffix.lower() == ".ino":
+            relative_no_ext = relative_path.with_suffix("")
+        else:
+            relative_no_ext = relative_path
+
+        parent = relative_no_ext.parent
+        if (
+            relative_path.suffix.lower() == ".ino"
+            and parent != Path(".")
+            and relative_no_ext.name.lower() == parent.name.lower()
+        ):
+            return parent.as_posix()
+
+        if parent == Path("."):
+            return relative_no_ext.name
+
+        return relative_no_ext.as_posix()
+
+    def _discover_example_identifiers(self, examples_dir: Path) -> Set[str]:
+        """Enumerate example identifiers within an ``examples`` directory."""
+
+        example_ids: Set[str] = set()
+        for ino_file in examples_dir.rglob("*.ino"):
+            try:
+                relative = ino_file.relative_to(examples_dir)
+            except ValueError:
+                continue
+
+            identifier = self._normalise_example_identifier(relative)
+            if identifier:
+                example_ids.add(identifier)
+
+        return example_ids
+
+    def get_installed_library_examples(self) -> Dict[str, List[str]]:
+        """Return a mapping of installed libraries to their example identifiers."""
+
+        libraries_with_examples: Dict[str, Set[str]] = {}
+        recorded_names: Set[str] = set()
+
+        for library_name, path_hint in self.installed_library_paths.items():
+            install_root = Path(path_hint)
+            if not install_root.exists():
+                continue
+
+            display_name = self._read_library_display_name(install_root) or library_name
+            example_dir = install_root / "examples"
+            if not example_dir.is_dir():
+                continue
+
+            identifiers = self._discover_example_identifiers(example_dir)
+            if identifiers:
+                libraries_with_examples.setdefault(display_name, set()).update(identifiers)
+                recorded_names.add(display_name)
+
+        if self.libraries_dir.exists():
+            for lib_dir in sorted(self.libraries_dir.iterdir(), key=lambda p: p.name.lower()):
+                if not lib_dir.is_dir():
+                    continue
+
+                display_name = self._read_library_display_name(lib_dir) or lib_dir.name
+                if display_name in recorded_names:
+                    continue
+
+                example_dir = lib_dir / "examples"
+                if not example_dir.is_dir():
+                    continue
+
+                identifiers = self._discover_example_identifiers(example_dir)
+                if identifiers:
+                    libraries_with_examples.setdefault(display_name, set()).update(identifiers)
+
+        sorted_examples: Dict[str, List[str]] = {}
+        for display_name, identifiers in libraries_with_examples.items():
+            sorted_examples[display_name] = sorted(
+                identifiers,
+                key=lambda item: [part.lower() for part in item.split("/")],
+            )
+
+        return dict(sorted(sorted_examples.items(), key=lambda item: item[0].lower()))
 
     def _load_library_index(self):
         """Load library index from cache"""
@@ -373,6 +547,7 @@ class LibraryManager(QObject):
             # Update library object
             library.installed_version = version
             library.install_path = str(install_path)
+            self.installed_library_paths[name] = str(install_path)
 
             self.status_message.emit(f"Successfully installed {name} v{version}")
             self.library_installed.emit(name, version)
@@ -397,7 +572,7 @@ class LibraryManager(QObject):
             self.status_message.emit(f"Library '{name}' is not installed")
             return False
 
-        install_path = self.libraries_dir / name
+        install_path = self._resolve_install_root(name) or (self.libraries_dir / name)
 
         try:
             if install_path.exists():
@@ -405,6 +580,8 @@ class LibraryManager(QObject):
 
             del self.installed_libraries[name]
             self._save_installed_libraries()
+            if name in self.installed_library_paths:
+                del self.installed_library_paths[name]
 
             # Update library object
             library = self.get_library(name)
@@ -477,16 +654,8 @@ class LibraryManager(QObject):
         if not example_name:
             return None
 
-        # Attempt to locate the library's installation directory.
-        library = self.get_library(library_name)
-        install_root: Optional[Path] = None
-        if library and library.install_path:
-            install_root = Path(library.install_path)
-
+        install_root = self._resolve_install_root(library_name)
         if not install_root:
-            install_root = self.libraries_dir / library_name
-
-        if not install_root.exists():
             return None
 
         examples_dir = install_root / "examples"
