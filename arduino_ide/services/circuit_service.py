@@ -644,6 +644,24 @@ class CircuitService(QObject):
         return [c for c in self._components.values() if c.sheet_id == target_sheet]
 
 
+    def get_connections_for_sheet(self, sheet_id: Optional[str] = None) -> List[Connection]:
+        """Return connections that belong to the specified sheet."""
+
+        target_sheet = sheet_id or self.get_active_sheet_id()
+        sheet_connections: List[Connection] = []
+
+        for connection in self._connections.values():
+            from_component = self._components.get(connection.from_component)
+            to_component = self._components.get(connection.to_component)
+
+            if (from_component and from_component.sheet_id == target_sheet) or (
+                to_component and to_component.sheet_id == target_sheet
+            ):
+                sheet_connections.append(connection)
+
+        return sheet_connections
+
+
     def get_circuit_connections(self) -> List[Connection]:
         """Get all connections in the circuit"""
         return list(self._connections.values())
