@@ -48,8 +48,10 @@ from arduino_ide.services.visual_programming_service import VisualProgrammingSer
 from arduino_ide.ui.visual_programming_editor import VisualProgrammingEditor
 from arduino_ide.services.error_recovery import SmartErrorRecovery
 from arduino_ide.services.unit_testing_service import UnitTestingService
+from arduino_ide.services.hil_testing_service import HILTestingService
 from arduino_ide.ui.preferences_dialog import PreferencesDialog
 from arduino_ide.ui.unit_testing_panel import UnitTestingDialog
+from arduino_ide.ui.hil_testing_dialog import HILTestingDialog
 from arduino_ide.ui.plugin_manager import PluginManagerWidget
 from arduino_ide.services.plugin_system import PluginManager, PluginType, PluginStatus
 from arduino_ide.services.debug_service import Breakpoint, DebugService, DebugState
@@ -199,10 +201,14 @@ class MainWindow(QMainWindow):
         self.status_display = None
         self.console_panel = None
         self.unit_testing_service = UnitTestingService()
+        self.hil_testing_service = HILTestingService(unit_testing_service=self.unit_testing_service)
         self.unit_testing_panel = None
         self.unit_testing_dialog = None
+        self.hil_testing_dialog: Optional[HILTestingDialog] = None
         self._unit_testing_project_root: Optional[str] = None
         self._unit_testing_actions_linked = False
+        self._hil_sessions_active: Set[str] = set()
+        self._hil_tests_running: Set[str] = set()
         self.main_toolbar = None
         self.extensions_toolbar_action = None
         self.extensions_action = None
@@ -293,14 +299,25 @@ class MainWindow(QMainWindow):
         self.open_unit_testing_action.setToolTip("Open the Unit Testing dialog")
         self.open_unit_testing_action.triggered.connect(self._show_unit_testing_dialog)
 
+        self.open_hil_testing_action = QAction("Hardware-in-the-Loop...", self)
+        self.open_hil_testing_action.setShortcut(QKeySequence("Ctrl+Shift+H"))
+        self.open_hil_testing_action.setToolTip("Configure fixtures and run HIL test suites")
+        self.open_hil_testing_action.triggered.connect(self._show_hil_testing_dialog)
+
         for action in (
             self.discover_tests_action,
             self.run_all_tests_action,
             self.run_selected_tests_action,
             self.stop_tests_action,
             self.open_unit_testing_action,
+            self.open_hil_testing_action,
         ):
             self.addAction(action)
+
+        self.hil_testing_service.session_started.connect(self._on_hil_session_started)
+        self.hil_testing_service.session_stopped.connect(self._on_hil_session_stopped)
+        self.hil_testing_service.test_started.connect(self._on_hil_test_started)
+        self.hil_testing_service.test_finished.connect(self._on_hil_test_finished)
 
         # Initialize plugin manager and UI integration
         self.plugin_manager = PluginManager(parent=self)
@@ -653,6 +670,9 @@ class MainWindow(QMainWindow):
 
         unit_testing_action = self.open_unit_testing_action
         tools_menu.addAction(unit_testing_action)
+
+        hil_testing_action = self.open_hil_testing_action
+        tools_menu.addAction(hil_testing_action)
 
         # Tests Menu
         tests_menu = menubar.addMenu("&Tests")
@@ -3088,6 +3108,14 @@ void loop() {
         self.unit_testing_dialog.raise_()
         self.unit_testing_dialog.activateWindow()
 
+    def _show_hil_testing_dialog(self):
+        if not self.hil_testing_dialog:
+            self.hil_testing_dialog = HILTestingDialog(self.hil_testing_service, parent=self)
+        self._update_hil_testing_project_path()
+        self.hil_testing_dialog.show()
+        self.hil_testing_dialog.raise_()
+        self.hil_testing_dialog.activateWindow()
+
     def _determine_unit_testing_root(self) -> Optional[Path]:
         project_path = getattr(self.project_manager, "project_path", None)
         if project_path:
@@ -3101,11 +3129,12 @@ void loop() {
         return None
 
     def _update_unit_testing_target(self, *, force_discover=False):
-        if not self.unit_testing_panel:
-            return
-
         root = self._determine_unit_testing_root()
-        if not root:
+        if root:
+            normalized = str(root)
+            if str(self.hil_testing_service.project_path) != normalized:
+                self.hil_testing_service.set_project_path(normalized)
+        if not self.unit_testing_panel or not root:
             return
 
         normalized = str(root)
@@ -3119,6 +3148,83 @@ void loop() {
             if getattr(self.unit_testing_service, "running", False):
                 return
             self.unit_testing_panel.discover_tests()
+
+    def _update_hil_testing_project_path(self):
+        root = self._determine_unit_testing_root()
+        if not root:
+            return
+        normalized = str(root)
+        if str(self.hil_testing_service.project_path) != normalized:
+            self.hil_testing_service.set_project_path(normalized)
+
+    def _on_hil_session_started(self, fixture_name: str):
+        self._hil_sessions_active.add(fixture_name)
+        self._update_hil_unit_lock()
+
+    def _on_hil_session_stopped(self, fixture_name: str):
+        self._hil_sessions_active.discard(fixture_name)
+        self._update_hil_unit_lock()
+
+    def _on_hil_test_started(self, fixture_name: str, test_name: str):
+        self._hil_tests_running.add(f"{fixture_name}:{test_name}")
+        self._update_hil_unit_lock()
+        if getattr(self, "status_bar", None) is not None:
+            self.status_bar.set_status(f"HIL: Running {test_name} on {fixture_name}")
+
+    def _on_hil_test_finished(self, fixture_name: str, result):
+        key = f"{fixture_name}:{getattr(result, 'test_name', '')}"
+        self._hil_tests_running.discard(key)
+        passed = getattr(result, "passed", False)
+        test_name = getattr(result, "test_name", "")
+        failure_message = getattr(result, "failure_message", "")
+        if getattr(self, "status_bar", None) is not None and test_name:
+            summary = f"HIL: {test_name} {'passed' if passed else 'failed'}"
+            if not passed and failure_message:
+                summary += f" — {failure_message}"
+            self.status_bar.set_status(summary)
+            QTimer.singleShot(3000, lambda: self.status_bar.set_status("Ready"))
+        self._update_hil_unit_lock()
+
+    def _update_hil_unit_lock(self):
+        self._lock_unit_testing_actions_from_hil(bool(self._hil_sessions_active or self._hil_tests_running))
+
+    def _lock_unit_testing_actions_from_hil(self, locked: bool) -> None:
+        actions = [
+            self.discover_tests_action,
+            self.run_all_tests_action,
+            self.run_selected_tests_action,
+        ]
+        if self.unit_testing_panel:
+            actions.extend(
+                [
+                    self.unit_testing_panel.discover_action,
+                    self.unit_testing_panel.run_all_action,
+                    self.unit_testing_panel.run_selected_action,
+                ]
+            )
+
+        for action in actions:
+            if not action:
+                continue
+            if locked:
+                if not action.property("hil_locked"):
+                    action.setProperty("hil_locked", True)
+                    action.setProperty("hil_prev_enabled", action.isEnabled())
+                    action.setEnabled(False)
+            else:
+                if action.property("hil_locked"):
+                    prev_enabled = action.property("hil_prev_enabled")
+                    action.setProperty("hil_locked", False)
+                    action.setProperty("hil_prev_enabled", None)
+                    if prev_enabled is None:
+                        prev_enabled = action.isEnabled()
+                    action.setEnabled(bool(prev_enabled))
+
+        if not locked and self.unit_testing_panel:
+            # Re-sync global actions with panel actions in case their state changed.
+            self.discover_tests_action.setEnabled(self.unit_testing_panel.discover_action.isEnabled())
+            self.run_all_tests_action.setEnabled(self.unit_testing_panel.run_all_action.isEnabled())
+            self.run_selected_tests_action.setEnabled(self.unit_testing_panel.run_selected_action.isEnabled())
 
     def _sync_unit_testing_actions(self):
         if self._unit_testing_actions_linked or not self.unit_testing_panel:
@@ -3138,6 +3244,9 @@ void loop() {
         bind(self.unit_testing_panel.stop_action, self.stop_tests_action)
 
         self._unit_testing_actions_linked = True
+
+        if self._hil_sessions_active or self._hil_tests_running:
+            self._lock_unit_testing_actions_from_hil(True)
 
     def _handle_project_loaded(self, _project_name):
         self._update_unit_testing_target(force_discover=True)
