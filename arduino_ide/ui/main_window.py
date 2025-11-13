@@ -7,8 +7,8 @@ from typing import Dict, List, Optional
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget, QDialog,
-    QComboBox, QLabel, QSizePolicy, QFileDialog, QMessageBox
+    QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget,
+    QComboBox, QLabel, QSizePolicy, QFileDialog, QMessageBox, QDialog
 )
 from PySide6.QtCore import Qt, QSettings, QTimer, Signal
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QTextCursor, QGuiApplication, QCursor
@@ -34,6 +34,7 @@ from arduino_ide.ui.find_replace_dialog import FindReplaceDialog
 from arduino_ide.ui.snippets_panel import SnippetsLibraryDialog
 from arduino_ide.ui.circuit_editor import CircuitDesignerWindow
 from arduino_ide.ui.onboarding_wizard import OnboardingWizard
+from arduino_ide.ui.git_panel import GitPanel
 from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
@@ -196,6 +197,8 @@ class MainWindow(QMainWindow):
         self.extensions_toolbar_action = None
         self.extensions_action = None
         self.plugin_manager_dialog = None
+        self.git_panel = None
+        self.git_dialog = None
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
@@ -243,6 +246,10 @@ class MainWindow(QMainWindow):
         self.plugin_manager.plugin_activated.connect(self._on_plugin_state_changed)
         self.plugin_manager.plugin_deactivated.connect(self._on_plugin_state_changed)
         self.plugin_manager.plugin_error.connect(self._on_plugin_error)
+        if hasattr(self.project_manager, "project_loaded"):
+            self.project_manager.project_loaded.connect(self._on_project_loaded)
+        if hasattr(self.project_manager, "project_saved"):
+            self.project_manager.project_saved.connect(self._on_project_saved)
 
         self._update_cli_library_paths()
 
@@ -331,6 +338,49 @@ class MainWindow(QMainWindow):
             paths = []
 
         self.cli_service.set_library_search_paths(paths)
+
+    def _on_project_loaded(self, _project_name):
+        """Handle project load events from the project manager."""
+        self._update_git_repository()
+
+    def _on_project_saved(self, _project_name):
+        """Refresh Git information after a project save."""
+        self._refresh_git_panel()
+
+    def _update_git_repository(self):
+        """Update the Git panel with the current project repository."""
+        if not self.git_panel:
+            return
+
+        project_path = getattr(self.project_manager, "project_path", None)
+        if project_path:
+            self.git_panel.set_repository_path(str(Path(project_path)))
+            self.git_panel.refresh_all()
+
+    def _refresh_git_panel(self):
+        """Refresh Git panel data if available."""
+        if self.git_panel:
+            self.git_panel.refresh_all()
+
+    def _ensure_git_dialog(self):
+        """Ensure the Git dialog and panel are created."""
+        if self.git_panel is None:
+            self.git_panel = GitPanel()
+
+        if self.git_dialog is None:
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Git")
+            layout = QVBoxLayout(dialog)
+            layout.addWidget(self.git_panel)
+            self.git_dialog = dialog
+
+    def open_git_dialog(self):
+        """Display the Git dialog and refresh its contents."""
+        self._ensure_git_dialog()
+        self._update_git_repository()
+        self.git_dialog.show()
+        self.git_dialog.raise_()
+        self.git_dialog.activateWindow()
 
     def init_ui(self):
         """Initialize the main UI"""
@@ -514,6 +564,11 @@ class MainWindow(QMainWindow):
         block_code_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_B)
         block_code_action.triggered.connect(self.show_block_code_editor)
         tools_menu.addAction(block_code_action)
+        tools_menu.addSeparator()
+
+        git_action = QAction("Git...", self)
+        git_action.triggered.connect(self.open_git_dialog)
+        tools_menu.addAction(git_action)
         tools_menu.addSeparator()
 
         circuit_designer_action = QAction("Circuit Designer...", self)
@@ -702,7 +757,7 @@ class MainWindow(QMainWindow):
         self._refresh_toolbar_plugins()
 
     def create_dock_widgets(self):
-        """Create panels (no dock widgets)"""
+        """Create panels and dockable widgets."""
         # --- LEFT COLUMN (Normal widgets, NOT docks) ---
         # Create left-side panel widgets
         self.quick_actions_panel = QuickActionsPanel()
@@ -906,6 +961,9 @@ class MainWindow(QMainWindow):
         """Surface plugin errors in the status bar."""
         if getattr(self, "status_bar", None) is not None:
             self.status_bar.set_status(f"Plugin error: {plugin_id}")
+        # --- GIT PANEL DIALOG ---
+        self._ensure_git_dialog()
+        self._update_git_repository()
 
     def create_new_editor(self, filename="untitled.ino", *, file_path=None, content=None, mark_clean=False):
         """Create a new editor tab"""
@@ -1142,6 +1200,10 @@ void loop() {
         self.add_recent_file(path)
         self.update_status_bar_for_file(editor_container.filename)
 
+        self._refresh_git_panel()
+
+        return True
+
     def _open_file_path(self, path: Path):
         try:
             contents = path.read_text(encoding="utf-8")
@@ -1275,6 +1337,7 @@ void loop() {
                     self.toggle_serial_monitor()
                 self._open_monitor_after_upload = False
                 QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+                self._refresh_git_panel()
             else:
                 if not is_background:
                     self.status_bar.set_status("Ready")
