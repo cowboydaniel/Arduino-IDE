@@ -1279,12 +1279,27 @@ void loop() {
         board_panel = getattr(self, "board_panel", None)
 
         # Get boards from arduino-cli (installed platforms only)
+        boards = []
         try:
             boards = self.board_manager.get_boards_from_cli()
             print(f"DEBUG: get_boards_from_cli() returned {len(boards)} boards")
         except Exception as e:
             print(f"DEBUG: get_boards_from_cli() raised exception: {e}")
-            boards = []
+
+        # ``arduino-cli board list`` only reports connected hardware.  When the
+        # IDE starts with no devices attached (the common case right after a
+        # fresh platform install) we still need to populate the selector with
+        # every board provided by the installed cores.  Fall back to parsing the
+        # installed ``boards.txt`` files so the toolbar updates immediately.
+        if not boards:
+            try:
+                boards = self.board_manager.get_all_boards()
+                print(
+                    "DEBUG: Falling back to get_all_boards(), "
+                    f"discovered {len(boards)} boards"
+                )
+            except Exception as e:
+                print(f"DEBUG: get_all_boards() raised exception: {e}")
 
         if boards:
             # Sort boards by name for better UX
