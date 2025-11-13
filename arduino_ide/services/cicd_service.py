@@ -177,6 +177,7 @@ class CICDService(QObject):
         self.pipelines: Dict[str, Pipeline] = {}
         self.deployments: Dict[str, Deployment] = {}
         self.configuration = PipelineConfiguration(platform=CICDPlatform.GITHUB_ACTIONS)
+        self.workspace_settings: Dict[str, str] = {}
 
         # Platform credentials
         self.github_token: Optional[str] = None
@@ -195,6 +196,10 @@ class CICDService(QObject):
     def set_configuration(self, config: PipelineConfiguration):
         """Set pipeline configuration"""
         self.configuration = config
+
+    def apply_workspace_settings(self, settings: Dict[str, str]):
+        """Persist workspace level settings used by CI/CD operations."""
+        self.workspace_settings = dict(settings)
 
     def set_github_token(self, token: str):
         """Set GitHub personal access token"""
