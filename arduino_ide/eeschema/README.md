@@ -198,8 +198,97 @@ Has been refactored into:
 
 The old files remain for backward compatibility but should be updated to use the new modules.
 
+## Visual Appearance - KiCad-Style UI
+
+The schematic editor visually matches KiCad's eeschema interface:
+
+### SCH_EDIT_FRAME - Main Editor Window
+
+The main editor window (`sch_edit_frame.py`) replicates KiCad's layout:
+
+**Canvas (Center):**
+- White background (light theme) or dark gray (dark theme)
+- Grid with dots (default), lines, or crosses
+- Default grid size: 50 mil (1.27mm)
+- Grid color: Light gray (#848484) on light theme, dark gray (#505050) on dark theme
+- Pan with middle mouse button
+- Zoom with mouse wheel
+- Full-screen crosshair cursor (optional)
+
+**Top Toolbar:**
+- File operations (New, Open, Save)
+- Edit operations (Undo, Redo)
+- Zoom controls (Zoom In, Out, Fit)
+- Find tool
+
+**Left Toolbar:**
+- Grid visibility toggle
+- Units toggle (inch/mm)
+- Cursor display toggle
+- Properties panel toggle
+
+**Right Toolbar:**
+- Selection tool (Esc)
+- Symbol placement (A)
+- Power symbol (P)
+- Wire drawing (W)
+- Bus drawing (B)
+- No-connect flag
+- Junction (J)
+- Net label (L)
+- Global label
+- Hierarchical sheet (S)
+- Sheet pins
+- Graphics (lines, text, images)
+- Delete tool
+
+**Status Bar:**
+- Cursor position (X, Y) in mils or mm
+- Relative position (dx, dy, dist)
+- Zoom level (Z)
+- Grid size
+- Units (inches/mm)
+
+**Menus:**
+- File: New, Open, Save, Import, Export
+- Edit: Undo, Redo, Cut, Copy, Paste
+- View: Zoom, Grid options
+- Place: Symbols, Wires, Buses, Labels, Power
+- Inspect: ERC, Netlist generation
+- Tools: Annotate, BOM generation
+- Preferences: Settings, Color themes
+
+### Launching the KiCad-Style UI
+
+To see the KiCad-lookalike interface:
+
+```bash
+python test_kicad_ui.py
+```
+
+This launches the standalone schematic editor with KiCad's visual appearance and layout.
+
+### Color Schemes
+
+Two themes are supported:
+
+**Light Theme (Default):**
+- Background: White (#FFFFFF)
+- Grid: Light gray (#848484)
+- Wires: Dark gray (#2A2A2A)
+- Components: Black outlines (#000000)
+
+**Dark Theme:**
+- Background: Dark gray (#191919)
+- Grid: Medium gray (#505050)
+- Wires: Green/Blue
+- Components: Light colored outlines
+
+Switch themes via `canvas.set_dark_theme()` or `canvas.set_light_theme()`.
+
 ## References
 
 - [KiCad Source Code](https://gitlab.com/kicad/code/kicad/-/tree/master/eeschema)
 - [KiCad File Formats](https://dev-docs.kicad.org/en/file-formats/)
 - [KiCad Developer Documentation](https://dev-docs.kicad.org/)
+- [KiCad 8.0 Schematic Editor Docs](https://docs.kicad.org/8.0/en/eeschema/eeschema.html)
