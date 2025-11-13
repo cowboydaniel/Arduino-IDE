@@ -2,7 +2,8 @@
 Main window for Arduino IDE Modern
 """
 
-from typing import Optional
+from functools import partial
+from typing import Dict, List, Optional
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
@@ -1969,24 +1970,80 @@ void loop() {
         """Show libraries menu/dialog"""
         libraries_menu = QMenu(self)
 
-        # Popular libraries
-        libraries_menu.addAction("Manage Libraries...").triggered.connect(self.open_library_manager)
-        libraries_menu.addSeparator()
+        manage_action = libraries_menu.addAction("Manage Libraries...")
+        manage_action.triggered.connect(self.open_library_manager)
 
-        # Quick access to common libraries
-        servo_menu = libraries_menu.addMenu("Servo")
-        servo_menu.addAction("Sweep Example").triggered.connect(lambda: self.load_library_example("Servo", "Sweep"))
-        servo_menu.addAction("Knob Example").triggered.connect(lambda: self.load_library_example("Servo", "Knob"))
+        library_examples = self.library_manager.get_installed_library_examples()
+        if library_examples:
+            separator_action = libraries_menu.addSeparator()
+            has_examples = False
 
-        stepper_menu = libraries_menu.addMenu("Stepper")
-        stepper_menu.addAction("stepper_oneRevolution").triggered.connect(lambda: self.load_library_example("Stepper", "stepper_oneRevolution"))
+            for library_name, example_ids in library_examples.items():
+                submenu = libraries_menu.addMenu(library_name)
+                if self._populate_library_examples_menu(submenu, library_name, example_ids):
+                    has_examples = True
+                else:
+                    libraries_menu.removeAction(submenu.menuAction())
 
-        wifi_menu = libraries_menu.addMenu("WiFi")
-        wifi_menu.addAction("WiFiScan").triggered.connect(lambda: self.load_library_example("WiFi", "WiFiScan"))
-        wifi_menu.addAction("WiFiWebServer").triggered.connect(lambda: self.load_library_example("WiFi", "WiFiWebServer"))
+            if not has_examples:
+                libraries_menu.removeAction(separator_action)
+                placeholder = libraries_menu.addAction("No library examples found")
+                placeholder.setEnabled(False)
+        else:
+            placeholder = libraries_menu.addAction("No library examples found")
+            placeholder.setEnabled(False)
 
         # Show menu at cursor position
         libraries_menu.exec_(QCursor.pos())
+
+    def _populate_library_examples_menu(
+        self,
+        menu: QMenu,
+        library_name: str,
+        example_ids: List[str],
+    ) -> bool:
+        """Populate ``menu`` with the examples belonging to ``library_name``."""
+
+        tree: Dict[str, Dict] = {}
+        for identifier in example_ids:
+            parts = [part for part in identifier.split("/") if part]
+            if not parts:
+                continue
+
+            node = tree
+            for part in parts[:-1]:
+                node = node.setdefault(part, {})
+            node.setdefault("__examples__", set()).add(parts[-1])
+
+        return self._build_example_menu_tree(menu, library_name, tree, [])
+
+    def _build_example_menu_tree(
+        self,
+        menu: QMenu,
+        library_name: str,
+        node: Dict[str, Dict],
+        prefix: List[str],
+    ) -> bool:
+        """Recursively convert ``node`` into nested menus and actions."""
+
+        has_entries = False
+
+        child_folders = [key for key in node.keys() if key != "__examples__"]
+        for folder_name in sorted(child_folders, key=str.lower):
+            submenu = menu.addMenu(folder_name)
+            if self._build_example_menu_tree(submenu, library_name, node[folder_name], prefix + [folder_name]):
+                has_entries = True
+            else:
+                menu.removeAction(submenu.menuAction())
+
+        for example_name in sorted(node.get("__examples__", []), key=str.lower):
+            request_parts = prefix + [example_name]
+            request = "/".join(request_parts)
+            action = menu.addAction(example_name)
+            action.triggered.connect(partial(self.load_library_example, library_name, request))
+            has_entries = True
+
+        return has_entries
 
     def load_example(self, example_name):
         """Load an example sketch"""

@@ -23,6 +23,7 @@ def create_manager(tmp_path: Path) -> LibraryManager:
     manager.cache_dir.mkdir(parents=True, exist_ok=True)
     manager.library_index = LibraryIndex()
     manager.installed_libraries = {}
+    manager.installed_library_paths = {}
     return manager
 
 
@@ -38,6 +39,7 @@ def add_library(manager: LibraryManager, name: str, install_root: Path) -> Libra
     )
     manager.library_index.libraries.append(library)
     manager.installed_libraries[name] = "1.0.0"
+    manager.installed_library_paths[name] = str(install_root)
     return library
 
 
@@ -77,3 +79,24 @@ def test_get_example_sketch_path_missing_returns_none(tmp_path):
     add_library(manager, "Stepper", manager.libraries_dir / "Stepper")
 
     assert manager.get_example_sketch_path("Stepper", "MissingExample") is None
+
+
+def test_get_installed_library_examples_returns_nested_identifiers(tmp_path):
+    manager = create_manager(tmp_path)
+
+    servo_root = manager.libraries_dir / "Servo"
+    servo_root.mkdir(parents=True, exist_ok=True)
+    (servo_root / "library.properties").write_text("name=Servo\nversion=1.0.0\n", encoding="utf-8")
+    sweep_dir = servo_root / "examples" / "01.Basics" / "Sweep"
+    sweep_dir.mkdir(parents=True)
+    (sweep_dir / "Sweep.ino").write_text("// sweep", encoding="utf-8")
+    knob_dir = servo_root / "examples" / "Knob"
+    knob_dir.mkdir(parents=True)
+    (knob_dir / "Knob.ino").write_text("// knob", encoding="utf-8")
+
+    manager._scan_installed_libraries()
+
+    examples = manager.get_installed_library_examples()
+
+    assert "Servo" in examples
+    assert examples["Servo"] == ["01.Basics/Sweep", "Knob"]

@@ -16,6 +16,7 @@ def library_manager(tmp_path, monkeypatch):
     manager = LibraryManager()
     manager.library_index = LibraryIndex()
     manager.installed_libraries = {}
+    manager.installed_library_paths = {}
     return manager
 
 
@@ -60,6 +61,8 @@ architectures=*
 
     # Add to index
     manager.library_index.libraries.append(library)
+
+    manager.installed_library_paths[name] = str(lib_path)
 
     # Mark as managed if requested
     if managed:
