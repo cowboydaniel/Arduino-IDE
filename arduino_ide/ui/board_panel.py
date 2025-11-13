@@ -4,22 +4,27 @@ Board information and selection panel
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox,
-    QGroupBox, QFormLayout
+    QGroupBox, QFormLayout, QDockWidget
 )
 from PySide6.QtCore import Qt
 from arduino_ide.ui.pin_usage_widget import PinUsageWidget
 
 
-class BoardPanel(QWidget):
+class BoardPanel(QDockWidget):
     """Panel showing board information and configuration"""
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__("Board & Pin Usage", parent)
+        self.setObjectName("BoardPanel")
+        self.setAllowedAreas(
+            Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea
+        )
         self.init_ui()
 
     def init_ui(self):
         """Initialize UI"""
-        layout = QVBoxLayout(self)
+        container = QWidget()
+        layout = QVBoxLayout(container)
 
         # Board selection
         board_group = QGroupBox("Board")
@@ -69,6 +74,8 @@ class BoardPanel(QWidget):
         layout.addWidget(self.pin_usage_widget)
 
         layout.addStretch()
+
+        self.setWidget(container)
 
     def update_board_info(self, board):
         """Update board information based on selected board.

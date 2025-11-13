@@ -4,7 +4,7 @@ Shows contextual information about Arduino functions when clicked
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QGroupBox, QTextBrowser
+    QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QGroupBox, QTextBrowser, QDockWidget
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QTextCursor
@@ -12,17 +12,22 @@ from PySide6.QtGui import QFont, QTextCursor
 from arduino_ide.data.arduino_api_reference import get_api_info
 
 
-class ContextPanel(QWidget):
+class ContextPanel(QDockWidget):
     """Panel that displays contextual information about Arduino code elements"""
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__("Context Help", parent)
+        self.setObjectName("ContextPanel")
+        self.setAllowedAreas(
+            Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea
+        )
         self.current_context = None
         self.init_ui()
 
     def init_ui(self):
         """Initialize UI"""
-        main_layout = QVBoxLayout(self)
+        container = QWidget()
+        main_layout = QVBoxLayout(container)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
@@ -167,6 +172,8 @@ class ContextPanel(QWidget):
 
         scroll.setWidget(self.content_widget)
         main_layout.addWidget(scroll)
+
+        self.setWidget(container)
 
     def update_context(self, word_under_cursor, full_context=None):
         """Update panel with context information for the word under cursor
