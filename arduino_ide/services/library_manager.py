@@ -30,6 +30,7 @@ from ..models import (
     LibraryType, LibraryStatus, ProjectConfig, InstallPlan, DependencyTree
 )
 from .download_manager import DownloadManager
+from .core_manager import CoreManager
 from .index_updater import IndexUpdater
 
 
@@ -97,6 +98,7 @@ class LibraryManager(QObject):
 
         # Also scan libraries directory
         self._scan_installed_libraries()
+        self._ensure_builtin_libraries_available()
 
     def _scan_installed_libraries(self):
         """Scan libraries directory for installed libraries"""
@@ -115,6 +117,22 @@ class LibraryManager(QObject):
                         self.installed_libraries[name] = version
                     except Exception as e:
                         print(f"Error reading {props_file}: {e}")
+
+    def _ensure_builtin_libraries_available(self):
+        """Install bundled libraries from the AVR core on first run."""
+        if self.installed_libraries:
+            return
+
+        if self.libraries_dir.exists() and any(self.libraries_dir.iterdir()):
+            return
+
+        core_manager = CoreManager()
+        newly_installed = core_manager.ensure_builtin_libraries(self.libraries_dir, ensure_core=True)
+
+        if newly_installed:
+            # Rescan so the freshly installed libraries are indexed immediately
+            self._scan_installed_libraries()
+            self._save_installed_libraries()
 
     def _parse_library_properties(self, path: Path) -> Dict[str, str]:
         """Parse library.properties file"""
