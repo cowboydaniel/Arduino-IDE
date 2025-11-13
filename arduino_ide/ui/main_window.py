@@ -55,6 +55,12 @@ from arduino_ide.ui.hil_testing_dialog import HILTestingDialog
 from arduino_ide.ui.plugin_manager import PluginManagerWidget
 from arduino_ide.services.plugin_system import PluginManager, PluginType, PluginStatus
 from arduino_ide.services.debug_service import Breakpoint, DebugService, DebugState
+from arduino_ide.services.power_analyzer_service import (
+    PowerAnalyzerService,
+    PowerSessionPhase,
+    PowerSessionStage,
+)
+from arduino_ide.ui.power_analyzer_dialog import PowerAnalyzerDialog
 import re
 
 
@@ -202,9 +208,11 @@ class MainWindow(QMainWindow):
         self.console_panel = None
         self.unit_testing_service = UnitTestingService()
         self.hil_testing_service = HILTestingService(unit_testing_service=self.unit_testing_service)
+        self.power_analyzer_service = PowerAnalyzerService(self)
         self.unit_testing_panel = None
         self.unit_testing_dialog = None
         self.hil_testing_dialog: Optional[HILTestingDialog] = None
+        self.power_analyzer_dialog: Optional[PowerAnalyzerDialog] = None
         self._unit_testing_project_root: Optional[str] = None
         self._unit_testing_actions_linked = False
         self._hil_sessions_active: Set[str] = set()
@@ -668,6 +676,14 @@ class MainWindow(QMainWindow):
         code_quality_action.triggered.connect(self.open_code_quality)
         tools_menu.addAction(code_quality_action)
 
+        self.power_analyzer_action = QAction("Power Consumption Analyzer...", self)
+        self.power_analyzer_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_P)
+        self.power_analyzer_action.setStatusTip(
+            "Open the Power Consumption Analyzer to review power metrics"
+        )
+        self.power_analyzer_action.triggered.connect(self.show_power_analyzer_dialog)
+        tools_menu.addAction(self.power_analyzer_action)
+
         unit_testing_action = self.open_unit_testing_action
         tools_menu.addAction(unit_testing_action)
 
@@ -896,6 +912,7 @@ class MainWindow(QMainWindow):
 
         # Connect serial monitor data to plotter
         self.serial_monitor.data_received.connect(self.plotter_panel.append_output)
+        self.serial_monitor.data_received.connect(self._on_serial_monitor_data)
 
         # Add panels to bottom tabs (created in init_ui)
         self.bottom_tabs.addTab(self.console_panel, "Console")
@@ -1620,6 +1637,7 @@ void loop() {
         # Store compilation output for parsing memory usage
         if self._cli_current_operation == "compile":
             self._compilation_output += text
+        self.power_analyzer_service.ingest_cli_output(self._cli_current_operation, text)
 
     def _handle_cli_error(self, text):
         if not text:
@@ -1628,6 +1646,16 @@ void loop() {
         # Only show errors for non-background compiles
         if not self._is_background_compile:
             self._append_console_stream(text, color="#F48771")
+
+    def _on_serial_monitor_data(self, payload: str):
+        """Forward serial telemetry to the power analyzer service."""
+
+        if not payload:
+            return
+
+        board = self._get_selected_board()
+        port = self._get_selected_port() or ""
+        self.power_analyzer_service.ingest_serial_stream(payload, board=board, port=port)
 
     def _handle_cli_finished(self, exit_code):
         operation = self._cli_current_operation
@@ -1709,6 +1737,8 @@ void loop() {
         # Clear compilation output buffer
         self._compilation_output = ""
         self._last_cli_error = ""
+
+        self.power_analyzer_service.handle_cli_finished(operation, exit_code, is_background=is_background)
 
         if self._pending_board_memory_refresh and not self.cli_service.is_running():
             self._pending_board_memory_refresh = False
@@ -2241,6 +2271,14 @@ void loop() {
         # Step 1: Compile first (verify)
         build_config = self.config_selector.currentText() if hasattr(self, "config_selector") else None
 
+        self.power_analyzer_service.start_upload_session(
+            board=board,
+            port=port,
+            sketch_path=str(sketch_path),
+            metadata={"trigger": "manual_upload"},
+        )
+        self.power_analyzer_service.update_stage(PowerSessionStage.COMPILE)
+
         self.console_panel.append_output(
             f"Step 1: Compiling {sketch_path.name} for {board.name}...",
             color="#6A9955"
@@ -2270,6 +2308,7 @@ void loop() {
             self.console_panel.append_output(f"✗ {exc}", color="#F48771")
             self.status_bar.set_status("Compilation Failed")
             QMessageBox.critical(self, "Upload Sketch", f"Compilation failed: {exc}")
+            self.power_analyzer_service.abort_active_session("compile_exception")
             self._open_monitor_after_upload = False
             QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
@@ -2288,6 +2327,7 @@ void loop() {
                 "✗ Upload cancelled: missing sketch, board, or port",
                 color="#F48771"
             )
+            self.power_analyzer_service.abort_active_session("upload_prerequisite_missing")
             self._open_monitor_after_upload = False
             return
 
@@ -2300,6 +2340,8 @@ void loop() {
         self._cli_current_operation = "upload"
         self._last_cli_error = ""
 
+        self.power_analyzer_service.update_stage(PowerSessionStage.UPLOAD)
+
         try:
             self.cli_service.run_upload(str(sketch_path), board.fqbn, port)
         except (RuntimeError, FileNotFoundError) as exc:
@@ -2307,6 +2349,7 @@ void loop() {
             self.console_panel.append_output(f"✗ {exc}", color="#F48771")
             self.status_bar.set_status("Upload Failed")
             QMessageBox.critical(self, "Upload Sketch", str(exc))
+            self.power_analyzer_service.abort_active_session("upload_exception")
             self._open_monitor_after_upload = False
             QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
@@ -2900,6 +2943,35 @@ void loop() {
         self.code_quality_panel.raise_()
         self.code_quality_panel.activateWindow()
 
+        self.status_bar.set_status("Ready")
+
+    def show_power_analyzer_dialog(self):
+        """Open the power consumption analyzer dialog."""
+
+        self.status_bar.set_status("Power Analyzer")
+
+        if not self.power_analyzer_dialog:
+            self.power_analyzer_dialog = PowerAnalyzerDialog(self.power_analyzer_service, parent=self)
+
+        active_session = self.power_analyzer_service.active_session
+        if active_session and active_session.phase == PowerSessionPhase.UPLOAD:
+            # An upload session is currently running; let it continue feeding data.
+            pass
+        elif not active_session:
+            board = self._get_selected_board()
+            port = self._get_selected_port() or ""
+            metadata = {"source": "tools_menu"}
+            self.power_analyzer_service.ensure_runtime_session(
+                board=board,
+                port=port,
+                metadata=metadata,
+                enable_estimation=True,
+            )
+            self.power_analyzer_service.update_stage(PowerSessionStage.RUNNING)
+
+        self.power_analyzer_dialog.show()
+        self.power_analyzer_dialog.raise_()
+        self.power_analyzer_dialog.activateWindow()
         self.status_bar.set_status("Ready")
 
     def show_snippets_library(self):
