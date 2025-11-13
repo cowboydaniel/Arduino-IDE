@@ -13,7 +13,7 @@ Features:
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (
@@ -273,6 +273,36 @@ class ConfigurationWidget(QWidget):
         config.enable_deployment = self.deployment_check.isChecked()
 
         return config
+
+    def set_branches(self, branches: List[str]):
+        """Update the branch input with the provided branches."""
+        cleaned = [str(branch).strip() for branch in branches if str(branch).strip()]
+        new_text = ",".join(cleaned)
+        if self.branches_input.text().strip() == new_text:
+            return
+
+        self.branches_input.blockSignals(True)
+        try:
+            self.branches_input.setText(new_text)
+        finally:
+            self.branches_input.blockSignals(False)
+
+        self._on_config_changed()
+
+    def set_boards(self, boards: List[str]):
+        """Update the boards input with the provided board identifiers."""
+        cleaned = [str(board).strip() for board in boards if str(board).strip()]
+        new_text = ",".join(cleaned)
+        if self.boards_input.text().strip() == new_text:
+            return
+
+        self.boards_input.blockSignals(True)
+        try:
+            self.boards_input.setText(new_text)
+        finally:
+            self.boards_input.blockSignals(False)
+
+        self._on_config_changed()
 
     def _on_config_changed(self):
         """Handle configuration change"""
@@ -634,6 +664,51 @@ class CICDPanel(QWidget):
             self.details_widget.clear_details()
             self.cancel_action.setEnabled(False)
 
+    def apply_workspace_settings(self, settings: Dict[str, Any]):
+        """Apply project/workspace level context to the panel."""
+        if not settings:
+            return
+
+        sanitized_settings: Dict[str, str] = {}
+        for key, value in settings.items():
+            if value is None:
+                continue
+            if isinstance(value, (list, tuple, set)):
+                sanitized_settings[key] = ",".join(str(item) for item in value)
+            else:
+                sanitized_settings[key] = str(value)
+
+        if sanitized_settings:
+            self.cicd_service.apply_workspace_settings(sanitized_settings)
+
+        branches: List[str] = []
+        if "branches" in settings and settings["branches"]:
+            branches_value = settings["branches"]
+            if isinstance(branches_value, (list, tuple, set)):
+                branches = [str(branch) for branch in branches_value]
+            else:
+                branches = [str(branches_value)]
+        elif "branch" in settings and settings["branch"]:
+            branches = [str(settings["branch"])]
+
+        if branches:
+            self.config_widget.set_branches(branches)
+
+        boards: List[str] = []
+        boards_value = settings.get("boards")
+        if boards_value:
+            if isinstance(boards_value, (list, tuple, set)):
+                boards = [str(board) for board in boards_value]
+            else:
+                boards = [str(boards_value)]
+        elif settings.get("board_fqbn"):
+            boards = [str(settings["board_fqbn"])]
+        elif settings.get("board_name"):
+            boards = [str(settings["board_name"])]
+
+        if boards:
+            self.config_widget.set_boards(boards)
+
     def set_cicd_service(self, service: CICDService):
         """Set the CI/CD service"""
         # Disconnect old signals
@@ -650,3 +725,7 @@ class CICDPanel(QWidget):
     def set_project_path(self, path: str):
         """Set project path"""
         self.cicd_service.set_project_path(path)
+
+    def refresh_pipelines(self):
+        """Public helper to refresh pipeline information."""
+        self._on_refresh()

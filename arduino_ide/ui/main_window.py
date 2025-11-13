@@ -35,6 +35,7 @@ from arduino_ide.ui.snippets_panel import SnippetsLibraryDialog
 from arduino_ide.ui.circuit_editor import CircuitDesignerWindow
 from arduino_ide.ui.onboarding_wizard import OnboardingWizard
 from arduino_ide.ui.git_panel import GitPanel
+from arduino_ide.ui.cicd_dialog import CICDDialog
 from arduino_ide.ui.breakpoint_gutter import BreakpointGutter, install_breakpoint_gutter
 from arduino_ide.ui.debug_workspace_dialog import DebugWorkspaceDialog
 from arduino_ide.services.theme_manager import ThemeManager
@@ -223,6 +224,11 @@ class MainWindow(QMainWindow):
         self.plugin_manager_dialog = None
         self.git_panel = None
         self.git_dialog = None
+        self.cicd_dialog: Optional[CICDDialog] = None
+        self._latest_cicd_context: Dict[str, str] = {}
+        self._cicd_refresh_timer = QTimer(self)
+        self._cicd_refresh_timer.setSingleShot(True)
+        self._cicd_refresh_timer.timeout.connect(self._refresh_cicd_context)
 
         # Debugger integration
         self.debug_service = DebugService(self)
@@ -337,8 +343,12 @@ class MainWindow(QMainWindow):
         self.plugin_manager.plugin_error.connect(self._on_plugin_error)
         if hasattr(self.project_manager, "project_loaded"):
             self.project_manager.project_loaded.connect(self._on_project_loaded)
+            self.project_manager.project_loaded.connect(self._schedule_cicd_refresh)
         if hasattr(self.project_manager, "project_saved"):
             self.project_manager.project_saved.connect(self._on_project_saved)
+            self.project_manager.project_saved.connect(self._schedule_cicd_refresh)
+        if hasattr(self.project_manager, "dependencies_changed"):
+            self.project_manager.dependencies_changed.connect(self._schedule_cicd_refresh)
 
         self._update_cli_library_paths()
 
@@ -470,6 +480,83 @@ class MainWindow(QMainWindow):
         self.git_dialog.show()
         self.git_dialog.raise_()
         self.git_dialog.activateWindow()
+
+    def _collect_cicd_workspace_settings(self) -> Dict[str, str]:
+        """Gather project and workspace details for the CI/CD dialog."""
+
+        context: Dict[str, str] = {}
+
+        project_path = getattr(self.project_manager, "project_path", None)
+        if project_path:
+            context["project_path"] = str(Path(project_path))
+
+        project = getattr(self.project_manager, "current_project", None)
+        project_name = getattr(project, "name", "") if project else ""
+        if project_name:
+            context["project_name"] = str(project_name)
+
+        board = self._get_selected_board() if hasattr(self, "_get_selected_board") else None
+        if board:
+            board_fqbn = getattr(board, "fqbn", "")
+            if board_fqbn:
+                context["board_fqbn"] = str(board_fqbn)
+            board_name = getattr(board, "name", "")
+            if board_name:
+                context["board_name"] = str(board_name)
+
+        return context
+
+    def _schedule_cicd_refresh(self, *_args):
+        """Update stored CI/CD context and schedule a refresh if needed."""
+
+        self._latest_cicd_context = self._collect_cicd_workspace_settings()
+
+        if not self.cicd_dialog:
+            return
+
+        if self._cicd_refresh_timer.isActive():
+            self._cicd_refresh_timer.stop()
+        self._cicd_refresh_timer.start(250)
+
+    def _refresh_cicd_context(self):
+        """Apply stored context changes and refresh the CI/CD dialog."""
+
+        self._apply_cicd_context(refresh=True)
+
+    def _apply_cicd_context(self, refresh: bool = False):
+        """Push the latest workspace context into the CI/CD dialog."""
+
+        if not self.cicd_dialog:
+            return
+
+        context = dict(self._latest_cicd_context)
+        project_path = context.pop("project_path", None)
+        workspace_settings = context or None
+
+        self.cicd_dialog.update_context(project_path, workspace_settings)
+
+        if refresh:
+            self.cicd_dialog.refresh_now()
+
+    def _ensure_cicd_dialog(self):
+        """Ensure the CI/CD dialog exists and is configured."""
+
+        if self.cicd_dialog is None:
+            self.cicd_dialog = CICDDialog(self)
+            if self._latest_cicd_context:
+                self._apply_cicd_context(refresh=False)
+
+    def open_cicd_dialog(self):
+        """Open the CI/CD dialog and refresh pipeline information."""
+
+        self._schedule_cicd_refresh()
+        self._ensure_cicd_dialog()
+        self._apply_cicd_context(refresh=False)
+
+        self.cicd_dialog.show()
+        self.cicd_dialog.raise_()
+        self.cicd_dialog.activateWindow()
+        self.cicd_dialog.refresh_now()
 
     def init_ui(self):
         """Initialize the main UI"""
@@ -658,6 +745,9 @@ class MainWindow(QMainWindow):
         git_action = QAction("Git...", self)
         git_action.triggered.connect(self.open_git_dialog)
         tools_menu.addAction(git_action)
+        self.cicd_action = QAction("CI/CD...", self)
+        self.cicd_action.triggered.connect(self.open_cicd_dialog)
+        tools_menu.addAction(self.cicd_action)
         self.debugger_action = QAction("Debugger...", self)
         self.debugger_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_D)
         self.debugger_action.triggered.connect(self.show_debugger_dialog)
@@ -2559,6 +2649,8 @@ void loop() {
         self.status_bar.set_board(board_name)
         # Reset to Ready after a moment
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
+        self._schedule_cicd_refresh()
 
     def on_port_changed(self, port_name):
         """Handle port selection change"""
