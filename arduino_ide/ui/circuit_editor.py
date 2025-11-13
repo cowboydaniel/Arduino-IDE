@@ -376,7 +376,13 @@ class ComponentLibraryWidget(QWidget):
         self._populate()
 
     def _populate(self):
-        self.toolbox.clear()
+        # QToolBox does not provide a convenience ``clear`` helper, so remove each
+        # page individually to keep behaviour consistent across PySide versions.
+        while self.toolbox.count():
+            widget = self.toolbox.widget(0)
+            self.toolbox.removeItem(0)
+            if widget is not None:
+                widget.deleteLater()
         grouped: Dict[str, List[ComponentDefinition]] = {}
         for comp in self.service.get_all_component_definitions():
             grouped.setdefault(comp.component_type.value, []).append(comp)
