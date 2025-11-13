@@ -4,10 +4,7 @@ import copy
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from enum import Enum
-from PySide6.QtCore import QObject, Signal
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from PySide6.QtCore import QObject, Signal
 
@@ -26,113 +23,18 @@ from arduino_ide.models.circuit_domain import (
     PinType,
     Sheet,
     SheetInstance,
-    SymbolUnit,
 )
+
+from arduino_ide.config import (
+    KICAD_GLOBAL_SYMBOL_LIBRARY_PATHS,
+    KICAD_PROJECT_CACHE_DIR,
+)
+from arduino_ide.services.kicad_symbol_adapter import KiCADSymbolAdapter
+
+logger = logging.getLogger(__name__)
 
 class CircuitSerializationError(Exception):
     """Raised when circuit data cannot be converted between formats."""
-
-
-class ComponentType(Enum):
-    """Types of circuit components"""
-    ARDUINO_BOARD = "arduino_board"
-    LED = "led"
-    RESISTOR = "resistor"
-    BUTTON = "button"
-    POTENTIOMETER = "potentiometer"
-    SERVO = "servo"
-    MOTOR = "motor"
-    SENSOR = "sensor"
-    BREADBOARD = "breadboard"
-    WIRE = "wire"
-    BATTERY = "battery"
-    CAPACITOR = "capacitor"
-    TRANSISTOR = "transistor"
-    IC = "ic"
-
-
-class PinType(Enum):
-    """Types of pins"""
-    DIGITAL = "digital"
-    ANALOG = "analog"
-    PWM = "pwm"
-    POWER = "power"
-    GROUND = "ground"
-    I2C = "i2c"
-    SPI = "spi"
-    SERIAL = "serial"
-
-
-@dataclass
-class Pin:
-    """Pin on a component"""
-    id: str
-    label: str
-    pin_type: PinType
-    position: Tuple[float, float]  # Relative position on component
-    length: float = 20.0
-    orientation: str = "left"
-    decoration: str = "line"
-
-
-@dataclass
-class ComponentDefinition:
-    """Definition of a circuit component"""
-    id: str
-    name: str
-    component_type: ComponentType
-    width: float
-    height: float
-    pins: List[Pin] = field(default_factory=list)
-    image_path: Optional[str] = None
-    description: str = ""
-    datasheet_url: Optional[str] = None
-    graphics: List[Dict[str, Any]] = field(default_factory=list)
-    units: List[Dict[str, Any]] = field(default_factory=list)
-
-
-@dataclass
-class ComponentInstance:
-    """Instance of a component in the circuit"""
-    instance_id: str
-    definition_id: str
-    x: float
-    y: float
-    rotation: float = 0.0  # Degrees
-    properties: Dict[str, Any] = field(default_factory=dict)
-    sheet_id: str = "root"
-
-
-@dataclass
-class Connection:
-    """Connection between two pins"""
-    connection_id: str
-    from_component: str
-    from_pin: str
-    to_component: str
-    to_pin: str
-    wire_color: str = "#000000"
-    connection_type: str = "wire"
-
-
-@dataclass
-class Sheet:
-    """Hierarchical sheet information"""
-    sheet_id: str
-    name: str
-    parent_id: Optional[str] = None
-    file_path: Optional[str] = None
-    embedded: bool = False
-
-
-@dataclass
-class Sheet:
-    """Schematic sheet"""
-    sheet_id: str
-    name: str
-    parent_id: Optional[str] = None
-    properties: Dict[str, Any] = field(default_factory=dict)
-    children: List[str] = field(default_factory=list)
 
 
 class CircuitService(QObject):
@@ -166,18 +68,27 @@ class CircuitService(QObject):
     sheets_changed = Signal()
     active_sheet_changed = Signal(str)
 
-    def __init__(self, parent=None, symbol_adapter: Optional["KiCADSymbolAdapter"] = None):
+    def __init__(self, parent=None, symbol_adapter: Optional[KiCADSymbolAdapter] = None):
         super().__init__(parent)
 
+        self._symbol_adapter = symbol_adapter or self._create_default_symbol_adapter()
         self._component_definitions: Dict[str, ComponentDefinition] = {}
         self._components: Dict[str, ComponentInstance] = {}
         self._connections: Dict[str, Connection] = {}
         self._sheets: Dict[str, Sheet] = {}
+        self._sheet_templates: Dict[str, Sheet] = {}
+        self._sheet_instances: Dict[str, SheetInstance] = {}
+        self._nets: Dict[str, Net] = {}
+        self._buses: Dict[str, Bus] = {}
+        self._differential_pairs: Dict[str, DifferentialPair] = {}
+        self._annotation_counters: Dict[ComponentType, int] = {}
         self._root_sheet_id = "root"
+        self._active_sheet_id: Optional[str] = None
 
         self._next_component_id = 1
         self._next_connection_id = 1
         self._next_sheet_index = 1
+        self._next_net_id = 1
 
         self._reset_circuit_state()
 
@@ -187,6 +98,16 @@ class CircuitService(QObject):
         self._ensure_root_sheet()
 
         logger.info("Circuit service initialized")
+
+    def _create_default_symbol_adapter(self) -> Optional[KiCADSymbolAdapter]:
+        """Create a KiCAD symbol adapter using application configuration."""
+
+        search_paths = [path for path in KICAD_GLOBAL_SYMBOL_LIBRARY_PATHS if path.exists()]
+        if not search_paths:
+            logger.warning("No KiCAD symbol library paths discovered from configuration")
+            return None
+
+        return KiCADSymbolAdapter(search_paths=search_paths, cache_dir=KICAD_PROJECT_CACHE_DIR)
 
     def _ensure_root_sheet(self):
         """Ensure there is always at least one root sheet."""
@@ -202,8 +123,8 @@ class CircuitService(QObject):
         self.active_sheet_changed.emit(sheet_id)
 
     def _generate_sheet_id(self) -> str:
-        sheet_id = f"sheet_{self._next_sheet_id}"
-        self._next_sheet_id += 1
+        sheet_id = f"sheet_{self._next_sheet_index}"
+        self._next_sheet_index += 1
         return sheet_id
 
     # ------------------------------------------------------------------
@@ -214,6 +135,9 @@ class CircuitService(QObject):
         parent = parent_id or self._active_sheet_id
         sheet = Sheet(sheet_id=sheet_id, name=name, parent_id=parent, embedded=embedded)
         self._sheets[sheet_id] = sheet
+        if parent and parent in self._sheets:
+            if sheet_id not in self._sheets[parent].children:
+                self._sheets[parent].children.append(sheet_id)
         self.sheets_changed.emit()
         return sheet
 
@@ -246,6 +170,18 @@ class CircuitService(QObject):
         """Initialize the component library using the KiCAD symbol adapter."""
 
         self._component_definitions.clear()
+        if not self._symbol_adapter:
+            logger.warning("Component library adapter unavailable; circuit library is empty")
+            return
+
+        components = self._symbol_adapter.load_components()
+        for component in components:
+            self.register_component(component)
+
+        logger.info(
+            "Component library initialized with %s KiCAD symbol(s)",
+            len(self._component_definitions),
+        )
 
     def _init_sheet_hierarchy(self, root_sheet_id: str, root_sheet_name: str):
         """Initialize the sheet hierarchy with a root sheet."""
@@ -263,14 +199,16 @@ class CircuitService(QObject):
         """Reset the mutable state for components, connections, and sheets."""
         self._components = {}
         self._connections = {}
+        self._nets = {}
+        self._buses = {}
+        self._differential_pairs = {}
+        self._sheet_instances = {}
+        self._annotation_counters.clear()
         self._init_sheet_hierarchy(root_sheet_id, root_sheet_name)
         self._next_component_id = 1
         self._next_connection_id = 1
-
-    def _generate_sheet_id(self) -> str:
-        sheet_id = f"sheet_{self._next_sheet_index}"
-        self._next_sheet_index += 1
-        return sheet_id
+        self._next_net_id = 1
+        self._active_sheet_id = None
 
     @staticmethod
     def _extract_numeric_suffix(value: str) -> int:
@@ -311,70 +249,6 @@ class CircuitService(QObject):
         ]
         max_sheet = max(sheet_numbers) if sheet_numbers else 0
         self._next_sheet_index = max_sheet + 1 if max_sheet > 0 else 1
-
-    def _load_component_from_json(self, json_path: Path) -> Optional[ComponentDefinition]:
-        """Load a component definition from a JSON file"""
-
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-
-            # Validate required fields
-            required_fields = ["id", "name", "component_type", "description", "width", "height", "pins"]
-            for field in required_fields:
-                if field not in data:
-                    logger.error(f"Component {json_path.name} missing required field: {field}")
-                    return None
-
-            # Parse component type
-            try:
-                component_type = ComponentType(data["component_type"])
-            except ValueError:
-                logger.error(f"Invalid component_type '{data['component_type']}' in {json_path.name}")
-                return None
-
-            # Parse pins
-            pins = []
-            for pin_data in data["pins"]:
-                try:
-                    pin_type = PinType(pin_data["pin_type"])
-                    pin = Pin(
-                        id=pin_data["id"],
-                        label=pin_data["label"],
-                        pin_type=pin_type,
-                        position=(pin_data["position"][0], pin_data["position"][1]),
-                        length=float(pin_data.get("length", 20.0)),
-                        orientation=pin_data.get("orientation", "left"),
-                        decoration=pin_data.get("decoration", "line"),
-                    )
-                    pins.append(pin)
-                except (ValueError, KeyError, IndexError) as e:
-                    logger.error(f"Invalid pin definition in {json_path.name}: {e}")
-                    return None
-
-            # Create component definition
-            component_def = ComponentDefinition(
-                id=data["id"],
-                name=data["name"],
-                component_type=component_type,
-                width=float(data["width"]),
-                height=float(data["height"]),
-                pins=pins,
-                image_path=data.get("image_path"),
-                description=data["description"],
-                datasheet_url=data.get("metadata", {}).get("datasheet_url"),
-                graphics=data.get("graphics", []),
-                units=data.get("units", []),
-            )
-
-        for component_def in components:
-            self.register_component(component_def)
-
-        logger.info(
-            "Component library initialized with %s KiCAD symbol(s)",
-            len(self._component_definitions),
-        )
-
 
     def register_component(self, component_def: ComponentDefinition):
         """Register a component definition"""
@@ -474,6 +348,64 @@ class CircuitService(QObject):
         """Return all nets."""
 
         return list(self._nets.values())
+
+    def create_bus(self, name: Optional[str] = None, nets: Optional[Iterable[str]] = None) -> Bus:
+        """Create a bus and optionally attach existing nets to it."""
+
+        if not name:
+            name = f"BUS{len(self._buses) + 1}"
+
+        if name in self._buses:
+            raise ValueError(f"Bus '{name}' already exists")
+
+        bus = Bus(name=name)
+        self._buses[name] = bus
+
+        for net_name in nets or []:
+            net = self._nets.get(net_name) or self.create_net(net_name)
+            net.bus = name
+            bus.nets.add(net.name)
+
+        return bus
+
+    def get_bus(self, name: str) -> Optional[Bus]:
+        """Return the bus by name if it exists."""
+
+        return self._buses.get(name)
+
+    def list_buses(self) -> List[Bus]:
+        """Return all defined buses."""
+
+        return list(self._buses.values())
+
+    def define_differential_pair(
+        self,
+        name: str,
+        positive_net: str,
+        negative_net: str,
+        bus_name: Optional[str] = None,
+    ) -> DifferentialPair:
+        """Create or update a differential pair association."""
+
+        if positive_net not in self._nets or negative_net not in self._nets:
+            raise ValueError("Differential pair nets must already exist")
+
+        pair = DifferentialPair(name=name, positive_net=positive_net, negative_net=negative_net)
+        self._differential_pairs[name] = pair
+
+        for net_name in (positive_net, negative_net):
+            net = self._nets[net_name]
+            net.differential_pair = name
+            if bus_name:
+                bus = self._buses.get(bus_name) or self.create_bus(bus_name)
+                bus.nets.add(net_name)
+                bus.differential_pairs[name] = pair
+                net.bus = bus.name
+
+        return pair
+
+    def get_differential_pair(self, name: str) -> Optional[DifferentialPair]:
+        return self._differential_pairs.get(name)
 
     def _detach_pin_from_any_net(self, component_id: str, pin_id: str) -> None:
         for net in self._nets.values():
@@ -629,10 +561,16 @@ class CircuitService(QObject):
         return True
 
 
-    def add_connection(self, from_component: str, from_pin: str,
-                      to_component: str, to_pin: str,
-                      wire_color: str = "#000000",
-                      connection_type: str = "wire") -> Optional[Connection]:
+    def add_connection(
+        self,
+        from_component: str,
+        from_pin: str,
+        to_component: str,
+        to_pin: str,
+        wire_color: str = "#000000",
+        connection_type: str = "wire",
+        net_name: Optional[str] = None,
+    ) -> Optional[Connection]:
         """Add a connection between two pins"""
 
         # Validate components exist
@@ -642,8 +580,12 @@ class CircuitService(QObject):
 
         # Check if connection already exists
         for conn in self._connections.values():
-            if ((conn.from_component == from_component and conn.from_pin == from_pin) or
-                (conn.to_component == from_component and conn.to_pin == from_pin)):
+            if (
+                (conn.from_component == from_component and conn.from_pin == from_pin)
+                or (conn.to_component == from_component and conn.to_pin == from_pin)
+                or (conn.from_component == to_component and conn.from_pin == to_pin)
+                or (conn.to_component == to_component and conn.to_pin == to_pin)
+            ):
                 logger.warning(f"Pin already connected: {from_component}.{from_pin}")
                 return None
 
@@ -667,6 +609,7 @@ class CircuitService(QObject):
             to_pin=to_pin,
             wire_color=wire_color,
             connection_type=connection_type,
+            net_name=net.name,
         )
 
         self._connections[connection_id] = connection
@@ -759,6 +702,83 @@ class CircuitService(QObject):
         return True
 
 
+    def define_sheet(
+        self,
+        sheet_id: str,
+        name: str,
+        *,
+        ports: Optional[Iterable[HierarchicalPort]] = None,
+    ) -> Sheet:
+        """Register a reusable sheet definition with optional hierarchical ports."""
+
+        template = Sheet(sheet_id=sheet_id, name=name)
+        if ports:
+            template.ports = {port.name: copy.deepcopy(port) for port in ports}
+
+        self._sheet_templates[sheet_id] = template
+        return template
+
+    def instantiate_sheet(
+        self,
+        sheet_id: str,
+        parent_path: Tuple[str, ...] = tuple(),
+    ) -> SheetInstance:
+        """Instantiate a sheet definition within the design hierarchy."""
+
+        template = self._sheet_templates.get(sheet_id)
+        if not template:
+            raise CircuitSerializationError(f"Sheet definition '{sheet_id}' not found")
+
+        instance_index = len(template.instances) + 1
+        instance_id = f"{sheet_id}_{instance_index}"
+        sheet_instance = SheetInstance(
+            instance_id=instance_id,
+            sheet_id=sheet_id,
+            parent_path=parent_path,
+        )
+
+        for port_name, port in template.ports.items():
+            sheet_instance.ports[port_name] = copy.deepcopy(port)
+
+        template.instances[instance_id] = sheet_instance
+        self._sheet_instances[instance_id] = sheet_instance
+        return sheet_instance
+
+    def bind_port_to_net(self, instance_id: str, port_name: str, net_name: str) -> bool:
+        """Bind a hierarchical port instance to a net."""
+
+        instance = self._sheet_instances.get(instance_id)
+        if not instance or port_name not in instance.ports:
+            return False
+
+        port = instance.ports[port_name]
+        port.net_name = net_name
+        self.assign_pin_to_net(
+            instance_id,
+            port_name,
+            net_name,
+            sheet_path=instance.parent_path,
+            pin_type=port.pin_type,
+            allow_virtual=True,
+        )
+        return True
+
+
+    def run_electrical_rules_check(self) -> List[ElectricalRuleDiagnostic]:
+        """Perform a lightweight electrical rule check similar to KiCAD."""
+
+        diagnostics: List[ElectricalRuleDiagnostic] = []
+        drive_pin_types = {
+            PinType.POWER,
+            PinType.DIGITAL,
+            PinType.PWM,
+            PinType.SPI,
+            PinType.SERIAL,
+        }
+
+        for net in self._nets.values():
+            if not net.nodes:
+                continue
 
             drive_nodes = [node for node in net.nodes if node.pin_type in drive_pin_types]
             if len(drive_nodes) > 1:
@@ -766,6 +786,18 @@ class CircuitService(QObject):
                     ElectricalRuleDiagnostic(
                         code="ERC_PIN_CONFLICT",
                         message=f"Net {net.name} ties multiple driven outputs together",
+                        severity="error",
+                        related_net=net.name,
+                    )
+                )
+
+            has_power = any(node.pin_type == PinType.POWER for node in net.nodes)
+            has_ground = any(node.pin_type == PinType.GROUND for node in net.nodes)
+            if has_power and has_ground:
+                diagnostics.append(
+                    ElectricalRuleDiagnostic(
+                        code="ERC_SHORT",
+                        message=f"Power and ground pins shorted on net {net.name}",
                         severity="error",
                         related_net=net.name,
                     )

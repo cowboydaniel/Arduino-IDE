@@ -7,7 +7,12 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from .component_models import ComponentDefinition, ComponentType, Pin, PinType
+from arduino_ide.models.circuit_domain import (
+    ComponentDefinition,
+    ComponentType,
+    Pin,
+    PinType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,16 +90,24 @@ class KiCADSymbolAdapter:
     # ------------------------------------------------------------------
     def _load_library(self, library_name: str, library_path: Path) -> List[ComponentDefinition]:
         cache_path = self.cache_dir / f"{library_name}.json"
-        source_mtime = library_path.stat().st_mtime
+        stat = library_path.stat()
+        source_signature = {
+            "mtime_ns": stat.st_mtime_ns,
+            "size": stat.st_size,
+        }
 
         cached = self._read_cache(cache_path)
-        if cached and cached.get("source_mtime") == source_mtime and cached.get("version") == _CACHE_VERSION:
+        if (
+            cached
+            and cached.get("source_signature") == source_signature
+            and cached.get("version") == _CACHE_VERSION
+        ):
             return [self._component_from_cache(entry) for entry in cached.get("components", [])]
 
         definitions = self._parse_symbol_file(library_name, library_path)
         payload = {
             "version": _CACHE_VERSION,
-            "source_mtime": source_mtime,
+            "source_signature": source_signature,
             "components": [self._component_to_cache(entry) for entry in definitions],
         }
         cache_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
