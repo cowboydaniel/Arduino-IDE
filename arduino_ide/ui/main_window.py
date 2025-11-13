@@ -54,6 +54,7 @@ from arduino_ide.ui.preferences_dialog import PreferencesDialog
 from arduino_ide.ui.unit_testing_panel import UnitTestingDialog
 from arduino_ide.ui.hil_testing_dialog import HILTestingDialog
 from arduino_ide.ui.plugin_manager import PluginManagerWidget
+from arduino_ide.ui.performance_profiler_dialog import PerformanceProfilerDialog
 from arduino_ide.services.plugin_system import PluginManager, PluginType, PluginStatus
 from arduino_ide.services.debug_service import Breakpoint, DebugService, DebugState
 from arduino_ide.services.power_analyzer_service import (
@@ -62,6 +63,10 @@ from arduino_ide.services.power_analyzer_service import (
     PowerSessionStage,
 )
 from arduino_ide.ui.power_analyzer_dialog import PowerAnalyzerDialog
+from arduino_ide.services.performance_profiler_service import (
+    PerformanceProfilerService,
+    ProfileMode,
+)
 import re
 
 
@@ -210,10 +215,14 @@ class MainWindow(QMainWindow):
         self.unit_testing_service = UnitTestingService()
         self.hil_testing_service = HILTestingService(unit_testing_service=self.unit_testing_service)
         self.power_analyzer_service = PowerAnalyzerService(self)
+        self.performance_profiler_service = PerformanceProfilerService()
         self.unit_testing_panel = None
         self.unit_testing_dialog = None
         self.hil_testing_dialog: Optional[HILTestingDialog] = None
         self.power_analyzer_dialog: Optional[PowerAnalyzerDialog] = None
+        self.performance_profiler_dialog: Optional[PerformanceProfilerDialog] = None
+        self._last_completed_profiling_session_id: Optional[str] = None
+        self._last_selected_profiler_session_id: Optional[str] = None
         self._unit_testing_project_root: Optional[str] = None
         self._unit_testing_actions_linked = False
         self._hil_sessions_active: Set[str] = set()
@@ -283,6 +292,9 @@ class MainWindow(QMainWindow):
         self.project_manager.project_saved.connect(self._handle_project_saved)
         self.project_manager.dependencies_changed.connect(self._handle_project_dependencies_changed)
 
+        self.performance_profiler_service.profiling_started.connect(self._on_profiler_session_started)
+        self.performance_profiler_service.profiling_finished.connect(self._on_profiler_session_finished)
+
         # Unit testing global actions (menus, toolbars, shortcuts)
         self.discover_tests_action = QAction("Discover Tests", self)
         self.discover_tests_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
@@ -317,6 +329,27 @@ class MainWindow(QMainWindow):
         self.open_hil_testing_action.setShortcut(QKeySequence("Ctrl+Shift+H"))
         self.open_hil_testing_action.setToolTip("Configure fixtures and run HIL test suites")
         self.open_hil_testing_action.triggered.connect(self._show_hil_testing_dialog)
+
+        self.performance_profiler_action = QAction("Performance Profiler...", self)
+        self.performance_profiler_action.setStatusTip("Open the Performance Profiler dashboard")
+        self.performance_profiler_action.triggered.connect(self.show_performance_profiler_dialog)
+
+        self.start_profiling_action = QAction("Start Profiling", self)
+        self.start_profiling_action.setShortcut(QKeySequence("Ctrl+Alt+P"))
+        self.start_profiling_action.setStatusTip("Start a performance profiling run for the active sketch")
+        self.start_profiling_action.triggered.connect(self.start_performance_profiling)
+
+        self.stop_profiling_action = QAction("Stop Profiling", self)
+        self.stop_profiling_action.setShortcut(QKeySequence("Ctrl+Alt+Shift+P"))
+        self.stop_profiling_action.setStatusTip("Stop the current performance profiling session")
+        self.stop_profiling_action.setEnabled(False)
+        self.stop_profiling_action.triggered.connect(self.stop_performance_profiling)
+
+        self.export_profiling_action = QAction("Export Profiling Report...", self)
+        self.export_profiling_action.setShortcut(QKeySequence("Ctrl+Alt+E"))
+        self.export_profiling_action.setStatusTip("Export profiling metrics to a JSON report")
+        self.export_profiling_action.setEnabled(False)
+        self.export_profiling_action.triggered.connect(self.export_current_profiling_session)
 
         for action in (
             self.discover_tests_action,
@@ -424,6 +457,9 @@ class MainWindow(QMainWindow):
 
         # Initialize status bar with current values
         self.initialize_status_bar()
+
+        self._sync_profiler_context()
+        self._update_profiler_actions_state()
 
         # Apply theme
         self.theme_manager.apply_theme("dark")
@@ -774,6 +810,13 @@ class MainWindow(QMainWindow):
         self.power_analyzer_action.triggered.connect(self.show_power_analyzer_dialog)
         tools_menu.addAction(self.power_analyzer_action)
 
+        tools_menu.addAction(self.performance_profiler_action)
+
+        profiler_controls_menu = tools_menu.addMenu("Performance Profiling Controls")
+        profiler_controls_menu.addAction(self.start_profiling_action)
+        profiler_controls_menu.addAction(self.stop_profiling_action)
+        profiler_controls_menu.addAction(self.export_profiling_action)
+
         unit_testing_action = self.open_unit_testing_action
         tools_menu.addAction(unit_testing_action)
 
@@ -885,6 +928,16 @@ class MainWindow(QMainWindow):
         upload_monitor_btn.setToolTip("Upload and Open Serial Monitor")
         upload_monitor_btn.triggered.connect(self.upload_and_monitor)
         main_toolbar.addAction(upload_monitor_btn)
+
+        main_toolbar.addSeparator()
+        self.start_profiling_action.setIconText("🕒 Start Profiling")
+        main_toolbar.addAction(self.start_profiling_action)
+        self.stop_profiling_action.setIconText("⏹ Stop Profiling")
+        main_toolbar.addAction(self.stop_profiling_action)
+        profiler_open_action = QAction("📈 Profiler", self)
+        profiler_open_action.setToolTip("Open the Performance Profiler dashboard")
+        profiler_open_action.triggered.connect(self.show_performance_profiler_dialog)
+        main_toolbar.addAction(profiler_open_action)
 
         main_toolbar.addSeparator()
 
@@ -2650,6 +2703,7 @@ void loop() {
         # Reset to Ready after a moment
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
+        self._sync_profiler_context()
         self._schedule_cicd_refresh()
 
     def on_port_changed(self, port_name):
@@ -2668,6 +2722,8 @@ void loop() {
             self.status_bar.set_connection_status(is_connected)
             # Reset to Ready after a moment
             QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
+        self._sync_profiler_context()
 
     def on_config_changed(self, config):
         """Handle build configuration change"""
@@ -3066,6 +3122,102 @@ void loop() {
         self.power_analyzer_dialog.activateWindow()
         self.status_bar.set_status("Ready")
 
+    def show_performance_profiler_dialog(self):
+        """Open or focus the performance profiler dashboard."""
+
+        self.status_bar.set_status("Performance Profiler")
+        dialog = self._ensure_profiler_dialog()
+        self._sync_profiler_context()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+        self.status_bar.set_status("Ready")
+
+    def start_performance_profiling(self, mode: Optional[ProfileMode] = None):
+        """Start a profiling session using the requested mode."""
+
+        if getattr(self.performance_profiler_service, "profiling_active", False):
+            QMessageBox.information(self, "Performance Profiler", "Profiling is already running.")
+            return
+
+        self._sync_profiler_context()
+        profile_mode = mode or ProfileMode.HOST_BASED
+        session_id = self.performance_profiler_service.start_profiling(profile_mode)
+        if not session_id:
+            QMessageBox.warning(
+                self,
+                "Performance Profiler",
+                "Unable to start profiling. Verify that another session is not already active.",
+            )
+            return
+
+        self._update_profiler_actions_state()
+
+    def stop_performance_profiling(self):
+        """Stop the currently running profiling session."""
+
+        if not getattr(self.performance_profiler_service, "profiling_active", False):
+            return
+
+        session = self.performance_profiler_service.stop_profiling()
+        if session and self.performance_profiler_dialog:
+            self.performance_profiler_dialog.focus_session(session.session_id)
+
+        self._update_profiler_actions_state()
+
+    def export_current_profiling_session(self):
+        """Export profiling metrics for the selected session."""
+
+        if not self.performance_profiler_service.sessions:
+            QMessageBox.information(self, "Performance Profiler", "No profiling sessions available to export.")
+            return
+
+        session_id: Optional[str] = None
+        if self.performance_profiler_dialog and self.performance_profiler_dialog.current_session_id:
+            session_id = self.performance_profiler_dialog.current_session_id
+        elif getattr(self.performance_profiler_service, "current_session", None):
+            session_id = self.performance_profiler_service.current_session.session_id
+        elif self._last_completed_profiling_session_id:
+            session_id = self._last_completed_profiling_session_id
+        elif self._last_selected_profiler_session_id:
+            session_id = self._last_selected_profiler_session_id
+        else:
+            session_id = next(iter(self.performance_profiler_service.sessions.keys()), None)
+
+        if not session_id:
+            QMessageBox.warning(
+                self,
+                "Performance Profiler",
+                "No profiling session is selected for export.",
+            )
+            return
+
+        default_name = f"{session_id}_profile.json"
+        default_path = (self.performance_profiler_service.project_path / default_name).resolve()
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Profiling Report",
+            str(default_path),
+            "JSON Files (*.json)",
+        )
+        if not file_path:
+            return
+
+        output_path = self.performance_profiler_service.export_profiling_report(session_id, file_path)
+        if not output_path:
+            QMessageBox.warning(
+                self,
+                "Performance Profiler",
+                "Failed to export profiling report for the selected session.",
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Performance Profiler",
+            f"Profiling report saved to {output_path}",
+        )
+
     def show_snippets_library(self):
         """Show code snippets library dialog"""
         # Create snippets dialog if it doesn't exist
@@ -3280,7 +3432,7 @@ void loop() {
         self.hil_testing_dialog.raise_()
         self.hil_testing_dialog.activateWindow()
 
-    def _determine_unit_testing_root(self) -> Optional[Path]:
+    def _determine_active_project_root(self) -> Optional[Path]:
         project_path = getattr(self.project_manager, "project_path", None)
         if project_path:
             return Path(project_path).resolve()
@@ -3291,6 +3443,93 @@ void loop() {
             return Path(file_path).resolve().parent
 
         return None
+
+    def _determine_unit_testing_root(self) -> Optional[Path]:
+        return self._determine_active_project_root()
+
+    def _sync_profiler_context(self) -> None:
+        root = self._determine_active_project_root()
+        project_path = str(root) if root else ""
+        if project_path:
+            if str(self.performance_profiler_service.project_path) != project_path:
+                self.performance_profiler_service.set_project_path(project_path)
+        board_obj = self._get_selected_board()
+        board_label = ""
+        target_board = ""
+        if board_obj:
+            board_label = getattr(board_obj, "name", "") or getattr(board_obj, "fqbn", "")
+            target_board = getattr(board_obj, "fqbn", "") or board_label
+        elif hasattr(self, "board_selector"):
+            board_label = self.board_selector.currentText().strip()
+            target_board = board_label
+        if target_board:
+            self.performance_profiler_service.target_board = target_board
+
+        port = self._get_selected_port() or ""
+        self.performance_profiler_service.serial_port = port
+
+        if self.performance_profiler_dialog:
+            self.performance_profiler_dialog.update_context(project_path, board_label, port)
+
+    def _ensure_profiler_dialog(self) -> PerformanceProfilerDialog:
+        if not self.performance_profiler_dialog:
+            self.performance_profiler_dialog = PerformanceProfilerDialog(
+                self.performance_profiler_service,
+                parent=self,
+            )
+            self.performance_profiler_dialog.start_requested.connect(self._on_profiler_start_requested)
+            self.performance_profiler_dialog.stop_requested.connect(self._on_profiler_stop_requested)
+            self.performance_profiler_dialog.export_requested.connect(self._on_profiler_export_requested)
+            self.performance_profiler_dialog.location_requested.connect(self._navigate_to_source)
+            self.performance_profiler_dialog.session_changed.connect(self._on_profiler_session_changed)
+            self.performance_profiler_dialog.update_context(
+                str(self.performance_profiler_service.project_path),
+                getattr(self.board_selector, "currentText", lambda: "")(),
+                self._get_selected_port() or "",
+            )
+            self.performance_profiler_dialog.set_profiling_active(
+                getattr(self.performance_profiler_service, "profiling_active", False)
+            )
+        return self.performance_profiler_dialog
+
+    def _on_profiler_start_requested(self, mode: ProfileMode) -> None:
+        self.start_performance_profiling(mode)
+
+    def _on_profiler_stop_requested(self) -> None:
+        self.stop_performance_profiling()
+
+    def _on_profiler_export_requested(self) -> None:
+        self.export_current_profiling_session()
+
+    def _on_profiler_session_changed(self, session_id: str) -> None:
+        self._last_selected_profiler_session_id = session_id or None
+        self._update_profiler_actions_state()
+
+    def _on_profiler_session_started(self, session_id: str) -> None:
+        self.status_bar.set_status("Profiling…")
+        self._update_profiler_actions_state()
+        if self.performance_profiler_dialog:
+            self.performance_profiler_dialog.set_profiling_active(True)
+            self.performance_profiler_dialog.focus_session(session_id)
+
+    def _on_profiler_session_finished(self, session_id: str) -> None:
+        self._last_completed_profiling_session_id = session_id
+        self._last_selected_profiler_session_id = session_id
+        self.status_bar.set_status("Profiling complete")
+        self._update_profiler_actions_state()
+        if self.performance_profiler_dialog:
+            self.performance_profiler_dialog.set_profiling_active(False)
+            self.performance_profiler_dialog.focus_session(session_id)
+        QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
+    def _update_profiler_actions_state(self) -> None:
+        is_running = getattr(self.performance_profiler_service, "profiling_active", False)
+        self.start_profiling_action.setEnabled(not is_running)
+        self.stop_profiling_action.setEnabled(is_running)
+        has_sessions = bool(self.performance_profiler_service.sessions or self._last_selected_profiler_session_id)
+        self.export_profiling_action.setEnabled(has_sessions and not is_running)
+        if self.performance_profiler_dialog:
+            self.performance_profiler_dialog.set_profiling_active(is_running)
 
     def _update_unit_testing_target(self, *, force_discover=False):
         root = self._determine_unit_testing_root()
@@ -3414,12 +3653,15 @@ void loop() {
 
     def _handle_project_loaded(self, _project_name):
         self._update_unit_testing_target(force_discover=True)
+        self._sync_profiler_context()
 
     def _handle_project_saved(self, _project_name):
         self._update_unit_testing_target(force_discover=True)
+        self._sync_profiler_context()
 
     def _handle_project_dependencies_changed(self):
         self._update_unit_testing_target(force_discover=True)
+        self._sync_profiler_context()
 
     def on_tab_changed(self, index):
         """Handle tab change - update pin usage and status for new tab"""
@@ -3435,6 +3677,7 @@ void loop() {
             # Trigger background compile for new tab (after a short delay)
             QTimer.singleShot(500, self._do_background_compile)
             self._update_unit_testing_target()
+            self._sync_profiler_context()
 
     def update_cursor_position(self):
         """Update cursor position in status bar"""
