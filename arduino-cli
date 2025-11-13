@@ -733,7 +733,7 @@ class ArduinoCLI:
                 continue
 
             # Skip if return type contains keywords that indicate this isn't a function
-            skip_keywords = ['class', 'struct', 'enum', 'typedef', 'namespace', 'if', 'while', 'for', 'switch']
+            skip_keywords = ['class', 'struct', 'enum', 'typedef', 'namespace', 'if', 'else', 'while', 'for', 'switch']
             if any(keyword in return_type for keyword in skip_keywords):
                 continue
 
