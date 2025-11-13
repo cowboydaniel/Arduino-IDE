@@ -1,6 +1,6 @@
 """Board information and selection panel."""
 
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, TYPE_CHECKING
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -19,16 +19,27 @@ from arduino_ide.ui.board_formatting import (
     format_board_specifications,
 )
 
+if TYPE_CHECKING:
+    from arduino_ide.services.board_manager import BoardManager
+
 
 class BoardPanel(QWidget):
     """Panel showing board information and configuration."""
 
     board_selected = Signal(object)  # Emits the selected Board
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, board_manager: Optional["BoardManager"] = None):
         super().__init__(parent)
         self._boards_by_index: Dict[int, Board] = {}
+        self._board_manager = board_manager
+        self._detailed_boards: Dict[str, Optional[Board]] = {}
         self.init_ui()
+
+    def set_board_manager(self, board_manager: Optional["BoardManager"]):
+        """Attach a board manager used to enrich board metadata."""
+
+        self._board_manager = board_manager
+        self._detailed_boards.clear()
 
     def init_ui(self):
         """Initialize UI."""
@@ -175,7 +186,9 @@ class BoardPanel(QWidget):
         if board is None:
             board = self._boards_by_index.get(self.board_combo.currentIndex())
 
-        specs = format_board_specifications(board)
+        board_for_display = self._get_detailed_board(board)
+
+        specs = format_board_specifications(board_for_display)
         self.cpu_label.setText(specs["cpu"])
         self.flash_label.setText(specs["flash"])
         self.ram_label.setText(specs["ram"])
@@ -183,7 +196,7 @@ class BoardPanel(QWidget):
         self.voltage_label.setText(specs["voltage"])
         self.digital_pins_label.setText(specs["digital_pins"])
 
-        features = format_board_features(board)
+        features = format_board_features(board_for_display)
         self.wifi_label.setText(features["wifi"])
         self.bluetooth_label.setText(features["bluetooth"])
         self.usb_label.setText(features["usb"])
@@ -193,9 +206,26 @@ class BoardPanel(QWidget):
         self.rtc_label.setText(features["rtc"])
         self.sleep_label.setText(features["sleep"])
 
-        power = format_board_power(board)
+        power = format_board_power(board_for_display)
         self.power_typical_label.setText(power["typical"])
         self.power_max_label.setText(power["maximum"])
+
+    def _get_detailed_board(self, board: Optional[Board]) -> Optional[Board]:
+        """Return an enriched board instance when available."""
+
+        if not board or not getattr(board, "fqbn", None):
+            return board
+
+        if not self._board_manager:
+            return board
+
+        cached = self._detailed_boards.get(board.fqbn, None)
+        if cached is not None or board.fqbn in self._detailed_boards:
+            return cached or board
+
+        detailed = self._board_manager.get_board(board.fqbn)
+        self._detailed_boards[board.fqbn] = detailed
+        return detailed or board
 
     def set_port(self, port):
         """Set connected port"""
