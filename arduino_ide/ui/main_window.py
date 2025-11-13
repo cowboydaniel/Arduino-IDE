@@ -3,6 +3,8 @@ Main window for Arduino IDE Modern
 """
 
 from functools import partial
+import getpass
+import os
 from typing import Dict, List, Optional, Set
 
 from PySide6.QtWidgets import (
@@ -36,6 +38,7 @@ from arduino_ide.ui.circuit_editor import CircuitDesignerWindow
 from arduino_ide.ui.onboarding_wizard import OnboardingWizard
 from arduino_ide.ui.git_panel import GitPanel
 from arduino_ide.ui.cicd_dialog import CICDDialog
+from arduino_ide.ui.collaboration_dialog import CollaborationDialog
 from arduino_ide.ui.breakpoint_gutter import BreakpointGutter, install_breakpoint_gutter
 from arduino_ide.ui.debug_workspace_dialog import DebugWorkspaceDialog
 from arduino_ide.services.theme_manager import ThemeManager
@@ -223,6 +226,15 @@ class MainWindow(QMainWindow):
         self.performance_profiler_dialog: Optional[PerformanceProfilerDialog] = None
         self._last_completed_profiling_session_id: Optional[str] = None
         self._last_selected_profiler_session_id: Optional[str] = None
+        self.collaboration_dialog: Optional[CollaborationDialog] = None
+        self._authenticated_user_id: Optional[str] = (
+            self.settings.value("collaboration/userId", "", str) or None
+        )
+        self._authenticated_username: Optional[str] = (
+            self.settings.value("collaboration/username", "", str) or None
+        )
+        self._collaboration_project_path: Optional[str] = None
+        self._collaboration_project_name: Optional[str] = None
         self._unit_testing_project_root: Optional[str] = None
         self._unit_testing_actions_linked = False
         self._hil_sessions_active: Set[str] = set()
@@ -594,6 +606,113 @@ class MainWindow(QMainWindow):
         self.cicd_dialog.activateWindow()
         self.cicd_dialog.refresh_now()
 
+    def _ensure_collaboration_dialog(self) -> CollaborationDialog:
+        """Create the collaboration dialog if it does not yet exist."""
+
+        if not self.collaboration_dialog:
+            self.collaboration_dialog = CollaborationDialog(self)
+
+            if self._authenticated_user_id and self._authenticated_username:
+                self.collaboration_dialog.set_current_user(
+                    self._authenticated_user_id,
+                    self._authenticated_username,
+                )
+
+            if self._collaboration_project_path or self._collaboration_project_name:
+                self.collaboration_dialog.set_project(
+                    self._collaboration_project_path,
+                    self._collaboration_project_name,
+                )
+
+        return self.collaboration_dialog
+
+    def _ensure_collaboration_user_defaults(self) -> None:
+        """Populate fallback authentication details when none are configured."""
+
+        if not self._authenticated_user_id:
+            fallback = (
+                os.environ.get("ARDUINO_IDE_USER_ID")
+                or os.environ.get("USER")
+                or os.environ.get("USERNAME")
+            )
+            if not fallback:
+                try:
+                    fallback = getpass.getuser()
+                except Exception:  # pragma: no cover - system-dependent
+                    fallback = "local-user"
+
+            self._authenticated_user_id = fallback or "local-user"
+
+        if not self._authenticated_username:
+            fallback_name = (
+                os.environ.get("ARDUINO_IDE_USER_NAME")
+                or self._authenticated_user_id
+            )
+            self._authenticated_username = fallback_name or "Local User"
+
+        if self._authenticated_user_id:
+            self.settings.setValue("collaboration/userId", self._authenticated_user_id)
+        if self._authenticated_username:
+            self.settings.setValue("collaboration/username", self._authenticated_username)
+
+    def _get_collaboration_user(self) -> tuple[Optional[str], Optional[str]]:
+        """Return the active authentication context for collaboration."""
+
+        self._ensure_collaboration_user_defaults()
+        return self._authenticated_user_id, self._authenticated_username
+
+    def set_authenticated_user(self, user_id: str, username: str) -> None:
+        """Update the authenticated user and refresh collaboration state."""
+
+        self._authenticated_user_id = user_id
+        self._authenticated_username = username
+        self.settings.setValue("collaboration/userId", user_id)
+        self.settings.setValue("collaboration/username", username)
+
+        if self.collaboration_dialog:
+            self.collaboration_dialog.set_current_user(user_id, username)
+
+    def _update_collaboration_project_context(self, project_root: Optional[Path] = None) -> None:
+        """Synchronize the collaboration dialog with the active project."""
+
+        resolved_root: Optional[Path]
+        if project_root is None:
+            resolved_root = self._determine_active_project_root()
+        elif isinstance(project_root, Path):
+            resolved_root = project_root
+        else:
+            resolved_root = Path(project_root)
+
+        normalized_path = str(resolved_root) if resolved_root else None
+        project_name = resolved_root.name if resolved_root else None
+
+        state_changed = (
+            normalized_path != self._collaboration_project_path
+            or project_name != self._collaboration_project_name
+        )
+
+        self._collaboration_project_path = normalized_path
+        self._collaboration_project_name = project_name
+
+        if self.collaboration_dialog and state_changed:
+            self.collaboration_dialog.set_project(normalized_path, project_name)
+
+    def show_collaboration_dialog(self):
+        """Display the collaboration dialog with up-to-date context."""
+
+        dialog = self._ensure_collaboration_dialog()
+
+        user_id, username = self._get_collaboration_user()
+        if user_id and username:
+            dialog.set_current_user(user_id, username)
+
+        self._update_collaboration_project_context()
+
+        dialog.initialize_session()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
     def init_ui(self):
         """Initialize the main UI"""
         self.setWindowTitle("Arduino IDE Modern")
@@ -781,6 +900,10 @@ class MainWindow(QMainWindow):
         git_action = QAction("Git...", self)
         git_action.triggered.connect(self.open_git_dialog)
         tools_menu.addAction(git_action)
+        self.collaboration_action = QAction("Collaboration...", self)
+        self.collaboration_action.setStatusTip("Open the real-time collaboration workspace")
+        self.collaboration_action.triggered.connect(self.show_collaboration_dialog)
+        tools_menu.addAction(self.collaboration_action)
         self.cicd_action = QAction("CI/CD...", self)
         self.cicd_action.triggered.connect(self.open_cicd_dialog)
         tools_menu.addAction(self.cicd_action)
@@ -3533,6 +3656,7 @@ void loop() {
 
     def _update_unit_testing_target(self, *, force_discover=False):
         root = self._determine_unit_testing_root()
+        self._update_collaboration_project_context(root)
         if root:
             normalized = str(root)
             if str(self.hil_testing_service.project_path) != normalized:
@@ -3654,14 +3778,17 @@ void loop() {
     def _handle_project_loaded(self, _project_name):
         self._update_unit_testing_target(force_discover=True)
         self._sync_profiler_context()
+        self._update_collaboration_project_context()
 
     def _handle_project_saved(self, _project_name):
         self._update_unit_testing_target(force_discover=True)
         self._sync_profiler_context()
+        self._update_collaboration_project_context()
 
     def _handle_project_dependencies_changed(self):
         self._update_unit_testing_target(force_discover=True)
         self._sync_profiler_context()
+        self._update_collaboration_project_context()
 
     def on_tab_changed(self, index):
         """Handle tab change - update pin usage and status for new tab"""
