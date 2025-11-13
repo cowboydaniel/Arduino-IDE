@@ -846,7 +846,11 @@ class ArduinoCLI:
         # Remove invalid global control flow statements (if/else if/else/while/for/switch)
         # that appear outside function bodies. The official Arduino IDE ignores these,
         # but they cause compilation errors in Arduino IDE Modern.
+        if verbose:
+            print(f"DEBUG: Checking for invalid global control flow statements...", flush=True)
         source_without_types = self._remove_invalid_global_control_flow(source_without_types)
+        if verbose:
+            print(f"DEBUG: Global control flow check complete", flush=True)
 
         # Generate function prototypes (will skip functions using custom types)
         prototypes = self._generate_function_prototypes(source)
@@ -874,6 +878,12 @@ class ArduinoCLI:
             # Add the original sketch code (with type definitions removed)
             cpp_content += source_without_types
             cpp_file.write_text(cpp_content, encoding="utf-8")
+
+            if verbose:
+                print(f"\nDEBUG: First 50 lines of generated {cpp_file.name}:", file=sys.stderr, flush=True)
+                for i, line in enumerate(cpp_content.split('\n')[:50], 1):
+                    print(f"  {i:3d}: {line}", file=sys.stderr, flush=True)
+                print("", file=sys.stderr, flush=True)
         except Exception as exc:
             print(f"✗ Failed to create preprocessed sketch: {exc}", file=sys.stderr)
             return 1
