@@ -46,6 +46,8 @@ from arduino_ide.services.visual_programming_service import VisualProgrammingSer
 from arduino_ide.ui.visual_programming_editor import VisualProgrammingEditor
 from arduino_ide.services.error_recovery import SmartErrorRecovery
 from arduino_ide.ui.preferences_dialog import PreferencesDialog
+from arduino_ide.ui.plugin_manager import PluginManagerWidget
+from arduino_ide.services.plugin_system import PluginManager, PluginType, PluginStatus
 import re
 
 
@@ -184,12 +186,17 @@ class MainWindow(QMainWindow):
         self.recent_files = self._load_recent_files()
         self._compile_verbose_enabled = self._load_compile_verbose_preference()
         self.view_menu = None
+        self.theme_menu = None
         self.code_quality_panel = None
         self._cli_boards = []
         self.board_panel = None
         self.pin_usage_panel = None
         self.status_display = None
         self.console_panel = None
+        self.main_toolbar = None
+        self.extensions_toolbar_action = None
+        self.extensions_action = None
+        self.plugin_manager_dialog = None
         self.git_panel = None
         self.git_dialog = None
 
@@ -231,6 +238,14 @@ class MainWindow(QMainWindow):
             board_manager=self.board_manager
         )
 
+        # Initialize plugin manager and UI integration
+        self.plugin_manager = PluginManager(parent=self)
+        self.plugin_manager.api.ide = self
+        self.plugin_manager_widget = PluginManagerWidget(self.plugin_manager, parent=self)
+        self.plugin_manager.plugin_loaded.connect(self._on_plugin_state_changed)
+        self.plugin_manager.plugin_activated.connect(self._on_plugin_state_changed)
+        self.plugin_manager.plugin_deactivated.connect(self._on_plugin_state_changed)
+        self.plugin_manager.plugin_error.connect(self._on_plugin_error)
         if hasattr(self.project_manager, "project_loaded"):
             self.project_manager.project_loaded.connect(self._on_project_loaded)
         if hasattr(self.project_manager, "project_saved"):
@@ -568,22 +583,19 @@ class MainWindow(QMainWindow):
         code_quality_action.triggered.connect(self.open_code_quality)
         tools_menu.addAction(code_quality_action)
 
+        tools_menu.addSeparator()
+
+        self.extensions_action = QAction("Extensions Manager...", self)
+        self.extensions_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_E)
+        self.extensions_action.setStatusTip("Open the Extensions Manager dialog to manage plugins")
+        self.extensions_action.triggered.connect(self.open_plugin_manager)
+        tools_menu.addAction(self.extensions_action)
+
         # View Menu
         self.view_menu = menubar.addMenu("&View")
 
-        theme_menu = self.view_menu.addMenu("Theme")
-
-        light_theme = QAction("Light", self)
-        light_theme.triggered.connect(lambda: self.theme_manager.apply_theme("light"))
-        theme_menu.addAction(light_theme)
-
-        dark_theme = QAction("Dark", self)
-        dark_theme.triggered.connect(lambda: self.theme_manager.apply_theme("dark"))
-        theme_menu.addAction(dark_theme)
-
-        high_contrast = QAction("High Contrast", self)
-        high_contrast.triggered.connect(lambda: self.theme_manager.apply_theme("high_contrast"))
-        theme_menu.addAction(high_contrast)
+        self.theme_menu = self.view_menu.addMenu("Theme")
+        self._populate_theme_menu()
 
         # Debug Menu
         debug_menu = menubar.addMenu("&Debug")
@@ -611,6 +623,8 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
 
+        self._refresh_plugin_integrations()
+
     def showEvent(self, event):
         """Ensure the window is maximized the first time it is shown"""
         super().showEvent(event)
@@ -624,6 +638,7 @@ class MainWindow(QMainWindow):
         main_toolbar.setObjectName("MainToolBar")
         main_toolbar.setMovable(False)
         self.addToolBar(main_toolbar)
+        self.main_toolbar = main_toolbar
 
         # Board selector
         main_toolbar.addWidget(QLabel("Board: "))
@@ -711,6 +726,12 @@ class MainWindow(QMainWindow):
         libraries_btn.triggered.connect(self.show_libraries)
         main_toolbar.addAction(libraries_btn)
 
+        # Extensions / Plugin manager button
+        self.extensions_toolbar_action = QAction("🧩 Extensions", self)
+        self.extensions_toolbar_action.setToolTip("Open Extensions Manager dialog")
+        self.extensions_toolbar_action.triggered.connect(self.open_plugin_manager)
+        main_toolbar.addAction(self.extensions_toolbar_action)
+
         main_toolbar.addSeparator()
 
         # Serial Monitor
@@ -732,6 +753,8 @@ class MainWindow(QMainWindow):
         circuit_btn.setToolTip("Open Circuit Designer")
         circuit_btn.triggered.connect(self.open_circuit_designer)
         main_toolbar.addAction(circuit_btn)
+
+        self._refresh_toolbar_plugins()
 
     def create_dock_widgets(self):
         """Create panels and dockable widgets."""
@@ -808,6 +831,136 @@ class MainWindow(QMainWindow):
         # Sync contextual help state with the initial Serial Monitor visibility
         self._broadcast_serial_monitor_state(self._is_serial_monitor_active())
 
+    def _ensure_plugin_manager_dialog(self):
+        """Create the plugin manager dialog if it hasn't been added yet."""
+        if getattr(self, "plugin_manager_widget", None) is None:
+            return
+        if self.plugin_manager_dialog is not None:
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Extensions Manager")
+        dialog.setModal(False)
+        dialog.setWindowModality(Qt.NonModal)
+        dialog.setAttribute(Qt.WA_DeleteOnClose, False)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.plugin_manager_widget)
+        self.plugin_manager_widget.setParent(dialog)
+
+        self.plugin_manager_dialog = dialog
+
+    def open_plugin_manager(self):
+        """Show the plugin manager dialog and refresh its contents."""
+        if getattr(self, "plugin_manager_widget", None) is None:
+            return
+
+        self._ensure_plugin_manager_dialog()
+
+        if self.plugin_manager_widget is not None:
+            self.plugin_manager_widget.refresh_plugins()
+            self._refresh_plugin_integrations()
+
+        if self.plugin_manager_dialog is not None:
+            self.plugin_manager_dialog.show()
+            self.plugin_manager_dialog.raise_()
+            self.plugin_manager_dialog.activateWindow()
+            self.plugin_manager_widget.setFocus()
+
+    def _populate_theme_menu(self):
+        """Populate the theme menu with built-in and plugin-provided themes."""
+        if self.theme_menu is None:
+            return
+
+        self.theme_menu.clear()
+
+        built_in_themes = [
+            ("Light", "light"),
+            ("Dark", "dark"),
+            ("High Contrast", "high_contrast"),
+        ]
+
+        for label, theme_key in built_in_themes:
+            action = QAction(label, self)
+            action.triggered.connect(lambda checked=False, key=theme_key: self.theme_manager.apply_theme(key))
+            self.theme_menu.addAction(action)
+
+        if getattr(self, "plugin_manager", None) is None:
+            return
+
+        theme_plugins = self.plugin_manager.get_plugins_by_type(PluginType.THEME)
+        if not theme_plugins:
+            return
+
+        self.theme_menu.addSeparator()
+
+        for plugin_info in theme_plugins:
+            action = QAction(plugin_info.metadata.name, self)
+            action.setCheckable(True)
+            action.setChecked(plugin_info.status == PluginStatus.ACTIVE)
+            action.triggered.connect(partial(self._on_theme_plugin_action_triggered, plugin_info.metadata.id))
+            self.theme_menu.addAction(action)
+
+    def _on_theme_plugin_action_triggered(self, plugin_id: str, checked=False):
+        """Toggle activation for a theme plugin when selected from the menu."""
+        if getattr(self, "plugin_manager", None) is None:
+            return
+
+        plugin_info = self.plugin_manager.get_plugin_info(plugin_id)
+        if plugin_info is None:
+            return
+
+        if plugin_info.status != PluginStatus.ACTIVE:
+            self.plugin_manager.activate_plugin(plugin_id)
+        else:
+            self.plugin_manager.deactivate_plugin(plugin_id)
+
+    def _refresh_theme_menu_from_plugins(self):
+        """Rebuild the theme menu to reflect current plugin state."""
+        self._populate_theme_menu()
+
+    def _refresh_toolbar_plugins(self):
+        """Update toolbar and menu metadata to reflect plugin counts."""
+        if getattr(self, "plugin_manager", None) is None:
+            return
+
+        total_plugins = len(self.plugin_manager.get_all_plugins())
+        active_plugins = len(self.plugin_manager.get_active_plugins())
+
+        suffix = ""
+        if total_plugins:
+            suffix = f" ({active_plugins} active / {total_plugins} installed)"
+
+        if self.extensions_toolbar_action is not None:
+            tooltip = "Open Extensions Manager dialog"
+            if suffix:
+                tooltip += suffix
+            self.extensions_toolbar_action.setToolTip(tooltip)
+
+        if self.extensions_action is not None:
+            status_tip = "Open the Extensions Manager dialog to manage plugins"
+            if suffix:
+                status_tip += f" — {active_plugins} active of {total_plugins} installed"
+            self.extensions_action.setStatusTip(status_tip)
+            self.extensions_action.setToolTip(status_tip)
+
+    def _refresh_plugin_integrations(self):
+        """Refresh UI elements that depend on plugin availability."""
+        self._refresh_theme_menu_from_plugins()
+        self._refresh_toolbar_plugins()
+
+    def _on_plugin_state_changed(self, plugin_id: str):
+        """Handle plugin load/unload/activation changes."""
+        self._refresh_plugin_integrations()
+
+        if getattr(self, "status_bar", None) is not None:
+            self.status_bar.set_status(f"Plugin updated: {plugin_id}")
+
+    def _on_plugin_error(self, plugin_id: str, error_message: str):
+        """Surface plugin errors in the status bar."""
+        if getattr(self, "status_bar", None) is not None:
+            self.status_bar.set_status(f"Plugin error: {plugin_id}")
         # --- GIT PANEL DIALOG ---
         self._ensure_git_dialog()
         self._update_git_repository()
