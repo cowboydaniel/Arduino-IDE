@@ -443,6 +443,13 @@ class MainWindow(QMainWindow):
         circuit_designer_action.triggered.connect(self.open_circuit_designer)
         tools_menu.addAction(circuit_designer_action)
 
+        tools_menu.addSeparator()
+
+        code_quality_action = QAction("Code Quality...", self)
+        code_quality_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_Q)
+        code_quality_action.triggered.connect(self.open_code_quality)
+        tools_menu.addAction(code_quality_action)
+
         # View Menu
         self.view_menu = menubar.addMenu("&View")
 
@@ -660,11 +667,6 @@ class MainWindow(QMainWindow):
         self.quick_actions_panel.serial_monitor_clicked.connect(self.toggle_serial_monitor)
         self.quick_actions_panel.serial_plotter_clicked.connect(self.toggle_plotter)
 
-        # --- DOCKED PANELS ---
-        self.code_quality_panel = CodeQualityPanel(self)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.code_quality_panel)
-        if self.view_menu:
-            self.view_menu.addAction(self.code_quality_panel.toggleViewAction())
         # Sync contextual help state with the initial Serial Monitor visibility
         self._broadcast_serial_monitor_state(self._is_serial_monitor_active())
 
@@ -1917,6 +1919,30 @@ void loop() {
 
         self.status_bar.set_status("Ready")
 
+    def open_code_quality(self):
+        """Open code quality analysis dialog"""
+        self.status_bar.set_status("Code Quality")
+
+        # Create dialog if it doesn't exist or was closed
+        if not self.code_quality_panel:
+            self.code_quality_panel = CodeQualityPanel(self)
+
+        # Get current code and analyze
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget and hasattr(current_widget, 'editor'):
+            code_text = current_widget.editor.toPlainText()
+        else:
+            code_text = ""
+
+        self.code_quality_panel.analyze_code(code_text)
+
+        # Show the dialog (non-modal)
+        self.code_quality_panel.show()
+        self.code_quality_panel.raise_()
+        self.code_quality_panel.activateWindow()
+
+        self.status_bar.set_status("Ready")
+
     def show_snippets_library(self):
         """Show code snippets library dialog"""
         # Create snippets dialog if it doesn't exist
@@ -2057,7 +2083,8 @@ void loop() {
 
     def _update_code_quality_panel(self):
         """Run static analysis on the current editor and refresh the panel."""
-        if not self.code_quality_panel:
+        # Only update if the dialog exists and is visible
+        if not self.code_quality_panel or not self.code_quality_panel.isVisible():
             return
 
         current_widget = self.editor_tabs.currentWidget()

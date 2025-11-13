@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple
 
 from PySide6.QtCore import QDateTime, Qt
 from PySide6.QtWidgets import (
-    QDockWidget,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 
-class CodeQualityPanel(QDockWidget):
+class CodeQualityPanel(QDialog):
     """Live code metrics and suggestions."""
 
     metrics: Dict[str, object] = {
@@ -31,17 +31,15 @@ class CodeQualityPanel(QDockWidget):
     }
 
     def __init__(self, parent=None):
-        super().__init__("Code Quality", parent)
-        self.setObjectName("CodeQualityPanel")
-        self.setAllowedAreas(
-            Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea
-        )
+        super().__init__(parent)
+        self.setWindowTitle("Code Quality")
+        self.setModal(False)
+        self.resize(450, 600)
 
         self.metrics = dict(self.metrics)  # Instance copy
         self.metric_widgets: Dict[str, object] = {}
 
-        container = QWidget()
-        layout = QVBoxLayout(container)
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
@@ -96,8 +94,7 @@ class CodeQualityPanel(QDockWidget):
         self.suggestions_list.setSelectionMode(QListWidget.NoSelection)
         layout.addWidget(self.suggestions_list)
 
-        container.setLayout(layout)
-        self.setWidget(container)
+        self.setLayout(layout)
 
         self.show_idle_state("Open or edit a sketch to analyze code quality.")
 
