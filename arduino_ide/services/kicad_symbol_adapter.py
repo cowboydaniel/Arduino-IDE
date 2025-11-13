@@ -31,7 +31,7 @@ _PIN_FUNCTION_MAP = {
     "power": PinType.POWER,
     "ground": PinType.GROUND,
 }
-_CACHE_VERSION = 1
+_CACHE_VERSION = 2  # Incremented for graphics support
 
 
 class KiCADSymbolAdapter:
@@ -145,6 +145,7 @@ class KiCADSymbolAdapter:
                 }
                 for pin in component.pins
             ],
+            "graphics": component.graphics,
         }
 
     def _component_from_cache(self, data: Dict[str, object]) -> ComponentDefinition:
@@ -165,6 +166,7 @@ class KiCADSymbolAdapter:
             width=float(data["width"]),
             height=float(data["height"]),
             pins=pins,
+            graphics=data.get("graphics", []),
             image_path=data.get("image_path"),
             description=data.get("description", ""),
             datasheet_url=data.get("datasheet_url"),
@@ -230,6 +232,9 @@ class KiCADSymbolAdapter:
             for record in pin_records
         ]
 
+        # Extract graphics elements from the symbol
+        graphics = self._collect_graphics(symbol_node, offset_x, offset_y)
+
         metadata = {
             "library": library_name,
             "library_path": str(library_path),
@@ -250,6 +255,7 @@ class KiCADSymbolAdapter:
             width=width,
             height=height,
             pins=pins,
+            graphics=graphics,
             image_path=None,
             description=description,
             datasheet_url=datasheet,
@@ -300,6 +306,224 @@ class KiCADSymbolAdapter:
             if isinstance(child, list) and child and child[0] == "pin":
                 nodes.append(child)
         return nodes
+
+    def _collect_graphics(self, symbol_node: List[object], offset_x: float, offset_y: float) -> List[Dict[str, object]]:
+        """Extract all graphics primitives from the symbol, with position offsets applied."""
+        graphics: List[Dict[str, object]] = []
+
+        # Graphics are in the unit sub-symbols (e.g., "Reference:R_Generic_0")
+        for child in symbol_node[2:]:
+            if isinstance(child, list) and child and child[0] == "symbol":
+                graphics.extend(self._extract_graphics_from_unit(child, offset_x, offset_y))
+
+        # If no graphics found in units, try the main symbol node
+        if not graphics:
+            graphics.extend(self._extract_graphics_from_unit(symbol_node, offset_x, offset_y))
+
+        return graphics
+
+    def _extract_graphics_from_unit(self, unit_node: List[object], offset_x: float, offset_y: float) -> List[Dict[str, object]]:
+        """Extract graphics primitives from a symbol unit node."""
+        graphics: List[Dict[str, object]] = []
+
+        for child in unit_node[1:]:
+            if not isinstance(child, list) or not child:
+                continue
+
+            element_type = str(child[0])
+
+            if element_type == "polyline":
+                graphic = self._parse_polyline(child, offset_x, offset_y)
+                if graphic:
+                    graphics.append(graphic)
+            elif element_type == "rectangle":
+                graphic = self._parse_rectangle(child, offset_x, offset_y)
+                if graphic:
+                    graphics.append(graphic)
+            elif element_type == "circle":
+                graphic = self._parse_circle(child, offset_x, offset_y)
+                if graphic:
+                    graphics.append(graphic)
+            elif element_type == "arc":
+                graphic = self._parse_arc(child, offset_x, offset_y)
+                if graphic:
+                    graphics.append(graphic)
+
+        return graphics
+
+    def _parse_polyline(self, node: List[object], offset_x: float, offset_y: float) -> Optional[Dict[str, object]]:
+        """Parse a polyline graphic element."""
+        points: List[Tuple[float, float]] = []
+        stroke_width = 0.254  # Default KiCad stroke width
+        fill_type = "none"
+
+        for child in node[1:]:
+            if not isinstance(child, list) or not child:
+                continue
+
+            if child[0] == "pts":
+                # Extract points from (xy x y) tuples
+                for pt_child in child[1:]:
+                    if isinstance(pt_child, list) and pt_child and pt_child[0] == "xy" and len(pt_child) >= 3:
+                        x = self._to_float(pt_child[1]) - offset_x
+                        y = self._to_float(pt_child[2]) - offset_y
+                        points.append((x, y))
+            elif child[0] == "stroke":
+                stroke_width = self._extract_stroke_width(child) or stroke_width
+            elif child[0] == "fill":
+                fill_type = self._extract_fill_type(child)
+
+        if not points:
+            return None
+
+        # Convert to renderer format
+        result = {
+            "type": "polygon",
+            "points": points,
+            "width": max(stroke_width, 0.254),  # Ensure minimum visible width
+            "pen": "#000000",  # Black stroke like KiCad
+        }
+
+        # Only add fill if it's not "none"
+        if fill_type and fill_type != "none":
+            result["fill"] = "#FAFAFA"  # Light gray fill like KiCad
+
+        return result
+
+    def _parse_rectangle(self, node: List[object], offset_x: float, offset_y: float) -> Optional[Dict[str, object]]:
+        """Parse a rectangle graphic element."""
+        start_x, start_y = 0.0, 0.0
+        end_x, end_y = 0.0, 0.0
+        stroke_width = 0.254  # Default KiCad stroke width
+        fill_type = "none"
+
+        for child in node[1:]:
+            if not isinstance(child, list) or not child:
+                continue
+
+            if child[0] == "start" and len(child) >= 3:
+                start_x = self._to_float(child[1]) - offset_x
+                start_y = self._to_float(child[2]) - offset_y
+            elif child[0] == "end" and len(child) >= 3:
+                end_x = self._to_float(child[1]) - offset_x
+                end_y = self._to_float(child[2]) - offset_y
+            elif child[0] == "stroke":
+                stroke_width = self._extract_stroke_width(child) or stroke_width
+            elif child[0] == "fill":
+                fill_type = self._extract_fill_type(child)
+
+        # Convert to renderer format (x, y, width, height)
+        x = min(start_x, end_x)
+        y = min(start_y, end_y)
+        width = abs(end_x - start_x)
+        height = abs(end_y - start_y)
+
+        result = {
+            "type": "rect",
+            "rect": [x, y, width, height],
+            "width": max(stroke_width, 0.254),  # Ensure minimum visible width
+            "pen": "#000000",  # Black stroke like KiCad
+        }
+
+        # Only add fill if it's not "none"
+        if fill_type and fill_type != "none":
+            result["fill"] = "#FAFAFA"  # Light gray fill like KiCad
+
+        return result
+
+    def _parse_circle(self, node: List[object], offset_x: float, offset_y: float) -> Optional[Dict[str, object]]:
+        """Parse a circle graphic element."""
+        center_x, center_y = 0.0, 0.0
+        radius = 0.0
+        stroke_width = 0.254  # Default KiCad stroke width
+        fill_type = "none"
+
+        for child in node[1:]:
+            if not isinstance(child, list) or not child:
+                continue
+
+            if child[0] == "center" and len(child) >= 3:
+                center_x = self._to_float(child[1]) - offset_x
+                center_y = self._to_float(child[2]) - offset_y
+            elif child[0] == "radius" and len(child) >= 2:
+                radius = self._to_float(child[1])
+            elif child[0] == "stroke":
+                stroke_width = self._extract_stroke_width(child) or stroke_width
+            elif child[0] == "fill":
+                fill_type = self._extract_fill_type(child)
+
+        result = {
+            "type": "circle",
+            "center": [center_x, center_y],
+            "radius": radius,
+            "width": max(stroke_width, 0.254),  # Ensure minimum visible width
+            "pen": "#000000",  # Black stroke like KiCad
+        }
+
+        # Only add fill if it's not "none"
+        if fill_type and fill_type != "none":
+            result["fill"] = "#FAFAFA"  # Light gray fill like KiCad
+
+        return result
+
+    def _parse_arc(self, node: List[object], offset_x: float, offset_y: float) -> Optional[Dict[str, object]]:
+        """Parse an arc graphic element.
+
+        KiCad uses 3-point arcs (start, mid, end). For simplicity, we approximate
+        with a polyline for now. A full implementation would calculate the center
+        and angles from the 3 points.
+        """
+        start_x, start_y = 0.0, 0.0
+        mid_x, mid_y = 0.0, 0.0
+        end_x, end_y = 0.0, 0.0
+        stroke_width = 0.254  # Default KiCad stroke width
+        fill_type = "none"
+
+        for child in node[1:]:
+            if not isinstance(child, list) or not child:
+                continue
+
+            if child[0] == "start" and len(child) >= 3:
+                start_x = self._to_float(child[1]) - offset_x
+                start_y = self._to_float(child[2]) - offset_y
+            elif child[0] == "mid" and len(child) >= 3:
+                mid_x = self._to_float(child[1]) - offset_x
+                mid_y = self._to_float(child[2]) - offset_y
+            elif child[0] == "end" and len(child) >= 3:
+                end_x = self._to_float(child[1]) - offset_x
+                end_y = self._to_float(child[2]) - offset_y
+            elif child[0] == "stroke":
+                stroke_width = self._extract_stroke_width(child) or stroke_width
+            elif child[0] == "fill":
+                fill_type = self._extract_fill_type(child)
+
+        # Approximate arc with a simple 3-point polyline
+        # TODO: Calculate proper arc center and angles for accurate rendering
+        result = {
+            "type": "polygon",
+            "points": [(start_x, start_y), (mid_x, mid_y), (end_x, end_y)],
+            "width": max(stroke_width, 0.254),
+            "pen": "#000000",
+        }
+
+        if fill_type and fill_type != "none":
+            result["fill"] = "#FAFAFA"
+
+        return result
+
+    def _extract_stroke_width(self, stroke_node: List[object]) -> float:
+        """Extract stroke width from a stroke node."""
+        for child in stroke_node[1:]:
+            if isinstance(child, list) and child and child[0] == "width" and len(child) >= 2:
+                return self._to_float(child[1])
+        return 0.0
+
+    def _extract_fill_type(self, fill_node: List[object]) -> str:
+        """Extract fill type from a fill node."""
+        for child in fill_node[1:]:
+            if isinstance(child, list) and child and child[0] == "type" and len(child) >= 2:
+                return str(child[1])
+        return "none"
 
     def _map_pin_type(self, pin_node: List[object]) -> PinType:
         function_name = pin_node[1] if len(pin_node) > 1 else ""
