@@ -82,6 +82,14 @@ void loop() {
 2. Click **→ Upload** to flash to your Arduino
 3. Watch the console for progress
 
+## Built-in Libraries Ready to Use
+
+On first launch the IDE automatically installs the same set of bundled
+libraries that ship with the classic Arduino 1.8 IDE (Servo, Wire, SD,
+Ethernet, LiquidCrystal, and many more). They are copied into the managed
+libraries folder (`~/.arduino-ide-modern/libraries`) so sketches can include
+headers like `#include <Servo.h>` immediately—no manual downloads required.
+
 ## Features to Explore
 
 ### Themes
