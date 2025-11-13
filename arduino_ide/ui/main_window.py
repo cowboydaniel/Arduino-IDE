@@ -626,15 +626,22 @@ class MainWindow(QMainWindow):
 
         # --- RIGHT COLUMN (Normal widgets, NOT docks) ---
         # Create right-side panel widgets
-        self.board_panel = BoardPanel()
         self.status_display = StatusDisplay()
-        self.context_panel = ContextPanel()
 
         # Add widgets to right column layout (NOT as dock widgets)
-        self.right_column_layout.addWidget(self.board_panel)
         self.right_column_layout.addWidget(self.status_display)
-        self.right_column_layout.addWidget(self.context_panel)
         self.right_column_layout.addStretch()
+
+        # --- DOCKED PANELS ---
+        self.board_panel = BoardPanel(self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.board_panel)
+        if self.view_menu:
+            self.view_menu.addAction(self.board_panel.toggleViewAction())
+
+        self.context_panel = ContextPanel(self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.context_panel)
+        if self.view_menu:
+            self.view_menu.addAction(self.context_panel.toggleViewAction())
 
         # --- BOTTOM TABS (Normal widgets in tabs, NOT docks) ---
         # Create bottom panels
