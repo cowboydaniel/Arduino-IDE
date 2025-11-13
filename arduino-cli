@@ -481,6 +481,103 @@ class ArduinoCLI:
 
         return custom_types
 
+    def _remove_invalid_global_control_flow(self, source: str) -> str:
+        """
+        Remove invalid global control flow statements (if/else if/else/while/for/switch)
+        that appear outside of function bodies.
+
+        The official Arduino IDE silently ignores these, but they cause compilation errors
+        in strict C++ mode. This function filters them out to maintain compatibility.
+
+        Args:
+            source: The sketch source code
+
+        Returns:
+            Source code with invalid global control flow statements removed
+        """
+        import re
+
+        lines = source.split('\n')
+        filtered_lines = []
+
+        # We need to track if we're inside a function to avoid removing valid statements
+        # This is a simple heuristic: count braces to track nesting level
+        brace_depth = 0
+        in_function = False
+
+        def is_control_flow_statement(line: str) -> bool:
+            """Check if a line is a control flow statement with semicolon body."""
+            line = line.strip()
+            if not line.endswith(';'):
+                return False
+
+            # Check for control flow keywords
+            control_keywords = ['if', 'else if', 'else', 'while', 'for', 'switch']
+
+            for keyword in control_keywords:
+                # Match keyword at start, possibly with whitespace
+                if keyword == 'else if':
+                    if re.match(r'^\s*else\s+if\s*\(', line):
+                        # Verify parentheses are balanced and line ends with );
+                        paren_count = 0
+                        for char in line:
+                            if char == '(':
+                                paren_count += 1
+                            elif char == ')':
+                                paren_count -= 1
+                        # If parentheses are balanced and line ends with ;, it's a control flow statement
+                        if paren_count == 0 and line.rstrip().endswith(');'):
+                            return True
+                elif keyword == 'else':
+                    if re.match(r'^\s*else\s*;', line):
+                        return True
+                elif keyword in ['if', 'while', 'for', 'switch']:
+                    if re.match(rf'^\s*{keyword}\s*\(', line):
+                        # Verify parentheses are balanced and line ends with );
+                        paren_count = 0
+                        for char in line:
+                            if char == '(':
+                                paren_count += 1
+                            elif char == ')':
+                                paren_count -= 1
+                        if paren_count == 0 and line.rstrip().endswith(');'):
+                            return True
+
+            return False
+
+        for line in lines:
+            # Track brace depth (simple heuristic for function bodies)
+            # This helps distinguish global scope from function scope
+            open_braces = line.count('{')
+            close_braces = line.count('}')
+
+            # Check if this line starts a function definition
+            # Pattern: return_type function_name(params) {
+            if re.match(r'^\s*(?:inline\s+|static\s+)?[a-zA-Z_][\w\s\*&:<>,]*\s+[a-zA-Z_]\w*\s*\([^)]*\)\s*\{', line):
+                in_function = True
+                brace_depth = 1  # Opening brace of function
+                filtered_lines.append(line)
+                continue
+
+            # Update brace depth
+            brace_depth += open_braces - close_braces
+
+            # If brace_depth goes to 0, we've exited all functions
+            if brace_depth <= 0:
+                in_function = False
+                brace_depth = 0
+
+            # Only filter out control flow statements at global scope
+            if not in_function:
+                if is_control_flow_statement(line):
+                    # Skip this invalid global statement
+                    continue
+
+            # Keep this line
+            filtered_lines.append(line)
+
+        return '\n'.join(filtered_lines)
+
     def _remove_prototypes_using_custom_types(self, source: str, custom_types: set) -> str:
         """Remove function prototypes that use custom types."""
         import re
@@ -745,6 +842,11 @@ class ArduinoCLI:
         # Remove any manual prototypes that use custom types from source_without_types
         # These will conflict if they appear before the type definitions
         source_without_types = self._remove_prototypes_using_custom_types(source_without_types, custom_types)
+
+        # Remove invalid global control flow statements (if/else if/else/while/for/switch)
+        # that appear outside function bodies. The official Arduino IDE ignores these,
+        # but they cause compilation errors in Arduino IDE Modern.
+        source_without_types = self._remove_invalid_global_control_flow(source_without_types)
 
         # Generate function prototypes (will skip functions using custom types)
         prototypes = self._generate_function_prototypes(source)
