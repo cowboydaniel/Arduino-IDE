@@ -3,7 +3,7 @@ Main window for Arduino IDE Modern
 """
 
 from functools import partial
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
@@ -35,6 +35,8 @@ from arduino_ide.ui.snippets_panel import SnippetsLibraryDialog
 from arduino_ide.ui.circuit_editor import CircuitDesignerWindow
 from arduino_ide.ui.onboarding_wizard import OnboardingWizard
 from arduino_ide.ui.git_panel import GitPanel
+from arduino_ide.ui.breakpoint_gutter import BreakpointGutter, install_breakpoint_gutter
+from arduino_ide.ui.debug_workspace_dialog import DebugWorkspaceDialog
 from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
@@ -50,6 +52,7 @@ from arduino_ide.ui.preferences_dialog import PreferencesDialog
 from arduino_ide.ui.unit_testing_panel import UnitTestingDialog
 from arduino_ide.ui.plugin_manager import PluginManagerWidget
 from arduino_ide.services.plugin_system import PluginManager, PluginType, PluginStatus
+from arduino_ide.services.debug_service import Breakpoint, DebugService, DebugState
 import re
 
 
@@ -206,6 +209,18 @@ class MainWindow(QMainWindow):
         self.plugin_manager_dialog = None
         self.git_panel = None
         self.git_dialog = None
+
+        # Debugger integration
+        self.debug_service = DebugService(self)
+        self.debug_service.state_changed.connect(self._on_debug_state_changed)
+        self.debug_service.error_occurred.connect(self._on_debug_error)
+        self.debug_service.breakpoint_added.connect(self._on_service_breakpoint_added)
+        self.debug_service.breakpoint_removed.connect(self._on_service_breakpoint_removed)
+        self.debug_service.breakpoint_updated.connect(self._on_service_breakpoint_updated)
+        self.debug_workspace_dialog: Optional[DebugWorkspaceDialog] = None
+        self._breakpoint_gutters: Dict[EditorContainer, BreakpointGutter] = {}
+        self._gutters_by_path: Dict[str, Set[BreakpointGutter]] = {}
+        self._create_debug_actions()
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
@@ -618,6 +633,10 @@ class MainWindow(QMainWindow):
         git_action = QAction("Git...", self)
         git_action.triggered.connect(self.open_git_dialog)
         tools_menu.addAction(git_action)
+        self.debugger_action = QAction("Debugger...", self)
+        self.debugger_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_D)
+        self.debugger_action.triggered.connect(self.show_debugger_dialog)
+        tools_menu.addAction(self.debugger_action)
         tools_menu.addSeparator()
 
         circuit_designer_action = QAction("Circuit Designer...", self)
@@ -642,12 +661,7 @@ class MainWindow(QMainWindow):
         tests_menu.addAction(self.run_selected_tests_action)
         tests_menu.addAction(self.stop_tests_action)
 
-        # View Menu
-        self.view_menu = menubar.addMenu("&View")
-
-        theme_menu = self.view_menu.addMenu("Theme")
         tools_menu.addSeparator()
-
         self.extensions_action = QAction("Extensions Manager...", self)
         self.extensions_action.setShortcut(Qt.CTRL | Qt.SHIFT | Qt.Key_E)
         self.extensions_action.setStatusTip("Open the Extensions Manager dialog to manage plugins")
@@ -659,17 +673,6 @@ class MainWindow(QMainWindow):
 
         self.theme_menu = self.view_menu.addMenu("Theme")
         self._populate_theme_menu()
-
-        # Debug Menu
-        debug_menu = menubar.addMenu("&Debug")
-
-        start_debug = QAction("Start Debugging", self)
-        start_debug.setShortcut(Qt.Key_F5)
-        debug_menu.addAction(start_debug)
-
-        toggle_breakpoint = QAction("Toggle Breakpoint", self)
-        toggle_breakpoint.setShortcut(Qt.Key_F9)
-        debug_menu.addAction(toggle_breakpoint)
 
         # Help Menu
         help_menu = menubar.addMenu("&Help")
@@ -1070,6 +1073,8 @@ class MainWindow(QMainWindow):
             lambda dirty, container=editor_container: self.on_editor_dirty_changed(container)
         )
 
+        self._attach_debugger_to_editor(editor_container)
+
         display_name = editor_container.current_display_name()
         index = self.editor_tabs.addTab(editor_container, display_name)
         self.editor_tabs.setTabToolTip(index, editor_container.filename)
@@ -1122,6 +1127,7 @@ void loop() {
                 if not self.save_file(index=index):
                     return
 
+        self._detach_debugger_from_editor(widget)
         self.editor_tabs.removeTab(index)
 
     def prompt_unsaved_changes(self, editor_container):
@@ -1201,6 +1207,226 @@ void loop() {
 
         return bool(getattr(self, "_compile_verbose_enabled", False))
 
+    # ------------------------------------------------------------------
+    # Debugger integration helpers
+
+    def _create_debug_actions(self) -> None:
+        """Create global debugger shortcuts and initial state."""
+
+        self.start_debug_action = QAction("Start/Continue Debugging", self)
+        self.start_debug_action.setShortcut(QKeySequence(Qt.Key_F5))
+        self.start_debug_action.triggered.connect(self._start_or_continue_debugging)
+
+        self.stop_debug_action = QAction("Stop Debugging", self)
+        self.stop_debug_action.setShortcut(QKeySequence(Qt.SHIFT | Qt.Key_F5))
+        self.stop_debug_action.triggered.connect(self.debug_service.stop_debugging)
+
+        self.pause_debug_action = QAction("Pause Debugging", self)
+        self.pause_debug_action.setShortcut(QKeySequence(Qt.Key_F6))
+        self.pause_debug_action.triggered.connect(self.debug_service.pause_execution)
+
+        self.step_over_action = QAction("Step Over", self)
+        self.step_over_action.setShortcut(QKeySequence(Qt.Key_F10))
+        self.step_over_action.triggered.connect(self.debug_service.step_over)
+
+        self.step_into_action = QAction("Step Into", self)
+        self.step_into_action.setShortcut(QKeySequence(Qt.Key_F11))
+        self.step_into_action.triggered.connect(self.debug_service.step_into)
+
+        self.step_out_action = QAction("Step Out", self)
+        self.step_out_action.setShortcut(QKeySequence(Qt.SHIFT | Qt.Key_F11))
+        self.step_out_action.triggered.connect(self.debug_service.step_out)
+
+        self.toggle_breakpoint_action = QAction("Toggle Breakpoint", self)
+        self.toggle_breakpoint_action.setShortcut(QKeySequence(Qt.Key_F9))
+        self.toggle_breakpoint_action.triggered.connect(self._toggle_breakpoint_at_cursor)
+
+        for action in (
+            self.start_debug_action,
+            self.stop_debug_action,
+            self.pause_debug_action,
+            self.step_over_action,
+            self.step_into_action,
+            self.step_out_action,
+            self.toggle_breakpoint_action,
+        ):
+            self.addAction(action)
+
+        self._update_debug_action_states(self.debug_service.state)
+
+    def _start_or_continue_debugging(self) -> None:
+        """Handle the Start/Continue shortcut."""
+
+        self.debug_service.start_debugging()
+
+    def _toggle_breakpoint_at_cursor(self) -> None:
+        """Toggle breakpoint at the current cursor line in the active editor."""
+
+        container = self.editor_tabs.currentWidget()
+        if not container:
+            return
+
+        gutter = self._breakpoint_gutters.get(container)
+        if not gutter:
+            return
+
+        file_path = container.file_path
+        if not file_path:
+            if getattr(self, "status_bar", None) is not None:
+                self.status_bar.set_status("Save the sketch before adding breakpoints.")
+            return
+
+        line_number = container.editor.textCursor().blockNumber() + 1
+        if gutter.has_breakpoint(line_number):
+            gutter.remove_breakpoint(line_number)
+        else:
+            gutter.add_breakpoint(line_number)
+
+    def _update_debug_action_states(self, state: DebugState) -> None:
+        """Enable or disable debugger shortcuts based on current state."""
+
+        start_enabled = state in (DebugState.IDLE, DebugState.DISCONNECTED, DebugState.CONNECTED)
+        stop_enabled = state not in (DebugState.IDLE, DebugState.DISCONNECTED)
+        pause_enabled = state == DebugState.RUNNING
+        stepping_enabled = state == DebugState.PAUSED
+
+        self.start_debug_action.setEnabled(start_enabled)
+        self.stop_debug_action.setEnabled(stop_enabled)
+        self.pause_debug_action.setEnabled(pause_enabled)
+        self.step_over_action.setEnabled(stepping_enabled)
+        self.step_into_action.setEnabled(stepping_enabled)
+        self.step_out_action.setEnabled(stepping_enabled)
+
+    def _on_debug_state_changed(self, state: DebugState) -> None:
+        self._update_debug_action_states(state)
+
+    def _on_debug_error(self, message: str) -> None:
+        if getattr(self, "status_bar", None) is not None:
+            self.status_bar.set_status(message)
+
+    def _on_service_breakpoint_added(self, breakpoint: Breakpoint) -> None:
+        self._refresh_gutters_for_path(breakpoint.file_path)
+
+    def _on_service_breakpoint_updated(self, breakpoint: Breakpoint) -> None:
+        self._refresh_gutters_for_path(breakpoint.file_path)
+
+    def _on_service_breakpoint_removed(self, breakpoint_id: int) -> None:  # noqa: ARG002
+        self._refresh_all_gutters()
+
+    def _refresh_gutters_for_path(self, file_path: Optional[str]) -> None:
+        if not file_path:
+            return
+
+        gutters = self._gutters_by_path.get(file_path)
+        if not gutters:
+            return
+
+        for gutter in list(gutters):
+            gutter.sync_with_debug_service(self.debug_service)
+
+    def _refresh_all_gutters(self) -> None:
+        for gutter in list(self._breakpoint_gutters.values()):
+            if getattr(gutter, "file_path", None):
+                gutter.sync_with_debug_service(self.debug_service)
+
+    def _attach_debugger_to_editor(self, editor_container: EditorContainer) -> None:
+        if editor_container in self._breakpoint_gutters:
+            return
+
+        gutter = install_breakpoint_gutter(editor_container.editor, self.debug_service)
+        gutter.breakpoint_added.connect(self._on_editor_breakpoint_added)
+        gutter.breakpoint_removed.connect(self._on_editor_breakpoint_removed)
+
+        self._breakpoint_gutters[editor_container] = gutter
+        self._sync_editor_breakpoints(editor_container)
+
+    def _detach_debugger_from_editor(self, editor_container: EditorContainer) -> None:
+        gutter = self._breakpoint_gutters.pop(editor_container, None)
+        if not gutter:
+            return
+
+        try:
+            gutter.breakpoint_added.disconnect(self._on_editor_breakpoint_added)
+        except Exception:
+            pass
+        try:
+            gutter.breakpoint_removed.disconnect(self._on_editor_breakpoint_removed)
+        except Exception:
+            pass
+
+        self._unregister_gutter(gutter)
+
+    def _unregister_gutter(self, gutter: BreakpointGutter) -> None:
+        existing_key = getattr(gutter, "_file_key", None)
+        if existing_key and existing_key in self._gutters_by_path:
+            gutters = self._gutters_by_path[existing_key]
+            gutters.discard(gutter)
+            if not gutters:
+                self._gutters_by_path.pop(existing_key, None)
+
+    def _sync_editor_breakpoints(self, editor_container: EditorContainer) -> None:
+        gutter = self._breakpoint_gutters.get(editor_container)
+        if not gutter:
+            return
+
+        # Remove previous registration
+        self._unregister_gutter(gutter)
+
+        file_path = editor_container.file_path
+        if file_path:
+            gutter.set_file_path(file_path)
+            gutter._file_key = file_path  # type: ignore[attr-defined]
+            self._gutters_by_path.setdefault(file_path, set()).add(gutter)
+            gutter.sync_with_debug_service(self.debug_service)
+        else:
+            gutter.set_file_path(None)
+            gutter._file_key = None  # type: ignore[attr-defined]
+
+    def _on_editor_breakpoint_added(self, file_path: str, line: int) -> None:
+        if not file_path:
+            return
+        self.debug_service.add_breakpoint(file_path, line)
+
+    def _on_editor_breakpoint_removed(self, file_path: str, line: int) -> None:
+        if not file_path:
+            return
+        breakpoint = self.debug_service.get_breakpoint_at_line(file_path, line)
+        if breakpoint:
+            self.debug_service.remove_breakpoint(breakpoint.id)
+
+    def _navigate_to_source(self, file_path: str, line: int) -> None:
+        if not file_path:
+            return
+
+        path = Path(file_path)
+        _, existing_container = self.find_editor_by_path(path)
+        if not existing_container:
+            self._open_file_path(path)
+            _, existing_container = self.find_editor_by_path(path)
+
+        if not existing_container:
+            return
+
+        self.editor_tabs.setCurrentWidget(existing_container)
+        editor = existing_container.editor
+        cursor = editor.textCursor()
+        block = editor.document().findBlockByNumber(max(line - 1, 0))
+        cursor.setPosition(block.position())
+        editor.setTextCursor(cursor)
+        editor.centerCursor()
+
+    def show_debugger_dialog(self, checked=False):  # noqa: ARG002
+        """Open (or focus) the debugger workspace dialog."""
+
+        if self.debug_workspace_dialog is None:
+            self.debug_workspace_dialog = DebugWorkspaceDialog(self.debug_service, self)
+            self.debug_workspace_dialog.breakpoints_panel.breakpoint_activated.connect(self._navigate_to_source)
+            self.debug_workspace_dialog.call_stack_panel.location_activated.connect(self._navigate_to_source)
+
+        self.debug_workspace_dialog.show()
+        self.debug_workspace_dialog.raise_()
+        self.debug_workspace_dialog.activateWindow()
+
     def new_file(self, checked=False):
         """Create new file"""
         self.create_new_editor()
@@ -1271,6 +1497,7 @@ void loop() {
 
         self.settings.setValue("lastSaveDir", str(path.parent))
         editor_container.set_file_path(path)
+        self._sync_editor_breakpoints(editor_container)
         editor_container.mark_clean()
         self.update_tab_title(index)
         self.add_recent_file(path)
@@ -1296,6 +1523,7 @@ void loop() {
         existing_index, existing_container = self.find_editor_by_path(path)
         if existing_container:
             existing_container.set_file_path(path)
+            self._sync_editor_breakpoints(existing_container)
             existing_container.set_content(contents, mark_clean=True)
             self.editor_tabs.setCurrentIndex(existing_index)
             self.update_status_bar_for_file(existing_container.filename)
@@ -1308,6 +1536,7 @@ void loop() {
                 mark_clean=True
             )
             editor_container.set_file_path(path)
+            self._sync_editor_breakpoints(editor_container)
 
         self.add_recent_file(path)
         self.status_bar.set_status(f"Opened {path.name}")
