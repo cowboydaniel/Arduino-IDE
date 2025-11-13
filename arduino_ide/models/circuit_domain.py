@@ -47,6 +47,9 @@ class Pin:
     label: str
     pin_type: PinType
     position: Tuple[float, float]
+    length: float = 20.0
+    orientation: str = "left"
+    decoration: str = "line"
 
 
 @dataclass
@@ -62,6 +65,9 @@ class ComponentDefinition:
     image_path: Optional[str] = None
     description: str = ""
     datasheet_url: Optional[str] = None
+    graphics: List[Dict[str, Any]] = field(default_factory=list)
+    units: List[Dict[str, Any]] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -71,6 +77,7 @@ class SymbolUnit:
     unit_id: str
     name: str
     pins: List[Pin] = field(default_factory=list)
+    graphics: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -102,6 +109,11 @@ class Sheet:
     symbol_units: Dict[str, SymbolUnit] = field(default_factory=dict)
     ports: Dict[str, HierarchicalPort] = field(default_factory=dict)
     instances: Dict[str, SheetInstance] = field(default_factory=dict)
+    parent_id: Optional[str] = None
+    properties: Dict[str, Any] = field(default_factory=dict)
+    children: List[str] = field(default_factory=list)
+    file_path: Optional[str] = None
+    embedded: bool = False
 
 
 @dataclass
@@ -116,6 +128,7 @@ class ComponentInstance:
     properties: Dict[str, Any] = field(default_factory=dict)
     annotation: Optional[str] = None
     sheet_path: Tuple[str, ...] = field(default_factory=tuple)
+    sheet_id: str = "root"
     unit_assignments: Dict[str, str] = field(default_factory=dict)
 
 
@@ -168,6 +181,7 @@ class Connection:
     to_component: str
     to_pin: str
     wire_color: str = "#000000"
+    connection_type: str = "wire"
     net_name: Optional[str] = None
 
 
