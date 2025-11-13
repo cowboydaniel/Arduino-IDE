@@ -7,6 +7,7 @@ import json
 import logging
 import hashlib
 import time
+from pathlib import Path
 from typing import Dict, List, Optional, Set, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -124,6 +125,10 @@ class CollaborationService(QObject):
 
         # Chat
         self._chat_history: List[ChatMessage] = []
+
+        # Active project context
+        self._active_project_path: Optional[str] = None
+        self._active_project_name: Optional[str] = None
 
         # Network (for future implementation)
         self._socket: Optional[QTcpSocket] = None
@@ -398,12 +403,72 @@ class CollaborationService(QObject):
         return self._chat_history.copy()
 
 
+    # ===== Project Context =====
+
+    def set_project(self, project_path: Optional[str], project_name: Optional[str] = None):
+        """Set or clear the active project for collaboration features."""
+
+        normalized_path: Optional[str]
+        if project_path:
+            try:
+                normalized_path = str(Path(project_path).resolve())
+            except Exception:  # pragma: no cover - guard against invalid paths
+                normalized_path = str(project_path)
+        else:
+            normalized_path = None
+
+        resolved_name: Optional[str] = project_name
+        if not resolved_name and normalized_path:
+            resolved_name = Path(normalized_path).name
+
+        state_changed = (
+            normalized_path != self._active_project_path
+            or resolved_name != self._active_project_name
+        )
+
+        self._active_project_path = normalized_path
+        self._active_project_name = resolved_name
+
+        if state_changed:
+            if normalized_path:
+                logger.info(
+                    "Active collaboration project set: %s (%s)",
+                    resolved_name or "",
+                    normalized_path,
+                )
+            else:
+                logger.info("Cleared active collaboration project context")
+
+    def get_active_project(self) -> tuple[Optional[str], Optional[str]]:
+        """Return the active project path and name."""
+
+        return self._active_project_path, self._active_project_name
+
+    def get_active_project_path(self) -> Optional[str]:
+        """Return the active project path if available."""
+
+        return self._active_project_path
+
+    def get_active_project_name(self) -> Optional[str]:
+        """Return the active project name if available."""
+
+        return self._active_project_name
+
+
     # ===== Project Sharing =====
 
-    def share_project(self, project_name: str, description: str = "", public: bool = False) -> SharedProject:
+    def share_project(
+        self,
+        project_name: Optional[str] = None,
+        description: str = "",
+        public: bool = False,
+    ) -> SharedProject:
         """Share a project for collaboration"""
         if not self._current_user:
             raise ValueError("No current user set")
+
+        if not project_name:
+            project_name = self._active_project_name or "Untitled Project"
 
         project_id = hashlib.sha256(
             f"{self._current_user.user_id}_{project_name}_{time.time()}".encode()

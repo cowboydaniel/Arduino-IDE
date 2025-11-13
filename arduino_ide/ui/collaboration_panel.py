@@ -214,7 +214,13 @@ class SharedProjectsWidget(QWidget):
     @Slot()
     def _on_share_project(self):
         """Share current project"""
-        name, ok = QInputDialog.getText(self, "Share Project", "Project name:")
+        default_name = self.service.get_active_project_name() or ""
+        name, ok = QInputDialog.getText(
+            self,
+            "Share Project",
+            "Project name:",
+            text=default_name,
+        )
 
         if ok and name:
             description, ok = QInputDialog.getText(self, "Share Project", "Description (optional):")
@@ -477,6 +483,12 @@ class CollaborationPanel(QWidget):
     def set_current_user(self, user_id: str, username: str):
         """Set current user"""
         self.service.set_current_user(user_id, username)
+
+
+    def set_project(self, project_path: Optional[str], project_name: Optional[str] = None):
+        """Update the active project used by collaboration features."""
+
+        self.service.set_project(project_path, project_name)
 
 
     def refresh_all(self):
