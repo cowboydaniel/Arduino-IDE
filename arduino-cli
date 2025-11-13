@@ -859,6 +859,7 @@ class ArduinoCLI:
             '-ffunction-sections',  # Place each function in its own section
             '-fdata-sections',  # Place each data item in its own section
             '-fno-threadsafe-statics',  # Reduce static initialization overhead
+            '-foperator-names',  # Enable alternative operator spellings
             '-Wno-error=narrowing',  # Don't error on narrowing conversions
             '-MMD',  # Generate dependency files
             '-flto',  # Enable link time optimization (C++ uses -flto without -fno-fat-lto-objects)
@@ -1016,7 +1017,8 @@ class ArduinoCLI:
                         lib_compile_flags.extend([
                             '-std=gnu++11', '-fpermissive', '-fno-exceptions',
                             '-ffunction-sections', '-fdata-sections',
-                            '-fno-threadsafe-statics', '-Wno-error=narrowing',
+                            '-fno-threadsafe-statics', '-foperator-names',
+                            '-Wno-error=narrowing',
                             '-MMD', '-flto', f'-mmcu={mcu}',
                         ])
                     else:  # .c file
@@ -1151,6 +1153,7 @@ class ArduinoCLI:
                         '-ffunction-sections',
                         '-fdata-sections',
                         '-fno-threadsafe-statics',
+                        '-foperator-names',
                         '-Wno-error=narrowing',
                         '-MMD',
                         '-flto',  # LTO for C++ without -fno-fat-lto-objects
