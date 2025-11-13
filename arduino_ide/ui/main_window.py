@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget, QDockWidget,
+    QMenuBar, QMenu, QToolBar, QStatusBar, QTabWidget,
     QComboBox, QLabel, QSizePolicy, QFileDialog, QMessageBox
 )
 from PySide6.QtCore import Qt, QSettings, QTimer, Signal
@@ -44,7 +44,9 @@ from arduino_ide.services import ArduinoCliService
 from arduino_ide.services.visual_programming_service import VisualProgrammingService
 from arduino_ide.ui.visual_programming_editor import VisualProgrammingEditor
 from arduino_ide.services.error_recovery import SmartErrorRecovery
+from arduino_ide.services.unit_testing_service import UnitTestingService
 from arduino_ide.ui.preferences_dialog import PreferencesDialog
+from arduino_ide.ui.unit_testing_panel import UnitTestingDialog
 import re
 
 
@@ -189,6 +191,11 @@ class MainWindow(QMainWindow):
         self.pin_usage_panel = None
         self.status_display = None
         self.console_panel = None
+        self.unit_testing_service = UnitTestingService()
+        self.unit_testing_panel = None
+        self.unit_testing_dialog = None
+        self._unit_testing_project_root: Optional[str] = None
+        self._unit_testing_actions_linked = False
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
@@ -227,6 +234,48 @@ class MainWindow(QMainWindow):
             library_manager=self.library_manager,
             board_manager=self.board_manager
         )
+        self.project_manager.project_loaded.connect(self._handle_project_loaded)
+        self.project_manager.project_saved.connect(self._handle_project_saved)
+        self.project_manager.dependencies_changed.connect(self._handle_project_dependencies_changed)
+
+        # Unit testing global actions (menus, toolbars, shortcuts)
+        self.discover_tests_action = QAction("Discover Tests", self)
+        self.discover_tests_action.setShortcut(QKeySequence("Ctrl+Shift+D"))
+        self.discover_tests_action.setToolTip("Discover unit tests in the active sketch directory")
+        self.discover_tests_action.setEnabled(False)
+        self.discover_tests_action.triggered.connect(self._discover_unit_tests)
+
+        self.run_all_tests_action = QAction("Run All Tests", self)
+        self.run_all_tests_action.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        self.run_all_tests_action.setToolTip("Run all discovered unit tests")
+        self.run_all_tests_action.setEnabled(False)
+        self.run_all_tests_action.triggered.connect(self._run_all_unit_tests)
+
+        self.run_selected_tests_action = QAction("Run Selected Test", self)
+        self.run_selected_tests_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
+        self.run_selected_tests_action.setToolTip("Run the selected test or suite in the Unit Testing panel")
+        self.run_selected_tests_action.setEnabled(False)
+        self.run_selected_tests_action.triggered.connect(self._run_selected_unit_tests)
+
+        self.stop_tests_action = QAction("Stop Tests", self)
+        self.stop_tests_action.setShortcut(QKeySequence("Ctrl+Shift+X"))
+        self.stop_tests_action.setToolTip("Stop running unit tests")
+        self.stop_tests_action.setEnabled(False)
+        self.stop_tests_action.triggered.connect(self._stop_unit_tests)
+
+        self.open_unit_testing_action = QAction("Unit Testing...", self)
+        self.open_unit_testing_action.setShortcut(QKeySequence("Ctrl+Shift+U"))
+        self.open_unit_testing_action.setToolTip("Open the Unit Testing dialog")
+        self.open_unit_testing_action.triggered.connect(self._show_unit_testing_dialog)
+
+        for action in (
+            self.discover_tests_action,
+            self.run_all_tests_action,
+            self.run_selected_tests_action,
+            self.stop_tests_action,
+            self.open_unit_testing_action,
+        ):
+            self.addAction(action)
 
         self._update_cli_library_paths()
 
@@ -512,6 +561,16 @@ class MainWindow(QMainWindow):
         code_quality_action.triggered.connect(self.open_code_quality)
         tools_menu.addAction(code_quality_action)
 
+        unit_testing_action = self.open_unit_testing_action
+        tools_menu.addAction(unit_testing_action)
+
+        # Tests Menu
+        tests_menu = menubar.addMenu("&Tests")
+        tests_menu.addAction(self.discover_tests_action)
+        tests_menu.addAction(self.run_all_tests_action)
+        tests_menu.addAction(self.run_selected_tests_action)
+        tests_menu.addAction(self.stop_tests_action)
+
         # View Menu
         self.view_menu = menubar.addMenu("&View")
 
@@ -677,6 +736,10 @@ class MainWindow(QMainWindow):
         circuit_btn.triggered.connect(self.open_circuit_designer)
         main_toolbar.addAction(circuit_btn)
 
+        main_toolbar.addSeparator()
+        self.run_all_tests_action.setIconText("🧪 Run Tests")
+        main_toolbar.addAction(self.run_all_tests_action)
+
     def create_dock_widgets(self):
         """Create panels (no dock widgets)"""
         # --- LEFT COLUMN (Normal widgets, NOT docks) ---
@@ -749,8 +812,17 @@ class MainWindow(QMainWindow):
         self.quick_actions_panel.serial_monitor_clicked.connect(self.toggle_serial_monitor)
         self.quick_actions_panel.serial_plotter_clicked.connect(self.toggle_plotter)
 
+        # --- UNIT TESTING DIALOG (Non-modal dialog) ---
+        if not self.unit_testing_dialog:
+            self.unit_testing_dialog = UnitTestingDialog(self.unit_testing_service, parent=self)
+            self.unit_testing_panel = self.unit_testing_dialog.panel
+        self._sync_unit_testing_actions()
+
         # Sync contextual help state with the initial Serial Monitor visibility
         self._broadcast_serial_monitor_state(self._is_serial_monitor_active())
+
+        # Prime unit testing service with the current sketch/project context
+        self._update_unit_testing_target(force_discover=True)
 
     def create_new_editor(self, filename="untitled.ino", *, file_path=None, content=None, mark_clean=False):
         """Create a new editor tab"""
@@ -797,6 +869,8 @@ class MainWindow(QMainWindow):
         # Trigger initial background compile for memory usage (after a short delay to ensure setup is complete)
         QTimer.singleShot(500, self._do_background_compile)
         self._update_code_quality_panel()
+
+        self._update_unit_testing_target()
 
         return editor_container
 
@@ -986,6 +1060,7 @@ void loop() {
         self.update_tab_title(index)
         self.add_recent_file(path)
         self.update_status_bar_for_file(editor_container.filename)
+        self._update_unit_testing_target(force_discover=True)
 
     def _open_file_path(self, path: Path):
         try:
@@ -1023,6 +1098,8 @@ void loop() {
 
         self.status_bar.set_status(f"Saved {path.name}")
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
+        self._update_unit_testing_target(force_discover=True)
 
         return True
 
@@ -2523,6 +2600,105 @@ void loop() {
         # No longer using estimation - background compilation updates memory
         pass
 
+    # ------------------------------------------------------------------
+    # Unit testing integration helpers
+    # ------------------------------------------------------------------
+    def _discover_unit_tests(self):
+        if not self.unit_testing_panel:
+            return
+        self._update_unit_testing_target(force_discover=True)
+        self.unit_testing_panel.discover_tests()
+
+    def _run_all_unit_tests(self):
+        if not self.unit_testing_panel:
+            return
+        self._update_unit_testing_target()
+        self.unit_testing_panel.run_all_tests()
+
+    def _run_selected_unit_tests(self):
+        if not self.unit_testing_panel:
+            return
+        self._update_unit_testing_target()
+        self.unit_testing_panel.run_selected()
+
+    def _stop_unit_tests(self):
+        if not self.unit_testing_panel:
+            return
+        self.unit_testing_panel.stop_tests()
+
+    def _show_unit_testing_dialog(self):
+        if not self.unit_testing_panel:
+            return
+        if not self.unit_testing_dialog:
+            self.unit_testing_dialog = UnitTestingDialog(self.unit_testing_service, parent=self)
+            self.unit_testing_panel = self.unit_testing_dialog.panel
+            self._unit_testing_actions_linked = False
+            self._sync_unit_testing_actions()
+        self._update_unit_testing_target()
+        self.unit_testing_dialog.show()
+        self.unit_testing_dialog.raise_()
+        self.unit_testing_dialog.activateWindow()
+
+    def _determine_unit_testing_root(self) -> Optional[Path]:
+        project_path = getattr(self.project_manager, "project_path", None)
+        if project_path:
+            return Path(project_path).resolve()
+
+        current_widget = self.editor_tabs.currentWidget()
+        file_path = getattr(current_widget, "file_path", None) if current_widget else None
+        if file_path:
+            return Path(file_path).resolve().parent
+
+        return None
+
+    def _update_unit_testing_target(self, *, force_discover=False):
+        if not self.unit_testing_panel:
+            return
+
+        root = self._determine_unit_testing_root()
+        if not root:
+            return
+
+        normalized = str(root)
+        path_changed = normalized != self._unit_testing_project_root
+
+        if path_changed:
+            self._unit_testing_project_root = normalized
+            self.unit_testing_panel.set_project_path(normalized)
+
+        if force_discover or path_changed:
+            if getattr(self.unit_testing_service, "running", False):
+                return
+            self.unit_testing_panel.discover_tests()
+
+    def _sync_unit_testing_actions(self):
+        if self._unit_testing_actions_linked or not self.unit_testing_panel:
+            return
+
+        def bind(source_action: QAction, target_action: QAction):
+            if not source_action or not target_action:
+                return
+            target_action.setEnabled(source_action.isEnabled())
+            source_action.changed.connect(
+                lambda *, s=source_action, t=target_action: t.setEnabled(s.isEnabled())
+            )
+
+        bind(self.unit_testing_panel.discover_action, self.discover_tests_action)
+        bind(self.unit_testing_panel.run_all_action, self.run_all_tests_action)
+        bind(self.unit_testing_panel.run_selected_action, self.run_selected_tests_action)
+        bind(self.unit_testing_panel.stop_action, self.stop_tests_action)
+
+        self._unit_testing_actions_linked = True
+
+    def _handle_project_loaded(self, _project_name):
+        self._update_unit_testing_target(force_discover=True)
+
+    def _handle_project_saved(self, _project_name):
+        self._update_unit_testing_target(force_discover=True)
+
+    def _handle_project_dependencies_changed(self):
+        self._update_unit_testing_target(force_discover=True)
+
     def on_tab_changed(self, index):
         """Handle tab change - update pin usage and status for new tab"""
         if index >= 0:
@@ -2536,6 +2712,7 @@ void loop() {
 
             # Trigger background compile for new tab (after a short delay)
             QTimer.singleShot(500, self._do_background_compile)
+            self._update_unit_testing_target()
 
     def update_cursor_position(self):
         """Update cursor position in status bar"""
