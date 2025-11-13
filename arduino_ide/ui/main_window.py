@@ -226,6 +226,13 @@ class MainWindow(QMainWindow):
             board_manager=self.board_manager
         )
 
+        self._update_cli_library_paths()
+
+        if hasattr(self.library_manager, "library_installed"):
+            self.library_manager.library_installed.connect(self._update_cli_library_paths)
+        if hasattr(self.library_manager, "library_uninstalled"):
+            self.library_manager.library_uninstalled.connect(self._update_cli_library_paths)
+
         # Track pending board list refreshes triggered by package changes.
         self._board_list_refresh_reason = ""
         self._board_list_refresh_pending = False
@@ -296,6 +303,16 @@ class MainWindow(QMainWindow):
 
         # Apply theme
         self.theme_manager.apply_theme("dark")
+
+    def _update_cli_library_paths(self, *_args):
+        """Synchronize the CLI's library search paths with the manager."""
+
+        try:
+            paths = self.library_manager.get_library_search_paths()
+        except Exception:
+            paths = []
+
+        self.cli_service.set_library_search_paths(paths)
 
     def init_ui(self):
         """Initialize the main UI"""

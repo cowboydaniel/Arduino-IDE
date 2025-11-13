@@ -146,22 +146,6 @@ class LibraryManager(QObject):
             self._scan_installed_libraries()
             self._save_installed_libraries()
 
-    def _ensure_builtin_libraries_available(self):
-        """Install bundled libraries from the AVR core on first run."""
-        if self.installed_libraries:
-            return
-
-        if self.libraries_dir.exists() and any(self.libraries_dir.iterdir()):
-            return
-
-        core_manager = CoreManager()
-        newly_installed = core_manager.ensure_builtin_libraries(self.libraries_dir, ensure_core=True)
-
-        if newly_installed:
-            # Rescan so the freshly installed libraries are indexed immediately
-            self._scan_installed_libraries()
-            self._save_installed_libraries()
-
     def _parse_library_properties(self, path: Path) -> Dict[str, str]:
         """Parse library.properties file"""
         props = {}
@@ -177,6 +161,21 @@ class LibraryManager(QObject):
         """Save installed libraries to file"""
         with open(self.installed_file, 'w', encoding='utf-8') as f:
             json.dump(self.installed_libraries, f, indent=2)
+
+    def get_library_search_paths(self) -> List[Path]:
+        """Return directories that should be exposed to ``arduino-cli``."""
+
+        search_paths: List[Path] = []
+
+        if self.libraries_dir:
+            search_paths.append(self.libraries_dir)
+
+        for path_hint in self.installed_library_paths.values():
+            candidate = Path(path_hint).parent
+            if candidate not in search_paths and candidate.exists():
+                search_paths.append(candidate)
+
+        return search_paths
 
     def _resolve_install_root(self, library_name: str) -> Optional[Path]:
         """Return the on-disk installation directory for a library if present."""

@@ -28,6 +28,14 @@ class ArduinoCliService(QObject):
         super().__init__(parent)
         self._process: Optional[QProcess] = None
         self._cli_path = (Path(__file__).resolve().parents[2] / "arduino-cli").resolve()
+        self._library_search_paths: List[Path] = []
+
+        # Default to the IDE's managed libraries directory so bundled libraries
+        # are available even before the UI wires up custom paths.  The folder is
+        # created lazily so ``arduino-cli`` always receives a valid location.
+        default_library_dir = Path.home() / ".arduino-ide-modern" / "libraries"
+        default_library_dir.mkdir(parents=True, exist_ok=True)
+        self._library_search_paths.append(default_library_dir)
 
     # ------------------------------------------------------------------
     # Public API
@@ -72,8 +80,39 @@ class ArduinoCliService(QObject):
         if optimize_for_debug:
             args.append("--optimize-for-debug")
 
+        for library_dir in self._library_search_paths:
+            try:
+                path = Path(library_dir)
+            except TypeError:
+                continue
+            if path.exists():
+                args.extend(["--libraries", str(path)])
+
         args.append(sketch_path)
         self._start_process(args)
+
+    def set_library_search_paths(self, paths: Iterable[Path]) -> None:
+        """Configure additional library directories for compilation commands."""
+
+        unique_paths: List[Path] = []
+        for raw_path in paths:
+            path = Path(raw_path)
+            if path not in unique_paths:
+                path.mkdir(parents=True, exist_ok=True)
+                unique_paths.append(path)
+
+        # Always keep the default managed directory at the front of the list so
+        # caller supplied paths augment (rather than replace) the standard
+        # location.  This mirrors how ``arduino-cli`` merges ``--libraries``
+        # arguments with the sketchbook library tree.
+        default_dir = Path.home() / ".arduino-ide-modern" / "libraries"
+        default_dir.mkdir(parents=True, exist_ok=True)
+
+        self._library_search_paths = [default_dir]
+        for path in unique_paths:
+            if path == default_dir:
+                continue
+            self._library_search_paths.append(path)
 
     def run_upload(self, sketch_path: str, fqbn: str, port: str, *, build_path: Optional[str] = None,
                    verify: bool = False) -> None:
