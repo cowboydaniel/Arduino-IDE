@@ -3,7 +3,7 @@ Pin Usage Overview Panel
 Shows which pins are being used in the current sketch
 """
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QSizePolicy
 from arduino_ide.ui.pin_usage_widget import PinUsageWidget
 
 
@@ -20,6 +20,8 @@ class PinUsagePanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.pin_usage_widget = PinUsageWidget()
+        self.pin_usage_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         layout.addWidget(self.pin_usage_widget)
 
     def set_board(self, board):

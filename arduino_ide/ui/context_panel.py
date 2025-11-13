@@ -4,7 +4,8 @@ Shows contextual information about Arduino functions when clicked
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QGroupBox, QTextBrowser
+    QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QGroupBox, QTextBrowser,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QTextCursor
@@ -18,6 +19,7 @@ class ContextPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_context = None
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         self.init_ui()
 
     def init_ui(self):
