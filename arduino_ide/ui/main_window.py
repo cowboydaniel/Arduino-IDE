@@ -15,6 +15,7 @@ from pathlib import Path
 from arduino_ide.ui.code_editor import CodeEditor, BreadcrumbBar, CodeMinimap
 from arduino_ide.ui.serial_monitor import SerialMonitor
 from arduino_ide.ui.board_panel import BoardPanel
+from arduino_ide.ui.pin_usage_panel import PinUsagePanel
 from arduino_ide.ui.console_panel import ConsolePanel
 from arduino_ide.ui.status_display import StatusDisplay
 from arduino_ide.ui.context_panel import ContextPanel
@@ -626,17 +627,19 @@ class MainWindow(QMainWindow):
 
         # --- RIGHT COLUMN (Normal widgets, NOT docks) ---
         # Create right-side panel widgets
+        self.board_panel = BoardPanel()
         self.status_display = StatusDisplay()
 
         # Add widgets to right column layout (NOT as dock widgets)
+        self.right_column_layout.addWidget(self.board_panel)
         self.right_column_layout.addWidget(self.status_display)
         self.right_column_layout.addStretch()
 
         # --- DOCKED PANELS ---
-        self.board_panel = BoardPanel(self)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.board_panel)
+        self.pin_usage_panel = PinUsagePanel(self)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.pin_usage_panel)
         if self.view_menu:
-            self.view_menu.addAction(self.board_panel.toggleViewAction())
+            self.view_menu.addAction(self.pin_usage_panel.toggleViewAction())
 
         self.context_panel = ContextPanel(self)
         self.addDockWidget(Qt.RightDockWidgetArea, self.context_panel)
@@ -1631,7 +1634,7 @@ void loop() {
         # Update board panel with Board object
         if board:
             self.board_panel.update_board_info(board)
-            self.board_panel.set_board(board)
+            self.pin_usage_panel.set_board(board)
         # Update status display with new board specs
         self.status_display.update_board(board_name)
         # Update status bar
@@ -2106,7 +2109,7 @@ void loop() {
         current_widget = self.editor_tabs.currentWidget()
         if current_widget and hasattr(current_widget, 'editor'):
             code_text = current_widget.editor.toPlainText()
-            self.board_panel.update_pin_usage(code_text)
+            self.pin_usage_panel.update_pin_usage(code_text)
 
     def update_status_display(self):
         """DEPRECATED: Now uses background compilation instead of estimates.
@@ -2165,7 +2168,7 @@ void loop() {
         # Set initial board for pin widget
         board = self._get_selected_board()
         if board:
-            self.board_panel.set_board(board)
+            self.pin_usage_panel.set_board(board)
 
         # Set initial port
         current_port = self.port_selector.currentText()

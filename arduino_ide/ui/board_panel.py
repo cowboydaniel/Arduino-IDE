@@ -4,27 +4,21 @@ Board information and selection panel
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QComboBox,
-    QGroupBox, QFormLayout, QDockWidget
+    QGroupBox, QFormLayout
 )
 from PySide6.QtCore import Qt
-from arduino_ide.ui.pin_usage_widget import PinUsageWidget
 
 
-class BoardPanel(QDockWidget):
+class BoardPanel(QWidget):
     """Panel showing board information and configuration"""
 
     def __init__(self, parent=None):
-        super().__init__("Board & Pin Usage", parent)
-        self.setObjectName("BoardPanel")
-        self.setAllowedAreas(
-            Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea
-        )
+        super().__init__(parent)
         self.init_ui()
 
     def init_ui(self):
         """Initialize UI"""
-        container = QWidget()
-        layout = QVBoxLayout(container)
+        layout = QVBoxLayout(self)
 
         # Board selection
         board_group = QGroupBox("Board")
@@ -69,13 +63,7 @@ class BoardPanel(QDockWidget):
         info_group.setLayout(info_layout)
         layout.addWidget(info_group)
 
-        # Pin usage overview
-        self.pin_usage_widget = PinUsageWidget()
-        layout.addWidget(self.pin_usage_widget)
-
         layout.addStretch()
-
-        self.setWidget(container)
 
     def update_board_info(self, board):
         """Update board information based on selected board.
@@ -109,19 +97,3 @@ class BoardPanel(QDockWidget):
     def set_port(self, port):
         """Set connected port"""
         self.port_label.setText(port)
-
-    def set_board(self, board):
-        """Set the current board
-
-        Args:
-            board: Board object from arduino_ide.models.board
-        """
-        self.pin_usage_widget.set_board(board)
-
-    def update_pin_usage(self, code_text):
-        """Update pin usage overview from code
-
-        Args:
-            code_text: Arduino sketch code as string
-        """
-        self.pin_usage_widget.update_from_code(code_text)
