@@ -22,7 +22,7 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 ### Key Highlights
 
 - **32,801+ lines** of Python code
-- **2,491 electronic components** in the circuit library
+- **KiCAD-backed component catalog** with rich symbol coverage
 - **All 6 development phases completed** (Core, Advanced Editing, Build System, Debugging, Advanced Features, Professional Tools)
 - **35 UI modules** and **25 service modules** providing complete IDE functionality
 - **Plugin system** for extensibility
@@ -86,7 +86,7 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 
 #### Circuit Design
 - Visual circuit editor with drag-and-drop components
-- Comprehensive component library (2,491 components):
+- KiCAD-powered component catalog with rich symbol coverage:
   - Arduino boards (Uno, Mega, Nano, etc.)
   - LEDs, resistors, capacitors, transistors
   - Integrated circuits (logic gates, op-amps, timers)
@@ -261,7 +261,6 @@ Arduino-IDE/
 │   │   └── ...               # 21+ more services
 │   │
 │   ├── models/               # Data models
-│   ├── component_library/    # 2,491 electronic components (JSON)
 │   ├── resources/            # Templates and snippets
 │   ├── cores/                # Arduino core definitions
 │   ├── data/                 # API reference data
@@ -369,7 +368,6 @@ pytest --cov=arduino_ide
 - Unit tests for services and components
 - Integration tests for library/board management
 - Feature tests for specific functionality
-- Component library validation tests
 
 ---
 
@@ -392,9 +390,6 @@ Comprehensive documentation is available in the repository:
 - **[DEBUGGING_INTEGRATION.md](DEBUGGING_INTEGRATION.md)**: Debug system integration
 - **[PHASE5_INTEGRATION.md](PHASE5_INTEGRATION.md)**: Visual programming, circuits, Git, collaboration, plugins
 - **[PHASE6_INTEGRATION.md](PHASE6_INTEGRATION.md)**: Testing, CI/CD, profiling, power analysis
-
-### Component Library
-- **[component_library/README.md](arduino_ide/component_library/README.md)**: Component file format
 
 ---
 
@@ -577,7 +572,7 @@ Advanced code editing with syntax highlighting, auto-completion, and error detec
 Block-based programming interface for beginners and rapid prototyping.
 
 ### Circuit Designer
-Drag-and-drop circuit design with extensive component library.
+Drag-and-drop circuit design powered by KiCAD symbol libraries.
 
 ### Debug Interface
 Professional debugging with breakpoints, call stack, and memory profiling.
@@ -592,7 +587,6 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 - Initial release
 - All 6 development phases completed
 - 32,801+ lines of Python code
-- 2,491 electronic components
 - Comprehensive testing and documentation
 
 ---
