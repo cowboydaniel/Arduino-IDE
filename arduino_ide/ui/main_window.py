@@ -1493,6 +1493,27 @@ void loop() {
 
         for board in cli_boards:
             if board.name == board_name or board.fqbn == board_name:
+                enriched_board = None
+                fqbn = getattr(board, "fqbn", "")
+
+                if fqbn:
+                    try:
+                        enriched_board = self.board_manager.get_board(fqbn)
+                    except Exception:
+                        enriched_board = None
+
+                if enriched_board:
+                    # Update cache so downstream consumers reuse enriched metadata
+                    try:
+                        index = cli_boards.index(board)
+                        cli_boards[index] = enriched_board
+                        self._cli_boards = cli_boards
+                    except ValueError:
+                        # Board might have been duplicated; append enriched definition
+                        cli_boards.append(enriched_board)
+                        self._cli_boards = cli_boards
+                    return enriched_board
+
                 return board
 
         return None
