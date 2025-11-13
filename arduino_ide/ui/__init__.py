@@ -5,7 +5,6 @@ from .code_editor import CodeEditor
 from .console_panel import ConsolePanel
 from .serial_monitor import SerialMonitor
 from .board_panel import BoardPanel
-from .project_explorer import ProjectExplorer
 from .variable_watch import VariableWatch
 from .status_display import StatusDisplay
 from .plotter_panel import PlotterPanel
@@ -22,7 +21,6 @@ __all__ = [
     'ConsolePanel',
     'SerialMonitor',
     'BoardPanel',
-    'ProjectExplorer',
     'VariableWatch',
     'StatusDisplay',
     'PlotterPanel',
