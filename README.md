@@ -43,7 +43,12 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 - Auto-indentation optimized for embedded development
 - IntelliSense with clangd integration
 - Code completion and smart suggestions
-- Code snippets library
+- **Code Snippets Library**:
+  - Category-based organization (Basic Structure, Digital I/O, Analog I/O, Serial Communication, etc.)
+  - Cursor positioning with placeholders ($0)
+  - Tab stops for parameter entry (${1:default})
+  - Search and filter snippets
+  - Custom snippet insertion
 - Code folding
 - Multi-file tabbed editing
 - Find and replace with regex support
@@ -91,16 +96,36 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
   - Missing pinMode warnings
   - Delay optimization suggestions
   - Analog pin usage recommendations
-- **Problem Panel**: Centralized error and warning tracking
+- **Problems Panel**: Centralized error and warning tracking
+  - Filter by severity (All, Errors Only, Warnings Only, Info Only)
+  - Double-click to jump to code location
+  - Problem count tracking
+  - Clear all functionality
+  - File, line number, and message display
 - **Git Change Highlighting**: Visual indicators for modified code
+- **Built-in API Reference**:
+  - **Arduino API Reference**: Comprehensive function reference with syntax, parameters, examples, warnings, and tips
+  - **C++ Language Reference**: Complete C++ data types, keywords, operators with platform-specific guidance
 
 #### Debugging
 - **Full GDB/MI Protocol Support**: Professional debugging capabilities
+- **Debug Workspace Dialog**: Unified debugging interface with integrated panels
 - **Breakpoint Management**: Visual breakpoint indicators in editor gutter
+  - Line, function, and conditional breakpoints
+  - Breakpoint hit count tracking
+  - Enable/disable individual breakpoints
 - **Call Stack Panel**: Stack trace visualization and frame navigation
 - **Variable Watch**: Monitor custom variables with real-time updates
+  - Variable type information
+  - Scope tracking (local, global)
+  - Address display
+  - Variable hierarchy for nested structures
 - **Memory Profiler**: RAM, Flash, Stack, and Heap monitoring
+  - Free/used memory calculation
+  - Memory region visualization
+  - Fragmentation tracking
 - **Execution Timeline**: Event tracking and chronological logging
+  - Breakpoint events, step events, function calls/returns
 - **Debug Toolbar**: Step over/into/out, continue, pause controls
 - Enhanced debug compilation with symbol generation
 
@@ -270,7 +295,11 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 #### Workspace
 - Dockable panels for flexible layouts
 - Project explorer with file tree navigation
-- Board information panel with hardware specifications
+- **Board Information Panel**: Comprehensive hardware specifications display
+  - Core specs (CPU, clock, flash, RAM, voltage, digital/PWM pins)
+  - Connectivity features (WiFi, Bluetooth, USB support)
+  - Advanced features (ADC resolution, DAC, touch pins, RTC, sleep mode)
+  - Power consumption metrics (typical and maximum)
 - Console panel for build output
 - Variable watch panel
 - Status bar with real-time information
@@ -281,7 +310,12 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 - **Pin Usage Panel**: Visual pin usage tracking and availability
 - **Onboarding Wizard**: Guided first-time setup and feature introduction
 - **Preferences Dialog**: Comprehensive application settings and configuration
-- Example templates for quick project setup
+- **Example Templates**: Pre-built project templates
+  - Basic sketch structure
+  - Button control
+  - Sensor reading
+  - LED patterns
+  - Serial communication examples
 
 ---
 
@@ -426,9 +460,27 @@ Arduino-IDE/
 │   │   └── ...               # 14+ more services
 │   │
 │   ├── models/               # Data models and structures
-│   ├── resources/            # Templates and snippets
+│   │   ├── board.py          # Board model with specifications
+│   │   ├── library.py        # Library model
+│   │   ├── package.py        # Package model
+│   │   └── circuit_domain.py # Circuit design models
+│   │
+│   ├── resources/            # Templates and resources
+│   │   ├── snippets/         # Code snippets library
+│   │   │   └── arduino_snippets.json # Organized snippet database
+│   │   └── templates/        # Project templates (.ino files)
+│   │
 │   ├── cores/                # Arduino core definitions
-│   ├── data/                 # API reference data
+│   │
+│   ├── data/                 # Built-in reference databases
+│   │   ├── arduino_api_reference.py # Arduino function reference
+│   │   └── cpp_reference.py # C++ language reference
+│   │
+│   ├── eeschema/             # Circuit schematic infrastructure
+│   │   ├── erc/              # Electrical Rules Checking engine
+│   │   ├── sch_io/           # Schematic I/O (JSON, KiCAD formats)
+│   │   └── connection_graph.py # Circuit connection analysis
+│   │
 │   ├── utils/                # Utility functions
 │   ├── main.py               # Application entry point
 │   └── config.py             # Configuration constants
@@ -702,18 +754,23 @@ Component Library (KiCAD) → Circuit Service → ERC Engine
 
 ## Statistics
 
-- **127+ Python files**
+- **101 Python files** (not counting test files)
 - **32,801+ lines of Python code**
-- **2,000+ KiCAD component definitions**
+- **2,000+ KiCAD component definitions** for circuit design
 - **22 Markdown documentation files**
-- **40+ test files**
+- **40+ test files** with comprehensive coverage
 - **41 UI modules** with 92+ UI classes
 - **29 service modules** providing comprehensive functionality
-- **50+ visual programming blocks**
+- **50+ visual programming blocks** across multiple categories
+- **Comprehensive snippet library** with organized categories
+- **5 project templates** for quick start
+- **Arduino API Reference**: 100+ functions documented
+- **C++ Language Reference**: 50+ data types, keywords, and operators
 - **15 assertion types** for unit testing
 - **8 signal types** for HIL testing
 - **8 plugin types** supported
 - **6 CI/CD platforms** integrated
+- **3 built-in themes** with custom theme support
 
 ---
 
