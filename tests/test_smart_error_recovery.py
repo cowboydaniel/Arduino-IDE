@@ -42,3 +42,34 @@ def test_unknown_error_returns_generic_advice():
     assert len(suggestions) == 1
     assert suggestions[0].issue == "unknown"
     assert suggestions[0].suggestions  # Should provide fallback guidance
+
+
+def test_expected_unqualified_id_else_hint():
+    recovery = SmartErrorRecovery()
+
+    suggestions = recovery.analyze_compile_error(
+        "error: expected unqualified-id before 'else'"
+    )
+
+    matches = [
+        s for s in suggestions if s.issue == "expected unqualified-id before 'else'"
+    ]
+    assert matches, "Should offer advice for stray else blocks"
+    assert any("matching if" in suggestion for suggestion in matches[0].suggestions)
+    assert any(
+        "function" in suggestion for suggestion in matches[0].suggestions
+    ), "Should explain that newer toolchains require the chain to live inside a function"
+
+
+def test_expected_unqualified_id_paren_hint():
+    recovery = SmartErrorRecovery()
+
+    suggestions = recovery.analyze_compile_error(
+        "error: expected unqualified-id before ')' token"
+    )
+
+    matches = [
+        s for s in suggestions if s.issue == "expected unqualified-id before ')' token"
+    ]
+    assert matches, "Should provide guidance for missing identifiers before parentheses"
+    assert any("identifier" in suggestion for suggestion in matches[0].suggestions)

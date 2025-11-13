@@ -35,6 +35,15 @@ class SmartErrorRecovery:
                 "Reduce buffer sizes",
                 "Optimize String usage",
             ],
+            "expected unqualified-id before 'else'": [
+                "Ensure each else follows a matching if block",
+                "Remove stray semicolons or braces before the else",
+                "Make sure the if/else chain lives inside a function like loop(); Arduino IDE 1.8's preprocessor sometimes hid that issue",
+            ],
+            "expected unqualified-id before ')' token": [
+                "Verify there is an identifier before the parentheses",
+                "Check for macros or functions that may need a preceding declaration",
+            ],
         }
         self._fallback_suggestions = [
             "Double-check the line referenced in the compiler output",
