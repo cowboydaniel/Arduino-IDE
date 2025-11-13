@@ -21,6 +21,11 @@ from PySide6.QtGui import QFont, QAction
 
 from ..models import Board, BoardPackage, BoardCategory
 from ..services.board_manager import BoardManager
+from .board_formatting import (
+    format_board_features,
+    format_board_power,
+    format_board_specifications,
+)
 
 
 class BoardComparisonDialog(QDialog):
@@ -298,27 +303,27 @@ class BoardDetailView(QWidget):
         self.title_label.setText(board.name)
         self.desc_label.setText(board.description)
 
-        # Specs
-        self.cpu_label.setText(board.specs.cpu)
-        self.clock_label.setText(board.specs.clock)
-        self.flash_label.setText(board.specs.flash)
-        self.ram_label.setText(board.specs.ram)
-        self.voltage_label.setText(board.specs.voltage)
-        self.pins_label.setText(f"{board.specs.digital_pins} (PWM: {board.specs.pwm_pins})")
+        specs = format_board_specifications(board)
+        self.cpu_label.setText(specs["cpu"])
+        self.clock_label.setText(specs["clock"])
+        self.flash_label.setText(specs["flash"])
+        self.ram_label.setText(specs["ram"])
+        self.voltage_label.setText(specs["voltage"])
+        self.pins_label.setText(specs["digital_pins"])
 
-        # Features
-        self.wifi_label.setText("✅ Yes" if board.specs.wifi else "❌ No")
-        self.bluetooth_label.setText("✅ Yes" if board.specs.bluetooth else "❌ No")
-        self.usb_label.setText("✅ Yes" if board.specs.usb else "❌ No")
-        self.adc_label.setText(board.specs.adc_resolution)
-        self.dac_label.setText("✅ Yes" if board.specs.dac else "❌ No")
-        self.touch_label.setText(str(board.specs.touch_pins) if board.specs.touch_pins > 0 else "❌ No")
-        self.rtc_label.setText("✅ Yes" if board.specs.rtc else "❌ No")
-        self.sleep_label.setText("✅ Yes" if board.specs.sleep_mode else "❌ No")
+        features = format_board_features(board)
+        self.wifi_label.setText(features["wifi"])
+        self.bluetooth_label.setText(features["bluetooth"])
+        self.usb_label.setText(features["usb"])
+        self.adc_label.setText(features["adc"])
+        self.dac_label.setText(features["dac"])
+        self.touch_label.setText(features["touch"])
+        self.rtc_label.setText(features["rtc"])
+        self.sleep_label.setText(features["sleep"])
 
-        # Power
-        self.power_typical_label.setText(board.specs.power_typical)
-        self.power_max_label.setText(board.specs.power_max)
+        power = format_board_power(board)
+        self.power_typical_label.setText(power["typical"])
+        self.power_max_label.setText(power["maximum"])
 
         # Best for
         if board.best_for:
