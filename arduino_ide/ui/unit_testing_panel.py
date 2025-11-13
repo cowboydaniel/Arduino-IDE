@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem, QLabel, QComboBox, QSpinBox, QCheckBox,
     QGroupBox, QProgressBar, QTextEdit, QTabWidget, QTableWidget,
     QTableWidgetItem, QHeaderView, QSplitter, QToolBar, QLineEdit,
-    QFileDialog, QMessageBox
+    QFileDialog, QMessageBox, QDialog
 )
 from PySide6.QtGui import QIcon, QColor, QBrush, QAction, QFont
 
@@ -688,3 +688,38 @@ class UnitTestingPanel(QWidget):
     def set_project_path(self, path: str):
         """Set project path"""
         self.testing_service.set_project_path(path)
+
+    # ------------------------------------------------------------------
+    # Public helpers used by external UI components (menus, toolbars)
+    # ------------------------------------------------------------------
+    def discover_tests(self):
+        """Trigger a fresh test discovery run."""
+        self._on_discover_tests()
+
+    def run_all_tests(self):
+        """Execute all discovered tests."""
+        self._on_run_all_tests()
+
+    def run_selected(self):
+        """Execute the currently selected test or suite."""
+        self._on_run_selected()
+
+    def stop_tests(self):
+        """Stop any running test jobs."""
+        self._on_stop_tests()
+
+
+class UnitTestingDialog(QDialog):
+    """Container dialog embedding the unit testing panel."""
+
+    def __init__(self, service: UnitTestingService, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Unit Testing")
+        self.setModal(False)
+        self.setAttribute(Qt.WA_DeleteOnClose, False)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self.panel = UnitTestingPanel(service, parent=self)
+        layout.addWidget(self.panel)
