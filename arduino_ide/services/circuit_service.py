@@ -1268,6 +1268,114 @@ class CircuitService(QObject):
         )
         self._connections[connection.connection_id] = connection
 
+    # ------------------------------------------------------------------
+    # State management helpers for undo/redo and tests
+    # ------------------------------------------------------------------
+    def export_circuit_state(self) -> Dict[str, Any]:
+        return {
+            "components": [
+                {
+                    "instance_id": c.instance_id,
+                    "definition_id": c.definition_id,
+                    "x": c.x,
+                    "y": c.y,
+                    "rotation": c.rotation,
+                    "properties": copy.deepcopy(c.properties),
+                    "sheet_id": c.sheet_id,
+                }
+                for c in self._components.values()
+            ],
+            "connections": [
+                {
+                    "connection_id": c.connection_id,
+                    "from_component": c.from_component,
+                    "from_pin": c.from_pin,
+                    "to_component": c.to_component,
+                    "to_pin": c.to_pin,
+                    "wire_color": c.wire_color,
+                    "connection_type": c.connection_type,
+                }
+                for c in self._connections.values()
+            ],
+            "sheets": [
+                {
+                    "sheet_id": s.sheet_id,
+                    "name": s.name,
+                    "parent_id": s.parent_id,
+                    "file_path": s.file_path,
+                    "embedded": s.embedded,
+                }
+                for s in self._sheets.values()
+            ],
+            "active_sheet": self._active_sheet_id,
+        }
+
+    def load_circuit_state(self, state: Dict[str, Any]):
+        self.clear_circuit()
+        self._sheets.clear()
+
+        for comp_data in state.get("components", []):
+            component = ComponentInstance(
+                instance_id=comp_data["instance_id"],
+                definition_id=comp_data["definition_id"],
+                x=comp_data["x"],
+                y=comp_data["y"],
+                rotation=comp_data.get("rotation", 0.0),
+                properties=copy.deepcopy(comp_data.get("properties", {})),
+                sheet_id=comp_data.get("sheet_id"),
+            )
+            self._components[component.instance_id] = component
+
+        for conn_data in state.get("connections", []):
+            connection = Connection(
+                connection_id=conn_data["connection_id"],
+                from_component=conn_data["from_component"],
+                from_pin=conn_data["from_pin"],
+                to_component=conn_data["to_component"],
+                to_pin=conn_data["to_pin"],
+                wire_color=conn_data.get("wire_color", "#000000"),
+                connection_type=conn_data.get("connection_type", "wire"),
+            )
+            self._connections[connection.connection_id] = connection
+
+        for sheet_data in state.get("sheets", []):
+            sheet = Sheet(
+                sheet_id=sheet_data["sheet_id"],
+                name=sheet_data["name"],
+                parent_id=sheet_data.get("parent_id"),
+                file_path=sheet_data.get("file_path"),
+                embedded=sheet_data.get("embedded", False),
+            )
+            self._sheets[sheet.sheet_id] = sheet
+
+        if not self._sheets:
+            self._ensure_root_sheet()
+
+        self._active_sheet_id = state.get("active_sheet", self._active_sheet_id)
+        if self._active_sheet_id not in self._sheets:
+            self._active_sheet_id = next(iter(self._sheets))
+
+        self.sheets_changed.emit()
+        self.active_sheet_changed.emit(self._active_sheet_id)
+        self.circuit_changed.emit()
+
+    def generate_connection_list(self) -> str:
+        """Generate a text description of connections"""
+        lines = ["Circuit Connections:", "=" * 50]
+
+        for conn in self._connections.values():
+            from_comp = self._components[conn.from_component]
+            to_comp = self._components[conn.to_component]
+
+            from_def = self.get_component_definition(from_comp.definition_id)
+            to_def = self.get_component_definition(to_comp.definition_id)
+
+            net_info = f" [{conn.net_name}]" if conn.net_name else ""
+            line = f"{from_def.name} ({conn.from_pin}) -> {to_def.name} ({conn.to_pin}){net_info}"
+            lines.append(line)
+
+        return "\n".join(lines)
+
 
 def _sexpr_format(node: Any) -> str:
     if isinstance(node, list):
@@ -1403,112 +1511,3 @@ def _sexpr_collect_properties(node: List[Any]) -> Dict[str, str]:
                 value = " ".join(str(part) for part in value)
             properties[key] = str(value)
     return properties
-
-    # ------------------------------------------------------------------
-    # State management helpers for undo/redo and tests
-    # ------------------------------------------------------------------
-    def export_circuit_state(self) -> Dict[str, Any]:
-        return {
-            "components": [
-                {
-                    "instance_id": c.instance_id,
-                    "definition_id": c.definition_id,
-                    "x": c.x,
-                    "y": c.y,
-                    "rotation": c.rotation,
-                    "properties": copy.deepcopy(c.properties),
-                    "sheet_id": c.sheet_id,
-                }
-                for c in self._components.values()
-            ],
-            "connections": [
-                {
-                    "connection_id": c.connection_id,
-                    "from_component": c.from_component,
-                    "from_pin": c.from_pin,
-                    "to_component": c.to_component,
-                    "to_pin": c.to_pin,
-                    "wire_color": c.wire_color,
-                    "connection_type": c.connection_type,
-                }
-                for c in self._connections.values()
-            ],
-            "sheets": [
-                {
-                    "sheet_id": s.sheet_id,
-                    "name": s.name,
-                    "parent_id": s.parent_id,
-                    "file_path": s.file_path,
-                    "embedded": s.embedded,
-                }
-                for s in self._sheets.values()
-            ],
-            "active_sheet": self._active_sheet_id,
-        }
-
-    def load_circuit_state(self, state: Dict[str, Any]):
-        self.clear_circuit()
-        self._sheets.clear()
-
-        for comp_data in state.get("components", []):
-            component = ComponentInstance(
-                instance_id=comp_data["instance_id"],
-                definition_id=comp_data["definition_id"],
-                x=comp_data["x"],
-                y=comp_data["y"],
-                rotation=comp_data.get("rotation", 0.0),
-                properties=copy.deepcopy(comp_data.get("properties", {})),
-                sheet_id=comp_data.get("sheet_id"),
-            )
-            self._components[component.instance_id] = component
-
-        for conn_data in state.get("connections", []):
-            connection = Connection(
-                connection_id=conn_data["connection_id"],
-                from_component=conn_data["from_component"],
-                from_pin=conn_data["from_pin"],
-                to_component=conn_data["to_component"],
-                to_pin=conn_data["to_pin"],
-                wire_color=conn_data.get("wire_color", "#000000"),
-                connection_type=conn_data.get("connection_type", "wire"),
-            )
-            self._connections[connection.connection_id] = connection
-
-        for sheet_data in state.get("sheets", []):
-            sheet = Sheet(
-                sheet_id=sheet_data["sheet_id"],
-                name=sheet_data["name"],
-                parent_id=sheet_data.get("parent_id"),
-                file_path=sheet_data.get("file_path"),
-                embedded=sheet_data.get("embedded", False),
-            )
-            self._sheets[sheet.sheet_id] = sheet
-
-        if not self._sheets:
-            self._ensure_root_sheet()
-
-        self._active_sheet_id = state.get("active_sheet", self._active_sheet_id)
-        if self._active_sheet_id not in self._sheets:
-            self._active_sheet_id = next(iter(self._sheets))
-
-        self.sheets_changed.emit()
-        self.active_sheet_changed.emit(self._active_sheet_id)
-        self.circuit_changed.emit()
-
-
-    def generate_connection_list(self) -> str:
-        """Generate a text description of connections"""
-        lines = ["Circuit Connections:", "=" * 50]
-
-        for conn in self._connections.values():
-            from_comp = self._components[conn.from_component]
-            to_comp = self._components[conn.to_component]
-
-            from_def = self.get_component_definition(from_comp.definition_id)
-            to_def = self.get_component_definition(to_comp.definition_id)
-
-            net_info = f" [{conn.net_name}]" if conn.net_name else ""
-            line = f"{from_def.name} ({conn.from_pin}) -> {to_def.name} ({conn.to_pin}){net_info}"
-            lines.append(line)
-
-        return "\n".join(lines)
