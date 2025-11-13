@@ -1,14 +1,26 @@
 """Board information and selection panel."""
 
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, TYPE_CHECKING
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QComboBox,
-    QGroupBox, QFormLayout
+    QWidget,
+    QVBoxLayout,
+    QLabel,
+    QComboBox,
+    QGroupBox,
+    QFormLayout,
 )
 from PySide6.QtCore import Signal
 
 from arduino_ide.models.board import Board
+from arduino_ide.ui.board_formatting import (
+    format_board_features,
+    format_board_power,
+    format_board_specifications,
+)
+
+if TYPE_CHECKING:
+    from arduino_ide.services.board_manager import BoardManager
 
 
 class BoardPanel(QWidget):
@@ -16,10 +28,18 @@ class BoardPanel(QWidget):
 
     board_selected = Signal(object)  # Emits the selected Board
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, board_manager: Optional["BoardManager"] = None):
         super().__init__(parent)
         self._boards_by_index: Dict[int, Board] = {}
+        self._board_manager = board_manager
+        self._detailed_boards: Dict[str, Optional[Board]] = {}
         self.init_ui()
+
+    def set_board_manager(self, board_manager: Optional["BoardManager"]):
+        """Attach a board manager used to enrich board metadata."""
+
+        self._board_manager = board_manager
+        self._detailed_boards.clear()
 
     def init_ui(self):
         """Initialize UI."""
@@ -55,8 +75,56 @@ class BoardPanel(QWidget):
         self.clock_label = QLabel("Unknown")
         info_layout.addRow("Clock:", self.clock_label)
 
+        self.voltage_label = QLabel("Unknown")
+        info_layout.addRow("Operating Voltage:", self.voltage_label)
+
+        self.digital_pins_label = QLabel("Unknown")
+        info_layout.addRow("Digital I/O Pins:", self.digital_pins_label)
+
         info_group.setLayout(info_layout)
         layout.addWidget(info_group)
+
+        features_group = QGroupBox("Features")
+        features_layout = QFormLayout()
+
+        self.wifi_label = QLabel("Unknown")
+        features_layout.addRow("WiFi:", self.wifi_label)
+
+        self.bluetooth_label = QLabel("Unknown")
+        features_layout.addRow("Bluetooth:", self.bluetooth_label)
+
+        self.usb_label = QLabel("Unknown")
+        features_layout.addRow("USB:", self.usb_label)
+
+        self.adc_label = QLabel("Unknown")
+        features_layout.addRow("ADC Resolution:", self.adc_label)
+
+        self.dac_label = QLabel("Unknown")
+        features_layout.addRow("DAC:", self.dac_label)
+
+        self.touch_label = QLabel("Unknown")
+        features_layout.addRow("Touch Pins:", self.touch_label)
+
+        self.rtc_label = QLabel("Unknown")
+        features_layout.addRow("RTC:", self.rtc_label)
+
+        self.sleep_label = QLabel("Unknown")
+        features_layout.addRow("Sleep Mode:", self.sleep_label)
+
+        features_group.setLayout(features_layout)
+        layout.addWidget(features_group)
+
+        power_group = QGroupBox("Power")
+        power_layout = QFormLayout()
+
+        self.power_typical_label = QLabel("Unknown")
+        power_layout.addRow("Typical:", self.power_typical_label)
+
+        self.power_max_label = QLabel("Unknown")
+        power_layout.addRow("Maximum:", self.power_max_label)
+
+        power_group.setLayout(power_layout)
+        layout.addWidget(power_group)
 
         layout.addStretch()
 
@@ -118,25 +186,46 @@ class BoardPanel(QWidget):
         if board is None:
             board = self._boards_by_index.get(self.board_combo.currentIndex())
 
-        # Default values
-        cpu = "Unknown"
-        flash = "Unknown"
-        ram = "Unknown"
-        clock = "Unknown"
+        board_for_display = self._get_detailed_board(board)
 
-        # Extract specs from Board object
-        if board and hasattr(board, 'specs'):
-            specs = board.specs
-            cpu = specs.cpu if specs.cpu else "Unknown"
-            flash = specs.flash if specs.flash else "Unknown"
-            ram = specs.ram if specs.ram else "Unknown"
-            clock = specs.clock if specs.clock else "Unknown"
+        specs = format_board_specifications(board_for_display)
+        self.cpu_label.setText(specs["cpu"])
+        self.flash_label.setText(specs["flash"])
+        self.ram_label.setText(specs["ram"])
+        self.clock_label.setText(specs["clock"])
+        self.voltage_label.setText(specs["voltage"])
+        self.digital_pins_label.setText(specs["digital_pins"])
 
-        # Update labels
-        self.cpu_label.setText(cpu)
-        self.flash_label.setText(flash)
-        self.ram_label.setText(ram)
-        self.clock_label.setText(clock)
+        features = format_board_features(board_for_display)
+        self.wifi_label.setText(features["wifi"])
+        self.bluetooth_label.setText(features["bluetooth"])
+        self.usb_label.setText(features["usb"])
+        self.adc_label.setText(features["adc"])
+        self.dac_label.setText(features["dac"])
+        self.touch_label.setText(features["touch"])
+        self.rtc_label.setText(features["rtc"])
+        self.sleep_label.setText(features["sleep"])
+
+        power = format_board_power(board_for_display)
+        self.power_typical_label.setText(power["typical"])
+        self.power_max_label.setText(power["maximum"])
+
+    def _get_detailed_board(self, board: Optional[Board]) -> Optional[Board]:
+        """Return an enriched board instance when available."""
+
+        if not board or not getattr(board, "fqbn", None):
+            return board
+
+        if not self._board_manager:
+            return board
+
+        cached = self._detailed_boards.get(board.fqbn, None)
+        if cached is not None or board.fqbn in self._detailed_boards:
+            return cached or board
+
+        detailed = self._board_manager.get_board(board.fqbn)
+        self._detailed_boards[board.fqbn] = detailed
+        return detailed or board
 
     def set_port(self, port):
         """Set connected port"""

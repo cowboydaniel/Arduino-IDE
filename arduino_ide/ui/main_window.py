@@ -643,7 +643,7 @@ class MainWindow(QMainWindow):
 
         # --- RIGHT COLUMN 1 (Normal widgets, NOT docks) ---
         # Create first right column widgets (Board/Status)
-        self.board_panel = BoardPanel()
+        self.board_panel = BoardPanel(board_manager=self.board_manager)
         self.board_panel.board_selected.connect(self._on_board_panel_board_selected)
         self.status_display = StatusDisplay()
 
