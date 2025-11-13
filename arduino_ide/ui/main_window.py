@@ -1280,6 +1280,44 @@ void loop() {
             self.status_bar.set_status(f"Background compile error: {exc}")
             QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
+    def _enrich_board_list(self, boards):
+        """Replace lightweight CLI board stubs with full definitions when possible."""
+
+        if not boards:
+            return []
+
+        enriched_boards = []
+        cached_results = {}
+        missing_definitions = []
+
+        for board in boards:
+            if not board:
+                continue
+
+            fqbn = getattr(board, "fqbn", "")
+            if not fqbn:
+                missing_definitions.append(getattr(board, "name", "<unknown>"))
+                continue
+
+            enriched_board = cached_results.get(fqbn)
+            if enriched_board is None:
+                enriched_board = self.board_manager.get_board(fqbn)
+                if enriched_board:
+                    cached_results[fqbn] = enriched_board
+                else:
+                    missing_definitions.append(fqbn)
+                    continue
+
+            enriched_boards.append(enriched_board)
+
+        if missing_definitions:
+            print(
+                "DEBUG: Missing board definitions for: "
+                + ", ".join(sorted(set(missing_definitions)))
+            )
+
+        return enriched_boards
+
     def _populate_boards(self):
         """Populate board selector with boards from arduino-cli.
 
@@ -1318,6 +1356,8 @@ void loop() {
                 )
             except Exception as e:
                 print(f"DEBUG: get_all_boards() raised exception: {e}")
+
+        boards = self._enrich_board_list(boards)
 
         if boards:
             # Sort boards by name for better UX
@@ -1448,7 +1488,8 @@ void loop() {
             except Exception:
                 cli_boards = []
             else:
-                self._cli_boards = cli_boards
+                cli_boards = self._enrich_board_list(cli_boards)
+            self._cli_boards = cli_boards
 
         for board in cli_boards:
             if board.name == board_name or board.fqbn == board_name:
