@@ -15,7 +15,6 @@ from pathlib import Path
 from arduino_ide.ui.code_editor import CodeEditor, BreadcrumbBar, CodeMinimap
 from arduino_ide.ui.serial_monitor import SerialMonitor
 from arduino_ide.ui.board_panel import BoardPanel
-from arduino_ide.ui.project_explorer import ProjectExplorer
 from arduino_ide.ui.console_panel import ConsolePanel
 from arduino_ide.ui.status_display import StatusDisplay
 from arduino_ide.ui.context_panel import ContextPanel
@@ -296,7 +295,7 @@ class MainWindow(QMainWindow):
         top_splitter = QSplitter(Qt.Horizontal)
         top_splitter.setHandleWidth(4)
 
-        # Left column (Quick Actions + Project Explorer)
+        # Left column (Quick Actions)
         self.left_column = QWidget()
         self.left_column_layout = QVBoxLayout(self.left_column)
         self.left_column_layout.setContentsMargins(0, 0, 0, 0)
@@ -614,12 +613,9 @@ class MainWindow(QMainWindow):
         # --- LEFT COLUMN (Normal widgets, NOT docks) ---
         # Create left-side panel widgets
         self.quick_actions_panel = QuickActionsPanel()
-        self.project_explorer = ProjectExplorer()
 
         # Add widgets to left column layout (NOT as dock widgets)
         self.left_column_layout.addWidget(self.quick_actions_panel)
-        self.left_column_layout.addWidget(self.project_explorer)
-        self.project_explorer.file_open_requested.connect(self.open_file_from_project_explorer)
 
         # --- RIGHT COLUMN (Normal widgets, NOT docks) ---
         # Create right-side panel widgets
@@ -889,10 +885,6 @@ void loop() {
         self.update_tab_title(index)
         self.add_recent_file(path)
         self.update_status_bar_for_file(editor_container.filename)
-
-    def open_file_from_project_explorer(self, file_path: str):
-        """Open a file from the project explorer tree."""
-        self._open_file_path(Path(file_path))
 
     def _open_file_path(self, path: Path):
         try:
