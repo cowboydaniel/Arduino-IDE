@@ -311,7 +311,8 @@ class MainWindow(QMainWindow):
 
         # Bottom tab widget (only under left area, NOT under right column)
         self.bottom_tabs = QTabWidget()
-        self.bottom_tabs.setMinimumHeight(150)
+        self.bottom_tabs.setMinimumHeight(50)
+        self.bottom_tabs.setMaximumHeight(150)
         self.bottom_tabs.currentChanged.connect(self._on_bottom_tab_changed)
         left_area_layout.addWidget(self.bottom_tabs)
 
@@ -629,22 +630,15 @@ class MainWindow(QMainWindow):
         # Create right-side panel widgets
         self.board_panel = BoardPanel()
         self.status_display = StatusDisplay()
+        self.pin_usage_panel = PinUsagePanel()
+        self.context_panel = ContextPanel()
 
         # Add widgets to right column layout (NOT as dock widgets)
         self.right_column_layout.addWidget(self.board_panel)
         self.right_column_layout.addWidget(self.status_display)
+        self.right_column_layout.addWidget(self.pin_usage_panel)
+        self.right_column_layout.addWidget(self.context_panel)
         self.right_column_layout.addStretch()
-
-        # --- DOCKED PANELS ---
-        self.pin_usage_panel = PinUsagePanel(self)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.pin_usage_panel)
-        if self.view_menu:
-            self.view_menu.addAction(self.pin_usage_panel.toggleViewAction())
-
-        self.context_panel = ContextPanel(self)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.context_panel)
-        if self.view_menu:
-            self.view_menu.addAction(self.context_panel.toggleViewAction())
 
         # --- BOTTOM TABS (Normal widgets in tabs, NOT docks) ---
         # Create bottom panels

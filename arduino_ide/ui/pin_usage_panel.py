@@ -3,32 +3,24 @@ Pin Usage Overview Panel
 Shows which pins are being used in the current sketch
 """
 
-from PySide6.QtWidgets import QDockWidget, QWidget, QVBoxLayout
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout
 from arduino_ide.ui.pin_usage_widget import PinUsageWidget
 
 
-class PinUsagePanel(QDockWidget):
-    """Dockable panel showing pin usage overview"""
+class PinUsagePanel(QWidget):
+    """Fixed panel showing pin usage overview"""
 
     def __init__(self, parent=None):
-        super().__init__("Pin Usage Overview", parent)
-        self.setObjectName("PinUsagePanel")
-        self.setAllowedAreas(
-            Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.BottomDockWidgetArea
-        )
+        super().__init__(parent)
         self.init_ui()
 
     def init_ui(self):
         """Initialize UI"""
-        container = QWidget()
-        layout = QVBoxLayout(container)
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.pin_usage_widget = PinUsageWidget()
         layout.addWidget(self.pin_usage_widget)
-
-        self.setWidget(container)
 
     def set_board(self, board):
         """Set the current board
