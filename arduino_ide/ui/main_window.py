@@ -44,6 +44,7 @@ from arduino_ide.services import ArduinoCliService
 from arduino_ide.services.visual_programming_service import VisualProgrammingService
 from arduino_ide.ui.visual_programming_editor import VisualProgrammingEditor
 from arduino_ide.services.error_recovery import SmartErrorRecovery
+from arduino_ide.ui.preferences_dialog import PreferencesDialog
 import re
 
 
@@ -180,6 +181,7 @@ class MainWindow(QMainWindow):
         self.settings = QSettings()
         self.theme_manager = ThemeManager()
         self.recent_files = self._load_recent_files()
+        self._compile_verbose_enabled = self._load_compile_verbose_preference()
         self.view_menu = None
         self.code_quality_panel = None
         self._cli_boards = []
@@ -478,6 +480,11 @@ class MainWindow(QMainWindow):
         library_action = QAction("Library Manager...", self)
         library_action.triggered.connect(self.open_library_manager)
         tools_menu.addAction(library_action)
+
+        preferences_action = QAction("Preferences...", self)
+        preferences_action.setShortcut(Qt.CTRL | Qt.Key_Comma)
+        preferences_action.triggered.connect(self.open_preferences)
+        tools_menu.addAction(preferences_action)
 
         tools_menu.addSeparator()
 
@@ -887,6 +894,23 @@ void loop() {
         if isinstance(stored, (list, tuple)):
             return [str(Path(item).resolve()) for item in stored]
         return []
+
+    def _load_compile_verbose_preference(self) -> bool:
+        """Retrieve the persisted compile verbosity preference."""
+
+        stored = self.settings.value("cli/verboseCompile", False)
+        if isinstance(stored, bool):
+            return stored
+        if isinstance(stored, str):
+            return stored.lower() in {"1", "true", "yes", "on"}
+        if isinstance(stored, int):
+            return stored != 0
+        return False
+
+    def _is_compile_verbose_enabled(self) -> bool:
+        """Return True when verbose compilation output is enabled."""
+
+        return bool(getattr(self, "_compile_verbose_enabled", False))
 
     def new_file(self, checked=False):
         """Create new file"""
@@ -1600,12 +1624,12 @@ void loop() {
         self.problems_panel.clear_problems()
 
         try:
-            # User-initiated verify: enable verbose output for detailed logs
+            # User-initiated verify: optional verbose output controlled by preferences
             self.cli_service.run_compile(
                 str(sketch_path),
                 board.fqbn,
                 config=build_config,
-                verbose=True,  # Enable verbose output to debug preprocessing issues
+                verbose=self._is_compile_verbose_enabled(),
                 export_binaries=True  # Export binaries to sketch folder like official IDE
             )
         except (RuntimeError, FileNotFoundError) as exc:
@@ -1691,7 +1715,7 @@ void loop() {
                 str(sketch_path),
                 board.fqbn,
                 config=build_config,
-                verbose=True,  # Enable verbose output to debug preprocessing issues
+                verbose=self._is_compile_verbose_enabled(),
                 export_binaries=True  # Export binaries for upload
             )
         except (RuntimeError, FileNotFoundError) as exc:
@@ -2276,6 +2300,22 @@ void loop() {
         dialog = LibraryManagerDialog(self.library_manager, self)
         dialog.exec_()
 
+        self.status_bar.set_status("Ready")
+
+    def open_preferences(self):
+        """Open the preferences dialog and apply any changes."""
+
+        self.console_panel.append_output("Opening Preferences...")
+        self.status_bar.set_status("Preferences")
+        previous = self._is_compile_verbose_enabled()
+        dialog = PreferencesDialog(self.settings, self)
+        if dialog.exec_():
+            self._compile_verbose_enabled = dialog.verbose_compile_enabled
+            if previous != self._compile_verbose_enabled:
+                state = "enabled" if self._compile_verbose_enabled else "disabled"
+                self.console_panel.append_output(
+                    f"Verbose compilation output {state}."
+                )
         self.status_bar.set_status("Ready")
 
     def open_board_manager(self):
