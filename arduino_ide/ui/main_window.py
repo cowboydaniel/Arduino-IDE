@@ -34,6 +34,7 @@ from arduino_ide.ui.find_replace_dialog import FindReplaceDialog
 from arduino_ide.ui.snippets_panel import SnippetsLibraryDialog
 from arduino_ide.ui.circuit_editor import CircuitDesignerWindow
 from arduino_ide.ui.onboarding_wizard import OnboardingWizard
+from arduino_ide.ui.git_panel import GitPanel
 from arduino_ide.services.theme_manager import ThemeManager
 from arduino_ide.services.library_manager import LibraryManager
 from arduino_ide.services.board_manager import BoardManager
@@ -189,6 +190,9 @@ class MainWindow(QMainWindow):
         self.pin_usage_panel = None
         self.status_display = None
         self.console_panel = None
+        self.git_panel = None
+        self.git_dock = None
+        self._git_view_action = None
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
@@ -227,6 +231,11 @@ class MainWindow(QMainWindow):
             library_manager=self.library_manager,
             board_manager=self.board_manager
         )
+
+        if hasattr(self.project_manager, "project_loaded"):
+            self.project_manager.project_loaded.connect(self._on_project_loaded)
+        if hasattr(self.project_manager, "project_saved"):
+            self.project_manager.project_saved.connect(self._on_project_saved)
 
         self._update_cli_library_paths()
 
@@ -315,6 +324,39 @@ class MainWindow(QMainWindow):
             paths = []
 
         self.cli_service.set_library_search_paths(paths)
+
+    def _on_project_loaded(self, _project_name):
+        """Handle project load events from the project manager."""
+        self._update_git_repository()
+
+    def _on_project_saved(self, _project_name):
+        """Refresh Git information after a project save."""
+        self._refresh_git_panel()
+
+    def _update_git_repository(self):
+        """Update the Git panel with the current project repository."""
+        if not self.git_panel:
+            return
+
+        project_path = getattr(self.project_manager, "project_path", None)
+        if project_path:
+            self.git_panel.set_repository_path(str(Path(project_path)))
+            self.git_panel.refresh_all()
+
+    def _refresh_git_panel(self):
+        """Refresh Git panel data if available."""
+        if self.git_panel:
+            self.git_panel.refresh_all()
+
+    def _on_git_visibility_changed(self, visible):
+        """Update Git information when the dock becomes visible."""
+        if visible:
+            self._update_git_repository()
+
+    def _on_git_view_toggled(self, visible):
+        """Handle View → Git action toggles."""
+        if visible:
+            self._refresh_git_panel()
 
     def init_ui(self):
         """Initialize the main UI"""
@@ -678,7 +720,7 @@ class MainWindow(QMainWindow):
         main_toolbar.addAction(circuit_btn)
 
     def create_dock_widgets(self):
-        """Create panels (no dock widgets)"""
+        """Create panels and dockable widgets."""
         # --- LEFT COLUMN (Normal widgets, NOT docks) ---
         # Create left-side panel widgets
         self.quick_actions_panel = QuickActionsPanel()
@@ -751,6 +793,23 @@ class MainWindow(QMainWindow):
 
         # Sync contextual help state with the initial Serial Monitor visibility
         self._broadcast_serial_monitor_state(self._is_serial_monitor_active())
+
+        # --- GIT PANEL DOCK ---
+        self.git_panel = GitPanel()
+        self.git_dock = QDockWidget("Git", self)
+        self.git_dock.setObjectName("GitDock")
+        self.git_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.git_dock.setWidget(self.git_panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.git_dock)
+        self.git_dock.visibilityChanged.connect(self._on_git_visibility_changed)
+
+        if self.view_menu:
+            self._git_view_action = self.git_dock.toggleViewAction()
+            self._git_view_action.setText("Git")
+            self._git_view_action.toggled.connect(self._on_git_view_toggled)
+            self.view_menu.addAction(self._git_view_action)
+
+        self._update_git_repository()
 
     def create_new_editor(self, filename="untitled.ino", *, file_path=None, content=None, mark_clean=False):
         """Create a new editor tab"""
@@ -987,6 +1046,10 @@ void loop() {
         self.add_recent_file(path)
         self.update_status_bar_for_file(editor_container.filename)
 
+        self._refresh_git_panel()
+
+        return True
+
     def _open_file_path(self, path: Path):
         try:
             contents = path.read_text(encoding="utf-8")
@@ -1120,6 +1183,7 @@ void loop() {
                     self.toggle_serial_monitor()
                 self._open_monitor_after_upload = False
                 QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+                self._refresh_git_panel()
             else:
                 if not is_background:
                     self.status_bar.set_status("Ready")
