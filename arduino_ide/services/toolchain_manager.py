@@ -88,6 +88,12 @@ class ToolchainManager:
             return self.avr_dir / 'bin' / 'avr-gcc.exe'
         return self.avr_dir / 'bin' / 'avr-gcc'
 
+    def get_avr_gpp_path(self) -> Path:
+        """Get path to avr-g++ executable"""
+        if platform.system() == 'Windows':
+            return self.avr_dir / 'bin' / 'avr-g++.exe'
+        return self.avr_dir / 'bin' / 'avr-g++'
+
     def get_avr_size_path(self) -> Path:
         """Get path to avr-size executable"""
         if platform.system() == 'Windows':

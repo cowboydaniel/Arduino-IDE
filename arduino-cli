@@ -846,7 +846,7 @@ class ArduinoCLI:
         # Compilation flags for Arduino sketch (treated as C++)
         # Matches official Arduino AVR core platform.txt compiler.cpp.flags
         compile_flags = [
-            str(toolchain.get_avr_gcc_path()),
+            str(toolchain.get_avr_gpp_path()),
             '-c',  # Compile only, don't link
             '-g',  # Debug info
             opt_level,  # Optimization level
@@ -859,6 +859,7 @@ class ArduinoCLI:
             '-ffunction-sections',  # Place each function in its own section
             '-fdata-sections',  # Place each data item in its own section
             '-fno-threadsafe-statics',  # Reduce static initialization overhead
+            '-foperator-names',  # Enable alternative operator spellings
             '-Wno-error=narrowing',  # Don't error on narrowing conversions
             '-MMD',  # Generate dependency files
             '-flto',  # Enable link time optimization (C++ uses -flto without -fno-fat-lto-objects)
@@ -1007,21 +1008,26 @@ class ArduinoCLI:
                     library_obj_files.append(lib_obj_file)
 
                     # Determine compilation flags based on file type
-                    if lib_source.suffix == '.cpp':
+                    suffix_lower = lib_source.suffix.lower()
+
+                    if suffix_lower in ('.cpp', '.cxx', '.cc'):
+                        compiler_path = toolchain.get_avr_gpp_path()
                         lib_compile_flags = [
-                            str(toolchain.get_avr_gcc_path()),
+                            str(compiler_path),
                             '-c', '-g', opt_level,
                         ]
                         lib_compile_flags.extend(warning_flags)
                         lib_compile_flags.extend([
                             '-std=gnu++11', '-fpermissive', '-fno-exceptions',
                             '-ffunction-sections', '-fdata-sections',
-                            '-fno-threadsafe-statics', '-Wno-error=narrowing',
+                            '-fno-threadsafe-statics', '-foperator-names',
+                            '-Wno-error=narrowing',
                             '-MMD', '-flto', f'-mmcu={mcu}',
                         ])
-                    else:  # .c file
+                    else:  # .c or other C-family file
+                        compiler_path = toolchain.get_avr_gcc_path()
                         lib_compile_flags = [
-                            str(toolchain.get_avr_gcc_path()),
+                            str(compiler_path),
                             '-c', '-g', opt_level,
                         ]
                         lib_compile_flags.extend(warning_flags)
@@ -1122,8 +1128,11 @@ class ArduinoCLI:
                 # Determine if this is an assembly file
                 is_assembly = core_source.suffix == '.S'
 
+                is_cpp_source = core_source.suffix.lower() in ('.cpp', '.cxx', '.cc')
+                compiler_path = toolchain.get_avr_gpp_path() if is_cpp_source else toolchain.get_avr_gcc_path()
+
                 core_compile_flags = [
-                    str(toolchain.get_avr_gcc_path()),
+                    str(compiler_path),
                     '-c',
                     '-g',
                 ]
@@ -1143,7 +1152,7 @@ class ArduinoCLI:
                     ])
 
                 # Apply language-specific flags
-                if core_source.suffix.lower() in ('.cpp', '.cxx', '.cc'):
+                if is_cpp_source:
                     core_compile_flags.extend([
                         '-std=gnu++11',
                         '-fpermissive',
@@ -1151,6 +1160,7 @@ class ArduinoCLI:
                         '-ffunction-sections',
                         '-fdata-sections',
                         '-fno-threadsafe-statics',
+                        '-foperator-names',
                         '-Wno-error=narrowing',
                         '-MMD',
                         '-flto',  # LTO for C++ without -fno-fat-lto-objects
