@@ -62,14 +62,27 @@ class BoardPanel(QWidget):
 
     def set_boards(self, boards: Sequence[Board]):
         """Populate the combo box with the provided boards."""
+        # Remember the currently selected board so we can restore it when possible
+        current_index = self.board_combo.currentIndex()
+        current_board = self._boards_by_index.get(current_index)
+        preferred_fqbn = current_board.fqbn if current_board else None
+        preferred_name = current_board.name if current_board else None
+
         self._boards_by_index = {}
         self.board_combo.blockSignals(True)
         self.board_combo.clear()
+
+        target_index = 0
         for index, board in enumerate(boards):
             self.board_combo.addItem(board.name)
             self._boards_by_index[index] = board
+            if preferred_fqbn and board.fqbn == preferred_fqbn:
+                target_index = index
+            elif not preferred_fqbn and preferred_name and board.name == preferred_name:
+                target_index = index
+
         if boards:
-            self.board_combo.setCurrentIndex(0)
+            self.board_combo.setCurrentIndex(target_index)
         self.board_combo.blockSignals(False)
 
         self.update_board_info(self._boards_by_index.get(self.board_combo.currentIndex()))
@@ -80,7 +93,9 @@ class BoardPanel(QWidget):
             return
 
         for index, stored_board in self._boards_by_index.items():
-            if stored_board.fqbn == board.fqbn:
+            if (stored_board.fqbn and stored_board.fqbn == board.fqbn) or (
+                not stored_board.fqbn and stored_board.name == board.name
+            ):
                 if self.board_combo.currentIndex() == index:
                     # Ensure info is up-to-date even if the index already matches
                     self.update_board_info(stored_board)

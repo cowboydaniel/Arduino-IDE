@@ -180,6 +180,10 @@ class MainWindow(QMainWindow):
         self.view_menu = None
         self.code_quality_panel = None
         self._cli_boards = []
+        self.board_panel = None
+        self.pin_usage_panel = None
+        self.status_display = None
+        self.console_panel = None
 
         # Ensure standard window chrome is available so desktop environments
         # show the minimize/maximize controls.  Some window managers (notably
@@ -647,6 +651,16 @@ class MainWindow(QMainWindow):
         self.right_column_layout.addWidget(self.board_panel)
         self.right_column_layout.addWidget(self.status_display)
         self.right_column_layout.addStretch()
+
+        if self._cli_boards:
+            self.board_panel.set_boards(self._cli_boards)
+            selected_board = self._get_selected_board()
+            if selected_board:
+                self.board_panel.select_board(selected_board)
+            else:
+                self.board_panel.update_board_info(None)
+        else:
+            self.board_panel.set_boards([])
 
         # --- RIGHT COLUMN 2 (Normal widgets, NOT docks) ---
         # Create second right column widgets (Pin Usage/Context)
@@ -1222,6 +1236,7 @@ void loop() {
 
         self.board_selector.blockSignals(True)
         self.board_selector.clear()
+        board_panel = getattr(self, "board_panel", None)
 
         # Get boards from arduino-cli (installed platforms only)
         try:
@@ -1236,7 +1251,8 @@ void loop() {
             boards.sort(key=lambda b: b.name)
 
             self._cli_boards = boards
-            self.board_panel.set_boards(self._cli_boards)
+            if board_panel:
+                board_panel.set_boards(self._cli_boards)
 
             # Add boards to selector
             for board in boards:
@@ -1252,7 +1268,8 @@ void loop() {
             self.status_bar.set_status(f"Loaded {len(boards)} boards from installed platforms")
         else:
             self._cli_boards = []
-            self.board_panel.set_boards(self._cli_boards)
+            if board_panel:
+                board_panel.set_boards(self._cli_boards)
             # No installed platforms - show helpful message
             self.board_selector.addItem("No boards available - Install a platform first")
             self.status_bar.set_status("No boards found. Install a platform via Tools > Board Manager")
@@ -1261,6 +1278,8 @@ void loop() {
 
         if boards:
             self.on_board_changed(self.board_selector.currentText())
+        elif board_panel:
+            board_panel.update_board_info(None)
 
     def _get_selected_board(self):
         """Get the currently selected board object from arduino-cli.
@@ -1692,17 +1711,22 @@ void loop() {
             return
 
         self.status_bar.set_status(f"Board changed to: {board_name}")
-        self.console_panel.append_output(f"Selected board: {board_name}")
+        if self.console_panel:
+            self.console_panel.append_output(f"Selected board: {board_name}")
 
         board = self._get_selected_board()
         if board:
-            self.board_panel.select_board(board)
-            self.pin_usage_panel.set_board(board)
+            if self.board_panel:
+                self.board_panel.select_board(board)
+            if self.pin_usage_panel:
+                self.pin_usage_panel.set_board(board)
 
         # Update board panel with Board object
-        self.board_panel.update_board_info(board)
+        if self.board_panel:
+            self.board_panel.update_board_info(board)
         # Update status display with new board specs
-        self.status_display.update_board(board_name)
+        if self.status_display:
+            self.status_display.update_board(board_name)
         # Update status bar
         self.status_bar.set_board(board_name)
         # Reset to Ready after a moment
@@ -1714,7 +1738,8 @@ void loop() {
             # Only log to console if port actually changed
             if port_name != self._last_selected_port:
                 self.status_bar.set_status(f"Port changed to: {port_name}")
-                self.console_panel.append_output(f"Selected port: {port_name}")
+                if self.console_panel:
+                    self.console_panel.append_output(f"Selected port: {port_name}")
                 self._last_selected_port = port_name
             # Update status bar
             self.status_bar.set_port(port_name)
@@ -1728,7 +1753,8 @@ void loop() {
         """Handle build configuration change"""
         self.build_config = config
         self.status_bar.set_status(f"Build configuration: {config}")
-        self.console_panel.append_output(f"Build configuration changed to: {config}")
+        if self.console_panel:
+            self.console_panel.append_output(f"Build configuration changed to: {config}")
         # Reset to Ready after a moment
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
