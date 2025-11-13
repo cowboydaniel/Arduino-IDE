@@ -9,7 +9,7 @@ import tarfile
 import zipfile
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 try:
     import requests
@@ -54,6 +54,54 @@ class CoreManager:
     def is_installed(self) -> bool:
         """Check if Arduino AVR core is installed"""
         return self.arduino_h_path.exists()
+
+    def ensure_builtin_libraries(self, target_dir: Optional[Path] = None,
+                                 ensure_core: bool = False) -> List[Path]:
+        """Ensure the Arduino core's bundled libraries are available in the IDE.
+
+        Args:
+            target_dir: Destination for managed libraries. Defaults to the
+                user's ``~/.arduino-ide-modern/libraries`` directory.
+            ensure_core: When True, download the core if it is not already
+                installed so the bundled libraries can be copied.
+
+        Returns:
+            A list of paths that were newly installed.
+        """
+        if target_dir is None:
+            target_dir = Path.home() / '.arduino-ide-modern' / 'libraries'
+
+        if ensure_core and not self.is_installed():
+            if not self.download_core():
+                return []
+
+        source_dir = self.avr_core_dir / 'libraries'
+        if not source_dir.exists():
+            return []
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        installed_paths: List[Path] = []
+        for library_dir in sorted(source_dir.iterdir()):
+            if not library_dir.is_dir():
+                continue
+
+            destination = target_dir / library_dir.name
+            if destination.exists():
+                continue
+
+            try:
+                shutil.copytree(library_dir, destination)
+                installed_paths.append(destination)
+            except FileExistsError:
+                continue
+            except Exception as exc:  # pragma: no cover - log but do not fail entirely
+                print(
+                    f"⚠️  Failed to install bundled library '{library_dir.name}': {exc}",
+                    file=sys.stderr,
+                )
+
+        return installed_paths
 
     def get_core_path(self) -> Path:
         """Get path to Arduino core directory"""
@@ -191,6 +239,7 @@ class CoreManager:
             # Verify installation
             if self.is_installed():
                 print("✓ Arduino AVR core installed successfully")
+                self.ensure_builtin_libraries()
                 return True
             else:
                 print("✗ Core installation failed - files not found", file=sys.stderr)
@@ -207,10 +256,14 @@ class CoreManager:
             True if core is available, False otherwise
         """
         if self.is_installed():
+            self.ensure_builtin_libraries()
             return True
 
         print("Arduino AVR core not found. Downloading automatically...")
-        return self.download_core()
+        if self.download_core():
+            self.ensure_builtin_libraries()
+            return True
+        return False
 
     def get_core_sources(self) -> list[Path]:
         """Get list of all core source files (.c, .cpp, .S) that need to be compiled
