@@ -1933,6 +1933,7 @@ void loop() {
                 self.board_panel.select_board(board)
             if self.pin_usage_panel:
                 self.pin_usage_panel.set_board(board)
+                self.update_pin_usage()
 
         # Update board panel with Board object
         if self.board_panel:
