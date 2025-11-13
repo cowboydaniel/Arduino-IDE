@@ -21,12 +21,15 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 
 ### Key Highlights
 
-- **32,801+ lines** of Python code
-- **KiCAD-backed component catalog** with rich symbol coverage
+- **32,801+ lines** of Python code across **127+ modules**
+- **2,000+ KiCAD component catalog** for circuit design
 - **All 6 development phases completed** (Core, Advanced Editing, Build System, Debugging, Advanced Features, Professional Tools)
-- **35 UI modules** and **25 service modules** providing complete IDE functionality
-- **Plugin system** for extensibility
+- **41 UI modules** (92+ classes) and **29 service modules** providing complete IDE functionality
+- **8-type plugin system** for extensibility
 - **Comprehensive testing** with 40+ test files
+- **Advanced debugging** with GDB/MI protocol support
+- **Real-time collaboration** with operational transformation
+- **Professional analysis tools**: Performance profiling, power analysis, HIL testing
 
 ---
 
@@ -43,7 +46,11 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 - Code snippets library
 - Code folding
 - Multi-file tabbed editing
-- Find and replace functionality
+- Find and replace with regex support
+- **Breadcrumb Navigation**: Visual file path and function context indicator
+- **Code Minimap**: Zoomed-out code overview for quick navigation
+- **Contextual Help System**: Inline hints and context-aware suggestions
+- **Smart Error Recovery**: Intelligent error detection with friendly recovery hints
 
 #### Build System
 - **Arduino CLI Integration**: Full compile and upload support
@@ -63,9 +70,29 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 - Configurable baud rates
 - Auto-reconnect functionality
 - Timestamp display
-- Data logging
+- Data logging to files
+- **Serial Plotter**: Real-time data visualization with multi-series support
+- **CSV Export**: Export plotted data for external analysis
+- Color-coded message types
+- Send/receive functionality with terminal emulation
 
 ### Advanced Development Tools
+
+#### Code Intelligence & Quality
+- **Code Quality Panel**: Real-time code metrics and analysis
+- **Inline Code Hints**: Context-aware suggestions and tips in the editor
+- **Smart Error Recovery**: Compiler error analysis with friendly recovery hints
+  - Semicolon and syntax error detection
+  - Identifier and type mismatch suggestions
+  - Memory and optimization issue detection
+- **Code Suggestion Analyzer**:
+  - Hardcoded pin detection
+  - Magic number identification
+  - Missing pinMode warnings
+  - Delay optimization suggestions
+  - Analog pin usage recommendations
+- **Problem Panel**: Centralized error and warning tracking
+- **Git Change Highlighting**: Visual indicators for modified code
 
 #### Debugging
 - **Full GDB/MI Protocol Support**: Professional debugging capabilities
@@ -86,16 +113,24 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 
 #### Circuit Design
 - Visual circuit editor with drag-and-drop components
-- KiCAD-powered component catalog with rich symbol coverage:
+- KiCAD-powered component catalog with **2000+ component definitions**:
   - Arduino boards (Uno, Mega, Nano, etc.)
-  - LEDs, resistors, capacitors, transistors
-  - Integrated circuits (logic gates, op-amps, timers)
-  - Sensors (temperature, motion, light, gas)
+  - LEDs, resistors, capacitors, inductors, transistors, diodes
+  - Integrated circuits (logic gates, op-amps, timers, microcontrollers)
+  - Sensors (temperature, motion, light, gas, humidity)
   - Motors (DC, servo, stepper)
   - Buttons, switches, potentiometers, breadboards
+  - Connectors, displays, and communication modules
 - Wire connections with validation
-- Pin type checking
+- Pin type checking (power, ground, signal, analog, digital)
 - Circuit save/load functionality
+- **Electrical Rules Checking (ERC)**:
+  - Unconnected power/ground pin detection
+  - Floating input detection
+  - Conflicting driver detection
+  - Connection graph analysis
+- **Multi-sheet hierarchical designs**: Support for complex circuits with sub-sheets
+- Component property editing and annotation
 
 ### Professional Tools
 
@@ -108,19 +143,29 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 - Built-in GitPython support
 
 #### Real-Time Collaboration
-- Collaborative editing sessions
-- Text change synchronization
-- Cursor position tracking
-- Built-in chat messaging
+- Collaborative editing sessions with multiple collaboration modes:
+  - Offline mode for local development
+  - Peer-to-peer for direct connections
+  - Server-based for centralized coordination
+- **Operational Transformation**: Advanced conflict resolution for concurrent edits
+- Text change synchronization with real-time updates
+- Cursor position tracking and presence indicators
+- Built-in chat messaging with message history
 - Project sharing (public/private)
-- User roles (Owner, Editor, Viewer)
+- User roles (Owner, Editor, Viewer) with permission management
+- Collaborator presence tracking and last active status
+- Session management and coordination
 
 #### Unit Testing Framework
 - **Multiple Framework Support**: GoogleTest, Unity, AUnit
-- Host-based and on-device testing
-- Code coverage reporting
-- Mock function system
+- Host-based and on-device testing with automatic test discovery
+- **15 Assertion Types**: equal, not_equal, true, false, null, not_null, greater, less, greater_or_equal, less_or_equal, near, throws, no_throw, contains, matches
+- **Mock Function System**: Create and manage mock functions for unit testing
+- Code coverage reporting with detailed metrics
 - JUnit XML export for CI integration
+- Test result aggregation and performance metrics
+- Test case management with status tracking (pending, running, passed, failed, skipped, error)
+- Multiple test types: unit, integration, functional, hardware
 
 #### CI/CD Integration
 - **Multi-Platform Support**:
@@ -131,33 +176,86 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
   - CircleCI
   - Azure Pipelines
 - Automatic pipeline configuration generation
-- Build status monitoring
+- Build status monitoring with real-time updates
 - Pipeline triggering from IDE
+- Build job management and tracking
+- Artifact management and storage
+- Multiple deployment environments (development, staging, production, testing)
+- Build log access and analysis
+- Automated testing integration in pipelines
 
 #### Performance Analysis
 - **Performance Profiler**:
   - Function-level execution time profiling
-  - Bottleneck detection
-  - Optimization suggestions
-  - Profile comparison
+  - Call count and statistics tracking
+  - CPU cycle counting
+  - Self vs total time tracking
+  - Bottleneck identification
+  - Memory allocation tracking
+  - Optimization suggestions with actionable recommendations
+  - Profile comparison for before/after analysis
+  - Multiple profiling modes: host-based, on-device, simulation
 - **Power Consumption Analyzer**:
   - Real-time current measurement (INA219/INA260 support)
+  - Voltage and power tracking (mW)
+  - Energy accumulation in millijoules (mJ)
+  - Session phase tracking (upload, runtime)
+  - Session stage monitoring (idle, compile, upload, running, cool_down)
+  - Average and peak power calculation
   - Sleep mode analysis
-  - Battery life estimation
+  - Battery life estimation based on usage patterns
+  - Load profile estimation
   - Power optimization suggestions
 - **Hardware-in-Loop (HIL) Testing**:
   - Automated hardware test execution
-  - Test fixture management
+  - Test fixture management and configuration
+  - **8 Signal Types**: digital, analog, PWM, serial, I2C, SPI, power, custom
+  - Signal direction configuration (input, output, bidirectional)
+  - Test step execution with validators
   - Signal generation and capture
-  - Multi-board test support
+  - Multi-board test coordination
+  - Test result capturing and measurement
+  - Automated test workflows
 
 #### Plugin System
-- Extensible plugin architecture
-- Plugin discovery and loading
-- Comprehensive Plugin API
-- Install from ZIP
-- Example plugin included
-- Supported plugin types: Tool, Editor, Compiler, Library, Theme
+- Extensible plugin architecture with lifecycle management
+- Plugin discovery and automatic loading
+- Comprehensive Plugin API with IDE instance access
+- Install from ZIP packages
+- Example plugin included for reference
+- **8 Supported Plugin Types**:
+  - Tool (custom utilities and features)
+  - Editor (code editing enhancements)
+  - Compiler (custom compilation workflows)
+  - Library (library management extensions)
+  - Theme (visual customization)
+  - Export (custom export formats)
+  - Debugger (debugging tools and protocols)
+  - Language (multi-language support)
+- Plugin dependency resolution and version constraints
+- Command and menu integration
+- Panel and widget registration
+- Event handler support
+- Enable/disable toggles for installed plugins
+
+#### System Utilities
+- **Background Updater**: Automatic IDE update checking
+- **Offline Detection**: Smart offline mode detection and handling
+- **Git Diff Visualization**: Enhanced diff display for version control
+- **Download Manager**: Multi-mirror downloads with checksum verification
+- **Index Updater**: Automatic board and library index synchronization
+
+#### Import/Export Features
+- **Project Import**: Arduino sketch import and example loading
+- **Library Installation**: ZIP library installation with validation
+- **Plugin Installation**: ZIP plugin packaging and installation
+- **Data Export**:
+  - JUnit XML export for test results
+  - CSV export for serial plotter data
+  - Circuit design save/load (JSON format)
+  - Block programming project save/load
+- **Board Package Management**: Install boards from package repositories
+- **Arduino CLI Integration**: Seamless binary distribution
 
 ### User Experience
 
@@ -172,12 +270,53 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 #### Workspace
 - Dockable panels for flexible layouts
 - Project explorer with file tree navigation
-- Board information panel
+- Board information panel with hardware specifications
 - Console panel for build output
 - Variable watch panel
 - Status bar with real-time information
 - Window state persistence
 - Keyboard shortcuts for common operations
+- **Quick Actions Panel**: Fast access to frequently used operations
+- **Context Panel**: Context-aware tools for different editor modes
+- **Pin Usage Panel**: Visual pin usage tracking and availability
+- **Onboarding Wizard**: Guided first-time setup and feature introduction
+- **Preferences Dialog**: Comprehensive application settings and configuration
+- Example templates for quick project setup
+
+---
+
+## Feature Matrix
+
+### Development Tools
+| Category | Features | Count |
+|----------|----------|-------|
+| **Editor** | Syntax highlighting, IntelliSense, snippets, minimap, breadcrumbs, find/replace | 10+ features |
+| **Code Intelligence** | Contextual help, inline hints, error recovery, code suggestions | 6+ analyzers |
+| **Build System** | Arduino CLI, library manager, board manager, custom configs | 4 systems |
+| **Serial Tools** | Monitor, plotter, data logging, CSV export | 4 tools |
+
+### Advanced Features
+| Category | Features | Count |
+|----------|----------|-------|
+| **Debugging** | GDB/MI protocol, breakpoints, call stack, memory profiler, execution timeline | 7+ panels |
+| **Visual Tools** | Block programming (50+ blocks), circuit design (2000+ components), ERC validation | 3 editors |
+| **Testing** | Unit tests (3 frameworks), HIL testing (8 signal types), 15 assertion types | 26+ capabilities |
+| **Analysis** | Performance profiler, power analyzer, code quality metrics | 3 profilers |
+
+### Professional Tools
+| Category | Features | Count |
+|----------|----------|-------|
+| **Version Control** | Git integration, diff visualization, branch management | Full Git support |
+| **Collaboration** | Real-time editing, operational transformation, chat, 3 user roles | 6+ features |
+| **CI/CD** | 6 platform support, pipeline generation, 4 deployment environments | 10+ features |
+| **Extensibility** | 8 plugin types, dependency resolution, API access | Full plugin system |
+
+### User Experience
+| Category | Features | Count |
+|----------|----------|-------|
+| **Interface** | 41 UI modules, dockable panels, 3 themes, onboarding wizard | 15+ panels |
+| **Workflow** | Quick actions, context panel, preferences, templates | 10+ tools |
+| **Import/Export** | Arduino sketches, ZIP packages, JUnit XML, CSV data | 8+ formats |
 
 ---
 
@@ -245,22 +384,48 @@ python -m arduino_ide.main
 ```
 Arduino-IDE/
 ├── arduino_ide/              # Main application package
-│   ├── ui/                   # User interface components (35 modules)
+│   ├── ui/                   # User interface components (41 modules)
 │   │   ├── main_window.py    # Central application window
-│   │   ├── code_editor.py    # Advanced code editor
+│   │   ├── code_editor.py    # Advanced code editor with minimap
+│   │   ├── breadcrumb_bar.py # Navigation breadcrumb
+│   │   ├── code_minimap.py   # Code overview minimap
 │   │   ├── serial_monitor.py # Serial communication
+│   │   ├── plotter_panel.py  # Real-time data plotting
 │   │   ├── debug_toolbar.py  # Debug controls
-│   │   ├── circuit_editor.py # Circuit designer
-│   │   └── ...               # 30+ more UI components
+│   │   ├── debug_workspace_dialog.py # Complete debug workspace
+│   │   ├── circuit_editor.py # Circuit designer with ERC
+│   │   ├── visual_programming_editor.py # Block-based programming
+│   │   ├── git_panel.py      # Git version control
+│   │   ├── collaboration_panel.py # Real-time collaboration
+│   │   ├── code_quality_panel.py # Code quality metrics
+│   │   ├── unit_testing_panel.py # Unit testing interface
+│   │   ├── cicd_panel.py     # CI/CD pipeline management
+│   │   ├── hil_testing_dialog.py # HIL testing interface
+│   │   ├── power_analyzer_dialog.py # Power analysis
+│   │   ├── performance_profiler_ui.py # Performance profiling
+│   │   ├── plugin_manager.py # Plugin management
+│   │   ├── onboarding_wizard.py # First-time setup
+│   │   └── ...               # 20+ more UI components
 │   │
-│   ├── services/             # Business logic layer (25 modules)
+│   ├── services/             # Business logic layer (29 modules)
 │   │   ├── board_manager.py  # Board management
 │   │   ├── library_manager.py # Library operations
-│   │   ├── debug_service.py  # Debugging engine
+│   │   ├── debug_service.py  # GDB/MI debugging engine
 │   │   ├── git_service.py    # Version control
-│   │   └── ...               # 21+ more services
+│   │   ├── collaboration_service.py # Real-time collaboration
+│   │   ├── circuit_service.py # Circuit design and validation
+│   │   ├── visual_programming_service.py # Block programming
+│   │   ├── unit_testing_service.py # Unit testing framework
+│   │   ├── cicd_service.py   # CI/CD integration
+│   │   ├── performance_profiler_service.py # Performance profiling
+│   │   ├── power_analyzer_service.py # Power analysis
+│   │   ├── hil_testing_service.py # HIL testing
+│   │   ├── plugin_system.py  # Plugin architecture
+│   │   ├── contextual_help_service.py # Code intelligence
+│   │   ├── error_recovery.py # Smart error recovery
+│   │   └── ...               # 14+ more services
 │   │
-│   ├── models/               # Data models
+│   ├── models/               # Data models and structures
 │   ├── resources/            # Templates and snippets
 │   ├── cores/                # Arduino core definitions
 │   ├── data/                 # API reference data
@@ -270,8 +435,8 @@ Arduino-IDE/
 │
 ├── tests/                    # Test suite (40+ test files)
 ├── scripts/                  # Utility scripts
-├── docs/                     # Documentation
-├── examples/                 # Example projects
+├── docs/                     # Documentation (22+ files)
+├── examples/                 # Example projects and templates
 ├── example_plugin/           # Example plugin implementation
 ├── arduino-cli               # Arduino CLI binary
 ├── run.py                    # Quick start script
@@ -340,6 +505,38 @@ Arduino-IDE/
 5. Place in the plugins directory and restart IDE
 
 See `example_plugin/` for a complete working example.
+
+### Running Unit Tests
+
+1. Open **Tools → Unit Testing Panel**
+2. Select your testing framework (GoogleTest, Unity, or AUnit)
+3. Add test cases with assertions
+4. Configure test settings (host-based or on-device)
+5. Run tests and view results with code coverage
+
+### Analyzing Power Consumption
+
+1. Open **Tools → Power Analyzer**
+2. Connect INA219 or INA260 current sensor
+3. Configure measurement settings
+4. Upload and run your sketch
+5. View real-time power metrics, energy usage, and battery life estimates
+
+### Setting Up CI/CD
+
+1. Open **Tools → CI/CD Panel**
+2. Select your CI/CD platform (GitHub Actions, GitLab CI, etc.)
+3. Configure build and deployment settings
+4. Generate pipeline configuration
+5. Monitor build status from within the IDE
+
+### Using Code Quality Tools
+
+1. View the **Code Quality Panel** for real-time metrics
+2. Check the **Problem Panel** for errors and warnings
+3. Hover over code for inline hints and suggestions
+4. Follow smart error recovery suggestions for compiler errors
+5. Review code suggestions for optimization opportunities
 
 ---
 
@@ -450,32 +647,73 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - **Model-View-Controller (MVC)**: Clean separation of concerns
 - **Observer Pattern**: Qt signals/slots for event handling
 - **Singleton Pattern**: Configuration and service managers
-- **Factory Pattern**: Component creation
+- **Factory Pattern**: Component creation and instantiation
 - **Strategy Pattern**: Pluggable compilation and upload strategies
+- **Command Pattern**: Menu actions and tool operations
+- **State Pattern**: Debug states and session management
 
 ### Data Flow
 
 ```
 User Input → UI Components → Services → Models → Arduino CLI/Hardware
+                ↓              ↓          ↓
+            Signals/Slots → Data Models → Persistence (QSettings/JSON)
 ```
+
+### Data Persistence
+
+- **QSettings**: Application preferences and window state
+- **JSON Format**: Circuit designs, block projects, test configurations
+- **File-based Projects**: Multi-file project organization
+- **Settings Serialization**: Automatic state save/restore on startup
+- **Git Integration**: Version control for project history
+
+### Threading Model
+
+- **Main Thread**: UI rendering and user interaction
+- **Background Threads**: Download operations, compilation, uploads
+- **QProcess**: External tool execution (Arduino CLI, Git, GDB)
+- **QThread**: Background tasks and long-running operations
+- **Signal/Slot Communication**: Thread-safe messaging between components
 
 ### Plugin Architecture
 
 ```
-Plugin Manifest (JSON) → Plugin Loader → Plugin Lifecycle → Event Handlers → IDE Integration
+Plugin Manifest (JSON) → Plugin Loader → Plugin Discovery
+                              ↓
+                    Lifecycle Management (load/activate/deactivate)
+                              ↓
+                    Event Handlers → IDE Integration
+                              ↓
+                    Command/Menu Registration → UI Integration
+```
+
+### Circuit Design Architecture
+
+```
+Component Library (KiCAD) → Circuit Service → ERC Engine
+                                  ↓
+                        Connection Graph → Pin Validation
+                                  ↓
+                        Schematic I/O → JSON/KiCAD Format
 ```
 
 ---
 
 ## Statistics
 
-- **117 Python files**
+- **127+ Python files**
 - **32,801+ lines of Python code**
-- **2,493 JSON component definitions**
+- **2,000+ KiCAD component definitions**
 - **22 Markdown documentation files**
 - **40+ test files**
-- **35 UI modules**
-- **25 service modules**
+- **41 UI modules** with 92+ UI classes
+- **29 service modules** providing comprehensive functionality
+- **50+ visual programming blocks**
+- **15 assertion types** for unit testing
+- **8 signal types** for HIL testing
+- **8 plugin types** supported
+- **6 CI/CD platforms** integrated
 
 ---
 
