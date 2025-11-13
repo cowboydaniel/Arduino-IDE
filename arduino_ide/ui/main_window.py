@@ -239,6 +239,7 @@ class MainWindow(QMainWindow):
         self._compilation_output = ""  # Store compilation output for parsing
         self._upload_after_compile = False  # Flag to trigger upload after successful compilation
         self._is_background_compile = False  # Flag to distinguish background vs user-initiated compile
+        self._pending_board_memory_refresh = False  # Force refresh once CLI becomes idle
 
         # Current build configuration
         self.build_config = "Release"
@@ -1102,6 +1103,10 @@ void loop() {
         self._compilation_output = ""
         self._last_cli_error = ""
 
+        if self._pending_board_memory_refresh and not self.cli_service.is_running():
+            self._pending_board_memory_refresh = False
+            QTimer.singleShot(0, self._do_background_compile)
+
     def _parse_and_update_memory_usage(self, output_text):
         """Parse memory usage from compilation output and update status display
 
@@ -1139,6 +1144,19 @@ void loop() {
                     f"✓ Memory updated: Flash {flash_used}/{flash_max} bytes, RAM {ram_used}/{ram_max} bytes",
                     color="#6A9955"
                 )
+
+    def _trigger_board_memory_refresh(self):
+        """Ensure memory usage is recalculated immediately after a board change."""
+        if self._background_compile_timer.isActive():
+            self._background_compile_timer.stop()
+
+        if self.cli_service.is_running():
+            # Try again once the CLI is idle
+            self._pending_board_memory_refresh = True
+            return
+
+        self._pending_board_memory_refresh = False
+        QTimer.singleShot(0, self._do_background_compile)
 
     def _on_code_changed(self):
         """Called when code changes - restart background compile timer"""
@@ -1727,6 +1745,7 @@ void loop() {
         # Update status display with new board specs
         if self.status_display:
             self.status_display.update_board(board_name)
+            self._trigger_board_memory_refresh()
         # Update status bar
         self.status_bar.set_board(board_name)
         # Reset to Ready after a moment
