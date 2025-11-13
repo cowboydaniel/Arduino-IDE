@@ -1605,7 +1605,7 @@ void loop() {
                 str(sketch_path),
                 board.fqbn,
                 config=build_config,
-                verbose=False,  # Keep false for cleaner output, can be toggled via UI later
+                verbose=True,  # Enable verbose output to debug preprocessing issues
                 export_binaries=True  # Export binaries to sketch folder like official IDE
             )
         except (RuntimeError, FileNotFoundError) as exc:
@@ -1691,7 +1691,7 @@ void loop() {
                 str(sketch_path),
                 board.fqbn,
                 config=build_config,
-                verbose=False,  # Keep false for cleaner output
+                verbose=True,  # Enable verbose output to debug preprocessing issues
                 export_binaries=True  # Export binaries for upload
             )
         except (RuntimeError, FileNotFoundError) as exc:
