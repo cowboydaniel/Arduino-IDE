@@ -654,7 +654,8 @@ class MainWindow(QMainWindow):
         # Add widgets to second right column layout
         self.right_column_2_layout.addWidget(self.pin_usage_panel)
         self.right_column_2_layout.addWidget(self.context_panel)
-        self.right_column_2_layout.addStretch()
+        self.right_column_2_layout.setStretch(0, 1)
+        self.right_column_2_layout.setStretch(1, 1)
 
         # --- BOTTOM TABS (Normal widgets in tabs, NOT docks) ---
         # Create bottom panels
