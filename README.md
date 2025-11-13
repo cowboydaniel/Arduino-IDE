@@ -21,7 +21,7 @@ This is NOT the official Arduino IDE, but rather a modern alternative designed f
 
 ### Key Highlights
 
-- **32,801+ lines** of Python code across **101 modules**
+- **43,116 lines** of Python code across **101 modules**
 - **2,000+ KiCAD component catalog** for circuit design
 - **All 6 development phases completed** (Core, Advanced Editing, Build System, Debugging, Advanced Features, Professional Tools)
 - **41 UI modules** (92+ classes) and **29 service modules** providing complete IDE functionality
@@ -755,7 +755,7 @@ Component Library (KiCAD) → Circuit Service → ERC Engine
 ## Statistics
 
 - **101 Python files** (not counting test files)
-- **32,801+ lines of Python code**
+- **43,116 lines of Python code**
 - **2,000+ KiCAD component definitions** for circuit design
 - **22 Markdown documentation files**
 - **40+ test files** with comprehensive coverage
