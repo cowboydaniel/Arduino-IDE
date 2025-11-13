@@ -1288,25 +1288,33 @@ void loop() {
 
         enriched_boards = []
         cached_results = {}
+        missing_definitions = []
 
         for board in boards:
             if not board:
                 continue
 
             fqbn = getattr(board, "fqbn", "")
-            enriched_board = None
+            if not fqbn:
+                missing_definitions.append(getattr(board, "name", "<unknown>"))
+                continue
 
-            if fqbn:
-                if fqbn in cached_results:
-                    enriched_board = cached_results[fqbn]
-                else:
-                    try:
-                        enriched_board = self.board_manager.get_board(fqbn)
-                    except Exception:
-                        enriched_board = None
+            enriched_board = cached_results.get(fqbn)
+            if enriched_board is None:
+                enriched_board = self.board_manager.get_board(fqbn)
+                if enriched_board:
                     cached_results[fqbn] = enriched_board
+                else:
+                    missing_definitions.append(fqbn)
+                    continue
 
-            enriched_boards.append(enriched_board or board)
+            enriched_boards.append(enriched_board)
+
+        if missing_definitions:
+            print(
+                "DEBUG: Missing board definitions for: "
+                + ", ".join(sorted(set(missing_definitions)))
+            )
 
         return enriched_boards
 
