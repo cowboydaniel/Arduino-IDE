@@ -411,6 +411,19 @@ arduino-ide
 python -m arduino_ide.main
 ```
 
+### Standalone Executable (.exe)
+
+For Windows users who don't have Python installed, you can build a standalone .exe:
+
+```bash
+# Build the standalone executable
+python build_exe.py
+```
+
+Or on Windows, simply double-click `build_exe.bat`.
+
+The generated `Arduino-IDE.exe` in the `dist/` folder can run on any Windows PC without Python installed. See [BUILD.md](BUILD.md) for detailed instructions and advanced options.
+
 ---
 
 ## Project Structure

@@ -3,6 +3,7 @@ Snippets manager for loading and managing code snippets
 """
 
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -51,7 +52,15 @@ class SnippetsManager:
 
     def load_snippets(self):
         """Load snippets from JSON file"""
-        snippets_file = Path(__file__).parent.parent / "resources" / "snippets" / "arduino_snippets.json"
+        # Handle PyInstaller bundled resources
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            # Running as PyInstaller bundle
+            base_path = Path(sys._MEIPASS)
+        else:
+            # Running as normal Python script
+            base_path = Path(__file__).parent.parent
+
+        snippets_file = base_path / "arduino_ide" / "resources" / "snippets" / "arduino_snippets.json"
 
         if not snippets_file.exists():
             print(f"Snippets file not found: {snippets_file}")

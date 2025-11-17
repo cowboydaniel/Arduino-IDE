@@ -15,7 +15,15 @@ from arduino_ide.ui.main_window import MainWindow
 def _ensure_default_core_installed() -> None:
     """Ensure the ``arduino:avr`` core is installed before the UI starts."""
 
-    cli_path = (Path(__file__).resolve().parents[1] / "arduino-cli").resolve()
+    # Handle PyInstaller bundled resources
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running as PyInstaller bundle
+        base_path = Path(sys._MEIPASS)
+    else:
+        # Running as normal Python script
+        base_path = Path(__file__).resolve().parents[1]
+
+    cli_path = (base_path / "arduino-cli").resolve()
     if not cli_path.exists():
         print(f"arduino-cli helper not found at {cli_path}. Skipping core installation.")
         return
