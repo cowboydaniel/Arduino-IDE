@@ -15,3 +15,6 @@ android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,REQUEST_INSTA
 [buildozer]
 log_level = 2
 warn_on_root = 0
+
+# Custom p4a recipes to fix libffi autoreconf issues
+p4a.local_recipes = ./p4a-recipes
