@@ -113,6 +113,7 @@ esac
 
 WRAPPER_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 WRAPPER_SHARED_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper-shared.jar
+WRAPPER_CLI_JAR=$APP_HOME/gradle/wrapper/gradle-cli.jar
 WRAPPER_JAR_TXT=$WRAPPER_JAR.txt
 WRAPPER_SHARED_JAR_TXT=$WRAPPER_SHARED_JAR.txt
 
@@ -150,6 +151,70 @@ PY
     return 1
 }
 
+wrapper_contains_main() {
+    jar_path=$1
+
+    if [ ! -f "$jar_path" ]; then
+        return 1
+    fi
+
+    if command -v python3 >/dev/null 2>&1 && GRADLE_WRAPPER_JAR=$jar_path python3 - <<'PY'
+import os
+import sys
+import zipfile
+
+jar_path = os.environ["GRADLE_WRAPPER_JAR"]
+
+try:
+    with zipfile.ZipFile(jar_path) as archive:
+        if any(name.endswith("GradleWrapperMain.class") for name in archive.namelist()):
+            sys.exit(0)
+except Exception:
+    pass
+
+sys.exit(1)
+PY
+    then
+        return 0
+    fi
+
+    return 1
+}
+
+wrapper_has_cli_support() {
+    wrapper_path=$1
+    cli_path=$2
+
+    if command -v python3 >/dev/null 2>&1 && WRAPPER_JAR=$wrapper_path WRAPPER_CLI_JAR=$cli_path python3 - <<'PY'
+import os
+import sys
+import zipfile
+
+wrapper_path = os.environ["WRAPPER_JAR"]
+cli_path = os.environ.get("WRAPPER_CLI_JAR")
+
+def has_cli(path):
+    if not path or not os.path.exists(path):
+        return False
+
+    try:
+        with zipfile.ZipFile(path) as archive:
+            return any(name.endswith("CommandLineParser.class") for name in archive.namelist())
+    except Exception:
+        return False
+
+if has_cli(wrapper_path) or has_cli(cli_path):
+    sys.exit(0)
+
+sys.exit(1)
+PY
+    then
+        return 0
+    fi
+
+    return 1
+}
+
 enhance_gradle_wrapper_download() {
     wrapper_props=$APP_HOME/gradle/wrapper/gradle-wrapper.properties
     if [ ! -f "$wrapper_props" ]; then
@@ -160,7 +225,7 @@ enhance_gradle_wrapper_download() {
         die "Python 3 is required to download Gradle wrapper jar automatically"
     fi
 
-    if ! GRADLE_WRAPPER_JAR="$WRAPPER_JAR" WRAPPER_SHARED_JAR="$WRAPPER_SHARED_JAR" WRAPPER_PROPERTIES="$wrapper_props" python3 - <<'PY'
+    if ! GRADLE_WRAPPER_JAR="$WRAPPER_JAR" WRAPPER_SHARED_JAR="$WRAPPER_SHARED_JAR" WRAPPER_CLI_JAR="$WRAPPER_CLI_JAR" WRAPPER_PROPERTIES="$wrapper_props" python3 - <<'PY'
 import os
 import sys
 import urllib.request
@@ -168,6 +233,7 @@ import zipfile
 
 jar_path = os.environ["GRADLE_WRAPPER_JAR"]
 shared_path = os.environ.get("WRAPPER_SHARED_JAR")
+cli_path = os.environ.get("WRAPPER_CLI_JAR")
 props_path = os.environ["WRAPPER_PROPERTIES"]
 
 distribution_url = None
@@ -189,21 +255,48 @@ with urllib.request.urlopen(distribution_url) as resp, open(tmp_zip, "wb") as ou
 with zipfile.ZipFile(tmp_zip) as archive:
     entries = archive.namelist()
 
-    jar_entry = None
-    for candidate in (
+    def has_wrapper_main(candidate_bytes):
+        try:
+            with zipfile.ZipFile(candidate_bytes) as jar:
+                return any(name.endswith("GradleWrapperMain.class") for name in jar.namelist())
+        except Exception:
+            return False
+
+    jar_candidates = [
         "gradle/wrapper/gradle-wrapper.jar",
         next((name for name in entries if name.endswith("gradle-wrapper.jar")), None),
-        next((name for name in entries if "gradle-wrapper-" in name and name.endswith(".jar")), None),
-    ):
-        if candidate:
-            jar_entry = candidate
+    ]
+
+    jar_candidates.extend(
+        name
+        for name in entries
+        if name not in jar_candidates and "gradle-wrapper-" in name and name.endswith(".jar")
+    )
+
+    jar_entry = None
+
+    for candidate in jar_candidates:
+        if not candidate or candidate not in entries:
+            continue
+
+        jar_entry = candidate
+
+        with archive.open(jar_entry) as src:
+            contents = src.read()
+
+        with open(jar_path, "wb") as dst:
+            dst.write(contents)
+
+        if has_wrapper_main(jar_path):
             break
+    else:
+        raise SystemExit("Valid Gradle wrapper jar not found in distribution")
 
-    if not jar_entry:
-        raise SystemExit("Gradle wrapper jar not found in distribution")
-
-    with archive.open(jar_entry) as src, open(jar_path, "wb") as dst:
-        dst.write(src.read())
+    if cli_path:
+        cli_entry = next((name for name in entries if "gradle-cli" in name and name.endswith(".jar")), None)
+        if cli_entry:
+            with archive.open(cli_entry) as src, open(cli_path, "wb") as dst:
+                dst.write(src.read())
 
     if shared_path:
         shared_entry = next((name for name in entries if "gradle-wrapper-shared" in name and name.endswith(".jar")), None)
@@ -222,7 +315,15 @@ ensure_gradle_wrapper_jar() {
     GRADLE_WRAPPER_JAR=$WRAPPER_JAR GRADLE_WRAPPER_TXT=$WRAPPER_JAR_TXT decode_wrapper_txt
     GRADLE_WRAPPER_JAR=$WRAPPER_SHARED_JAR GRADLE_WRAPPER_TXT=$WRAPPER_SHARED_JAR_TXT decode_wrapper_txt
 
-    if [ -f "$WRAPPER_JAR" ] && { [ ! -f "$WRAPPER_SHARED_JAR_TXT" ] || [ -f "$WRAPPER_SHARED_JAR" ]; }; then
+    if ! wrapper_contains_main "$WRAPPER_JAR"; then
+        rm -f "$WRAPPER_JAR"
+    fi
+
+    if ! wrapper_has_cli_support "$WRAPPER_JAR" "$WRAPPER_CLI_JAR"; then
+        rm -f "$WRAPPER_CLI_JAR"
+    fi
+
+    if wrapper_contains_main "$WRAPPER_JAR" && wrapper_has_cli_support "$WRAPPER_JAR" "$WRAPPER_CLI_JAR" && { [ ! -f "$WRAPPER_SHARED_JAR_TXT" ] || [ -f "$WRAPPER_SHARED_JAR" ]; }; then
         return
     fi
 
@@ -234,6 +335,9 @@ ensure_gradle_wrapper_jar
 CLASSPATH=$WRAPPER_JAR
 if [ -f "$WRAPPER_SHARED_JAR" ]; then
     CLASSPATH=$CLASSPATH:$WRAPPER_SHARED_JAR
+fi
+if [ -f "$WRAPPER_CLI_JAR" ]; then
+    CLASSPATH=$CLASSPATH:$WRAPPER_CLI_JAR
 fi
 
 
