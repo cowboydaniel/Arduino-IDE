@@ -1,0 +1,76 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-android-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git \
+            zip \
+            unzip \
+            openjdk-17-jdk \
+            autoconf \
+            libtool \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            cmake \
+            libffi-dev \
+            libssl-dev
+
+      - name: Install buildozer and dependencies
+        run: |
+          pip install --upgrade pip
+          pip install buildozer
+          pip install cython
+
+      - name: Build APK with buildozer
+        working-directory: android
+        run: |
+          buildozer android debug
+
+      - name: Find APK file
+        id: find_apk
+        working-directory: android
+        run: |
+          APK_PATH=$(find bin -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "apk_name=$(basename $APK_PATH)" >> $GITHUB_OUTPUT
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arduino-ide-android-${{ github.sha }}
+          path: android/${{ steps.find_apk.outputs.apk_path }}
+          retention-days: 90
+
+      - name: Create Release (if tagged)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/${{ steps.find_apk.outputs.apk_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
