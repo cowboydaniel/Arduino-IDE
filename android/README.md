@@ -19,8 +19,11 @@
 
 Whether you're prototyping on the go, teaching Arduino in classrooms without computers, or debugging projects in the field, Arduino IDE Modern for Android provides a professional-grade development experience optimized for touchscreen interfaces.
 
+For local builds, see [BUILD_ANDROID.md](./BUILD_ANDROID.md) for the Android Studio import steps and the asset staging performed by the Gradle wrapper.
+
 ### Current Status
 
+- ✅ **Phase 0: Importable Android Studio Project** – Checked-in Gradle wrapper, staged Qt/PySide6 runtime placeholders, and bundled Arduino CLI binary so the project opens and syncs with no extra generation steps.
 - ✅ **Phase 1: Android Foundation & Basic Editor** – Initial PySide6-based Android shell with touch-friendly editor, syntax highlighting, file management, tabbed editing, keyboard toolbar, and theme support.
 - ✅ **Phase 2: Arduino Build System Integration** – Integrated Arduino CLI-powered verification with board selection, core installation, library management, build console, and clickable compiler errors.
 

@@ -6,27 +6,34 @@ plugins {
 // the Qt/PySide6 bootstrapper can load them without an external deploy step.
 def repoRoot = rootProject.rootDir.toPath().resolve('..').resolve('..').normalize().toFile()
 def pythonInputs = [
-        [name: 'entrypoint', path: new File(repoRoot, 'arduino_ide/main.py'), dest: 'python'],
+        [name: 'androidEntrypoint', path: new File(repoRoot, 'android/main.py'), dest: 'python'],
+        [name: 'desktopEntrypoint', path: new File(repoRoot, 'arduino_ide/main.py'), dest: 'python/arduino_ide'],
         [name: 'workspaceMain', path: new File(repoRoot, 'main.py'), dest: 'python'],
         [name: 'package', path: new File(repoRoot, 'arduino_ide'), dest: 'python/arduino_ide'],
-        [name: 'uiMobile', path: new File(repoRoot, 'ui_mobile'), dest: 'python/ui_mobile'],
-        [name: 'servicesMobile', path: new File(repoRoot, 'services_mobile'), dest: 'python/services_mobile'],
+        [name: 'uiMobile', path: new File(repoRoot, 'android/ui_mobile'), dest: 'python/ui_mobile'],
+        [name: 'servicesMobile', path: new File(repoRoot, 'android/services_mobile'), dest: 'python/services_mobile'],
 ]
 
-def generatedPythonAssets = layout.buildDirectory.dir('generated/pythonAssets')
-def pythonAssetDir = generatedPythonAssets.get().asFile
+def runtimeInputs = [
+        [name: 'qtRuntime', path: new File(repoRoot, 'android/runtime/qt-runtime'), dest: 'runtime/qt-runtime'],
+        [name: 'pyside6Runtime', path: new File(repoRoot, 'android/runtime/pyside6'), dest: 'runtime/pyside6'],
+        [name: 'arduinoCli', path: new File(repoRoot, 'arduino-cli'), dest: 'runtime/arduino-cli'],
+]
 
-tasks.register('preparePythonAssets', Sync) {
-    into(pythonAssetDir)
+def generatedMobileAssets = layout.buildDirectory.dir('generated/mobileAssets')
+def mobileAssetDir = generatedMobileAssets.get().asFile
 
-    pythonInputs.each { entry ->
+tasks.register('prepareMobileAssets', Sync) {
+    into(mobileAssetDir)
+
+    (pythonInputs + runtimeInputs).each { entry ->
         if (entry.path.exists()) {
             from(entry.path) {
                 includeEmptyDirs = false
                 into(entry.dest)
             }
         } else {
-            logger.lifecycle("[android-studio] Skipping missing Python source ${entry.path}")
+            logger.lifecycle("[android-studio] Skipping missing asset ${entry.path}")
         }
     }
 }
@@ -63,13 +70,13 @@ android {
 
     sourceSets {
         named('main') {
-            assets.srcDir(pythonAssetDir)
+            assets.srcDir(mobileAssetDir)
         }
     }
 }
 
 tasks.named('preBuild').configure {
-    dependsOn('preparePythonAssets')
+    dependsOn('prepareMobileAssets')
 }
 
 dependencies {
