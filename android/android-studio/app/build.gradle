@@ -1,0 +1,79 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Stage the Python entry point and mobile-specific modules inside assets so
+// the Qt/PySide6 bootstrapper can load them without an external deploy step.
+def repoRoot = rootProject.rootDir.toPath().resolve('..').resolve('..').normalize().toFile()
+def pythonInputs = [
+        [name: 'entrypoint', path: new File(repoRoot, 'arduino_ide/main.py'), dest: 'python'],
+        [name: 'workspaceMain', path: new File(repoRoot, 'main.py'), dest: 'python'],
+        [name: 'package', path: new File(repoRoot, 'arduino_ide'), dest: 'python/arduino_ide'],
+        [name: 'uiMobile', path: new File(repoRoot, 'ui_mobile'), dest: 'python/ui_mobile'],
+        [name: 'servicesMobile', path: new File(repoRoot, 'services_mobile'), dest: 'python/services_mobile'],
+]
+
+def generatedPythonAssets = layout.buildDirectory.dir('generated/pythonAssets')
+def pythonAssetDir = generatedPythonAssets.get().asFile
+
+tasks.register('preparePythonAssets', Sync) {
+    into(pythonAssetDir)
+
+    pythonInputs.each { entry ->
+        if (entry.path.exists()) {
+            from(entry.path) {
+                includeEmptyDirs = false
+                into(entry.dest)
+            }
+        } else {
+            logger.lifecycle("[android-studio] Skipping missing Python source ${entry.path}")
+        }
+    }
+}
+
+android {
+    namespace 'com.arduino.ide.mobile'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.arduino.ide.mobile'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '0.1.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ['/META-INF/{AL2.0,LGPL2.1}']
+        }
+    }
+
+    sourceSets {
+        named('main') {
+            assets.srcDir(pythonAssetDir)
+        }
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn('preparePythonAssets')
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+}

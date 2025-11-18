@@ -157,7 +157,7 @@ Coming Soon - Currently in Beta Testing
 
 #### Prerequisites
 
-The Android build is now based on Qt for Android with a Gradle toolchain. **Buildozer and python-for-android are not used or supported.** Make sure the following components are installed and available on your system:
+The Android build is now driven by a committed Android Studio/Gradle project under `android/android-studio/`. **Buildozer and python-for-android remain unsupported.** Install the following:
 
 - Python 3.10+ with `pip`
 - Java 11 or 17 (for the Gradle Android plugin)
@@ -166,7 +166,7 @@ The Android build is now based on Qt for Android with a Gradle toolchain. **Buil
 - CMake 3.22+ and Ninja (installed with the Android SDK, or system packages)
 - Qt 6.6+ for Android (arm64-v8a at minimum) and the matching host Qt used by PySide6
 
-Environment variables expected by the tooling:
+Environment variables commonly used by Qt for Android:
 
 ```bash
 export ANDROID_SDK_ROOT=/path/to/android-sdk
@@ -184,42 +184,31 @@ pip install -r ../requirements.txt
 pip install "pyside6==6.6.*" "shiboken6==6.6.*"
 ```
 
+#### Android Studio Project
+
+The Gradle wrapper, sources, manifests, and resources are checked in at `android/android-studio/`. Open that folder directly in Android Studio to work on, run, or debug the Android build without running `pyside6-android-deploy` first.
+
+- The `preparePythonAssets` Gradle task (wired into `preBuild`) copies `arduino_ide/main.py`, the full `arduino_ide/` package, and any `ui_mobile/` or `services_mobile/` modules from the repository root into `app/src/main/assets/python/` so the PySide6 bootstrapper can find them inside the APK.
+- The assets task copies sources verbatim from your checkout; rebuild after changing `arduino_ide/`, `ui_mobile/`, or `services_mobile/` so the updated Python files are staged into the APK.
+- To avoid committing binaries, `gradlew` downloads the Gradle wrapper JAR on first use based on `gradle/wrapper/gradle-wrapper.properties` (requires Python 3 and network access).
+- Set SDK/NDK paths in **Android Studio → Settings → Appearance & Behavior → System Settings → Android SDK** or via a `local.properties` file with `sdk.dir`/`ndk.dir` entries.
+
 #### Build Steps
 
 ```bash
 # Clone the repository
 git clone https://github.com/cowboydaniel/Arduino-IDE.git
-cd Arduino-IDE/android
+cd Arduino-IDE/android/android-studio
 
-# Generate the Qt/Gradle deployment configuration for Android
-pyside6-android-deploy --init android-deploy.json
-
-# Build the APK with the Gradle-based Qt toolchain
-pyside6-android-deploy \
-  --config android-deploy.json \
-  --android-sdk "$ANDROID_SDK_ROOT" \
-  --android-ndk "$ANDROID_NDK_ROOT" \
-  --qt-host-path "$QT_HOST_PATH" \
-  --qt-target-path "$QT_ANDROID" \
-  --build-type debug
-
-# The generated Gradle project lives under ./.build/android/gradle
-cd .build/android/gradle
+# Build the APK with the committed Gradle wrapper
 ./gradlew assembleDebug    # produces app/build/outputs/apk/debug/*.apk
+./gradlew assembleRelease  # produces a release build (configure signing as needed)
 ```
-
-To produce a release-signed build, pass `--build-type release` to `pyside6-android-deploy` and configure your signing keystore in the generated `android-deploy.json` before running `./gradlew assembleRelease`.
-
-**Notes**
-
-- The entire pipeline is driven by Qt for Android and Gradle; Buildozer and python-for-android are intentionally unsupported.
-- If the Android SDK tools are installed via Android Studio, ensure `cmdline-tools`, `platform-tools`, `build-tools 34.x`, and the selected NDK are installed.
-- The deploy tool may create the Gradle wrapper during the first run; subsequent builds are faster because SDK/NDK artifacts are cached.
 
 Deployment to a device or emulator can be done directly from Gradle:
 
 ```bash
-# From .build/android/gradle
+# From android/android-studio
 ./gradlew installDebug    # installs the debug APK on a connected device/emulator
 ./gradlew installRelease  # installs a release build (requires signing config)
 ```
@@ -535,8 +524,7 @@ android/
 │   ├── bluetooth_service.py  # BLE and Classic Bluetooth
 │   └── storage_service.py    # Scoped storage handling
 ├── p4a-recipes/              # Legacy p4a recipes (not used by the Qt/Gradle toolchain)
-└── .build/android/gradle/    # Generated Gradle project from `pyside6-android-deploy`
-                              # (created during the build; not committed)
+└── android-studio/           # Committed Android Studio/Gradle project (open directly in IDE)
 ```
 
 ---
