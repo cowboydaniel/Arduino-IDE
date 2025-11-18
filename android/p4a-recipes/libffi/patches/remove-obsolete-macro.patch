@@ -1,0 +1,15 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -225,8 +225,10 @@ AC_ARG_ENABLE(pax_emutramp,
+       [Define this if you want to enable pax emulated trampolines (experimental)])
+   fi)
+
+-LT_SYS_SYMBOL_USCORE
+-if test "x$sys_symbol_underscore" = xyes; then
++# LT_SYS_SYMBOL_USCORE - This macro is obsolete and removed from modern libtool
++# Modern systems don't use symbol underscores, so we set it to 'no' by default
++sys_symbol_underscore=no
++if test "x$sys_symbol_underscore" = xyes; then
+   AC_DEFINE(HAVE_AS_REGISTER_PSEUDO_OP, 1,
+        [Define if your assembler and linker support unaligned PC relative relocs.])
+   AC_DEFINE(FFI_EXEC_TRAMPOLINE_TABLE, 1,
