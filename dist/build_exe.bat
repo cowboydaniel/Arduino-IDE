@@ -16,8 +16,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Change to parent directory (project root)
+cd /d "%~dp0.."
+
 REM Run the build script
-python build_exe.py
+python dist/build_exe.py
 
 echo.
 echo Press any key to exit...

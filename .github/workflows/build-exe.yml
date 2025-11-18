@@ -28,7 +28,7 @@ jobs:
 
     - name: Build Windows executable
       run: |
-        python build_exe.py
+        python dist/build_exe.py
 
     - name: Upload executable as artifact
       uses: actions/upload-artifact@v4

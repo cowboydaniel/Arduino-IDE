@@ -62,7 +62,7 @@ def main():
         subprocess.check_call([
             sys.executable,
             "-m", "PyInstaller",
-            "arduino_ide.spec",
+            "dist/arduino_ide.spec",
             "--clean"
         ])
 
