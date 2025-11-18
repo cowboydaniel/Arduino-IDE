@@ -22,7 +22,8 @@ This roadmap outlines the complete development process for bringing Arduino IDE 
 **Goal**: Get a functional text editor running on Android
 
 ### What Gets Built
-- Android app structure using python-for-android and Buildozer
+- Android app structure using Qt for Android with PySide6, generated via `pyside6-android-deploy` and Gradle
+- Gradle packaging config (`android-deploy.json`) for reproducible arm64-v8a debug builds
 - PySide6/Qt for Android UI framework integration
 - Basic code editor with syntax highlighting for Arduino C/C++
 - File management (new, open, save, delete)
@@ -34,15 +35,16 @@ This roadmap outlines the complete development process for bringing Arduino IDE 
 - Scoped storage compliance (Android 11+)
 
 ### Success Criteria
-- ✅ APK installs and runs on Android 7.0+ devices
+- ✅ Debug APK assembles via the Qt for Android/Gradle pipeline and installs on Android 7.0+ devices
 - ✅ Can create and edit Arduino sketches
 - ✅ Syntax highlighting works smoothly
 - ✅ App launches in < 3 seconds
 - ✅ Responsive on phones (5"+) and tablets (7"+)
 - ✅ Proper keyboard handling and text selection
+- ✅ No Buildozer/python-for-android dependencies required to reproduce the build
 
 ### Deliverable
-A basic Arduino code editor app that lets you write sketches on Android.
+A basic Arduino code editor app that lets you write sketches on Android, packaged with the Qt for Android + Gradle toolchain.
 
 ---
 
@@ -52,6 +54,7 @@ A basic Arduino code editor app that lets you write sketches on Android.
 
 ### What Gets Built
 - Arduino CLI compiled for ARM64 architecture
+- Gradle packaging of Arduino CLI and assets using the Qt for Android deployment pipeline
 - Sketch verification (compile without upload)
 - Build output console with error parsing
 - Compiler error detection with clickable line numbers
@@ -65,6 +68,7 @@ A basic Arduino code editor app that lets you write sketches on Android.
 
 ### Success Criteria
 - ✅ Can compile "Blink" sketch in < 15 seconds
+- ✅ Qt/Gradle build continues to assemble installable APKs with the bundled CLI assets
 - ✅ Compiler errors are clickable and jump to code
 - ✅ Board cores install successfully (Arduino AVR, ESP32, etc.)
 - ✅ Libraries install from Arduino registry
