@@ -154,22 +154,43 @@ Coming Soon - Currently in Beta Testing
 4. Grant required permissions (Storage, USB, Bluetooth)
 
 ### Building from Source
+
+#### Prerequisites
+
+Before building, install required system dependencies:
+
 ```bash
-# Install Buildozer (on Linux desktop or Termux)
-pip install buildozer
+# On Ubuntu/Debian
+sudo apt update
+sudo apt install -y python3 python3-pip git
+
+# IMPORTANT: Install autotools (required for libffi compilation)
+sudo apt install -y autoconf automake libtool pkg-config
+
+# Install build essentials
+sudo apt install -y build-essential openjdk-11-jdk
+```
+
+#### Build Steps
+
+```bash
+# Install Buildozer
+pip3 install --user buildozer
 
 # Clone the repository
 git clone https://github.com/cowboydaniel/Arduino-IDE.git
 cd Arduino-IDE/android
 
-# Build APK
+# Build APK (first build takes 30-60 minutes)
 buildozer android debug
 
 # Install to connected device
 buildozer android deploy run
 ```
 
-See [BUILD_ANDROID.md](BUILD_ANDROID.md) for detailed build instructions.
+**Note**: The `autoconf`, `automake`, and `libtool` packages are required for building libffi (a core dependency). Without these, the build will fail with "autoreconf: not found".
+
+See [BUILD_ANDROID.md](BUILD_ANDROID.md) for complete build instructions, troubleshooting, and advanced options.
 
 ---
 
