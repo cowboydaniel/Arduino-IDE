@@ -10,6 +10,8 @@ on:
 jobs:
   build-windows-exe:
     runs-on: windows-latest
+    permissions:
+      contents: write  # Allow pushing commits back to repository
 
     steps:
     - name: Checkout repository
