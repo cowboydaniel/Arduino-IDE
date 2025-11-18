@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Arduino IDE Modern</string>
+    <string name="welcome_headline">Kotlin-first Android build</string>
+    <string name="welcome_body">This mobile shell is implemented natively in Kotlin so CI can assemble installable APKs without Python or Qt runtime staging.</string>
 </resources>
