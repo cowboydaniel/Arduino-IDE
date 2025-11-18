@@ -17,6 +17,31 @@ This roadmap outlines the complete development process for bringing Arduino IDE 
 
 ---
 
+## Phase 0: Importable Android Studio Project (Near-Term)
+**Duration**: 3-4 weeks
+**Goal**: Provide a fully checked-in Android Studio project that opens and builds without regeneration steps
+
+### What Gets Built
+- Gradle wrapper committed with project-level and app/module `build.gradle` files
+- Android Studio project structure (settings, modules, and Qt/PySide6 artifacts) pre-generated and committed
+- Bundled assets required to assemble the Android app, including the PySide6/Qt runtime output and Arduino CLI binaries/assets
+- Consistent project configuration aligned with the existing Qt for Android deployment pipeline
+
+### Success Criteria
+- ✅ Project opens in Android Studio and syncs successfully without invoking `pyside6-android-deploy` or other generation commands
+- ✅ Builds from Android Studio (debug variant) complete using the committed Gradle wrapper and modules
+- ✅ PySide6/Qt runtime and Arduino CLI assets are resolved from the repository contents (no external downloads beyond Gradle/Maven dependencies)
+- ✅ New contributors can clone and immediately build/install from Android Studio following the documented steps
+
+### Dependencies
+- Packaging and committing the PySide6/Qt runtime artifacts produced by the Qt for Android toolchain
+- Packaging and committing Arduino CLI binaries and support assets needed for builds
+
+### Deliverable
+A ready-to-import Android Studio project with Gradle wrapper, modules, and runtime assets included so new contributors can open, sync, and build immediately.
+
+---
+
 ## Phase 1: Android Foundation & Basic Editor ✅ Completed
 **Duration**: 6-8 weeks
 **Goal**: Get a functional text editor running on Android
