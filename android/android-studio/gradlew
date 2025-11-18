@@ -112,9 +112,10 @@ case "$( uname )" in                #(
 esac
 
 WRAPPER_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+WRAPPER_SHARED_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper-shared.jar
 
 ensure_gradle_wrapper_jar() {
-    if [ -f "$WRAPPER_JAR" ]; then
+    if [ -f "$WRAPPER_JAR" ] && { [ ! -f "$WRAPPER_SHARED_JAR" ] || [ -f "$WRAPPER_SHARED_JAR" ]; }; then
         return
     fi
 
@@ -127,13 +128,14 @@ ensure_gradle_wrapper_jar() {
         die "Python 3 is required to download Gradle wrapper jar automatically"
     fi
 
-    if ! GRADLE_WRAPPER_JAR="$WRAPPER_JAR" WRAPPER_PROPERTIES="$wrapper_props" python3 - <<'PY'
+    if ! GRADLE_WRAPPER_JAR="$WRAPPER_JAR" WRAPPER_SHARED_JAR="$WRAPPER_SHARED_JAR" WRAPPER_PROPERTIES="$wrapper_props" python3 - <<'PY'
 import os
 import sys
 import urllib.request
 import zipfile
 
 jar_path = os.environ["GRADLE_WRAPPER_JAR"]
+shared_path = os.environ.get("GRADLE_WRAPPER_SHARED_JAR")
 props_path = os.environ["WRAPPER_PROPERTIES"]
 
 distribution_url = None
@@ -153,8 +155,29 @@ with urllib.request.urlopen(distribution_url) as resp, open(tmp_zip, "wb") as ou
     out.write(resp.read())
 
 with zipfile.ZipFile(tmp_zip) as archive:
-    with archive.open("gradle/wrapper/gradle-wrapper.jar") as src, open(jar_path, "wb") as dst:
+    entries = archive.namelist()
+
+    jar_entry = None
+    for candidate in (
+        "gradle/wrapper/gradle-wrapper.jar",
+        next((name for name in entries if name.endswith("gradle-wrapper.jar")), None),
+        next((name for name in entries if "gradle-wrapper-" in name and name.endswith(".jar")), None),
+    ):
+        if candidate:
+            jar_entry = candidate
+            break
+
+    if not jar_entry:
+        raise SystemExit("Gradle wrapper jar not found in distribution")
+
+    with archive.open(jar_entry) as src, open(jar_path, "wb") as dst:
         dst.write(src.read())
+
+    if shared_path:
+        shared_entry = next((name for name in entries if "gradle-wrapper-shared" in name and name.endswith(".jar")), None)
+        if shared_entry:
+            with archive.open(shared_entry) as src, open(shared_path, "wb") as dst:
+                dst.write(src.read())
 
 os.remove(tmp_zip)
 PY
@@ -166,6 +189,9 @@ PY
 ensure_gradle_wrapper_jar
 
 CLASSPATH=$WRAPPER_JAR
+if [ -f "$WRAPPER_SHARED_JAR" ]; then
+    CLASSPATH=$CLASSPATH:$WRAPPER_SHARED_JAR
+fi
 
 
 # Determine the Java command to use to start the JVM.
