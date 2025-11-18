@@ -9,8 +9,6 @@ import sys
 from PySide6.QtWidgets import QApplication, QLabel
 from PySide6.QtCore import Qt
 
-from arduino_ide.main import main as desktop_main
-
 
 def _bootstrap_environment() -> None:
     """Configure import paths so the bundled assets can resolve correctly.
@@ -52,6 +50,12 @@ def main() -> int:
     splash.show()
 
     # Reuse the desktop entry point so Phase 0 shares the same feature surface.
+    try:
+        from arduino_ide.main import main as desktop_main
+    except Exception as exc:  # noqa: BLE001 - we want to catch unexpected bootstrap failures
+        print(f"Failed to start Arduino IDE: {exc}")
+        return 1
+
     exit_code = desktop_main()
     splash.close()
     return exit_code
