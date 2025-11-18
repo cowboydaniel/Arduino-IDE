@@ -47,25 +47,21 @@ jobs:
           pip install buildozer
           pip install cython
 
-      - name: Pre-accept Android SDK licenses
-        run: |
-          # Create license directory
-          mkdir -p $HOME/.buildozer/android/platform/android-sdk/licenses
-
-          # Add license hashes
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
-
-          echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $HOME/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
-
       - name: Build APK with buildozer
         working-directory: android
         run: |
-          # Let buildozer install SDK automatically with pre-accepted licenses
-          buildozer -v android debug
+          # Auto-accept all prompts during buildozer execution
+          yes | buildozer -v android debug || true
+
+          # If first attempt had issues with licenses, accept them and retry
+          if [ ! -f bin/*.apk ]; then
+            mkdir -p $HOME/.buildozer/android/platform/android-sdk/licenses
+            echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+            echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+            echo "84831b9409646a918e30573bab4c9c91346d8abd" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
+            echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $HOME/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
+            buildozer -v android debug
+          fi
 
       - name: Find APK file
         id: find_apk
