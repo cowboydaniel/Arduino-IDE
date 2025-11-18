@@ -89,8 +89,8 @@ def _ensure_default_core_installed() -> None:
         print(f"Failed to install arduino:avr core: {exc.stderr.strip() if exc.stderr else exc}")
 
 
-def main():
-    """Initialize and run the application"""
+def main() -> int:
+    """Initialize and run the application."""
     # Enable high DPI scaling
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -98,7 +98,7 @@ def main():
 
     _ensure_default_core_installed()
 
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(APP_ORGANIZATION)
     app.setApplicationVersion(APP_VERSION)
@@ -109,8 +109,8 @@ def main():
     window.showMaximized()
     QTimer.singleShot(0, window.showMaximized)
 
-    sys.exit(app.exec())
+    return app.exec()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
