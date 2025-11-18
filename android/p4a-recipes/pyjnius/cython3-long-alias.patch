@@ -1,9 +1,9 @@
 --- a/jnius/jnius_utils.pxi
 +++ b/jnius/jnius_utils.pxi
-@@
+@@ -1,5 +1,12 @@
  cdef str_for_c(s):
      return s.encode('utf-8')
-
+ 
 +# Cython 3 (and Python 3) no longer define the Python 2 ``long`` builtin.
 +# Alias it to ``int`` so legacy checks continue to work during cythonization.
 +try:
