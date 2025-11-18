@@ -25,15 +25,15 @@ def main():
     # Check if PyInstaller is installed
     try:
         import PyInstaller
-        print(f"✓ PyInstaller {PyInstaller.__version__} found")
+        print(f"[OK] PyInstaller {PyInstaller.__version__} found")
     except ImportError:
-        print("✗ PyInstaller not found!")
-        print("  Installing PyInstaller...")
+        print("[!] PyInstaller not found!")
+        print("    Installing PyInstaller...")
         subprocess.check_call([
             sys.executable, "-m", "pip", "install",
             "--break-system-packages", "pyinstaller==6.3.0"
         ])
-        print("✓ PyInstaller installed")
+        print("[OK] PyInstaller installed")
 
     print()
 
@@ -68,7 +68,7 @@ def main():
 
         print()
         print("=" * 70)
-        print("✓ Build completed successfully!")
+        print("[SUCCESS] Build completed successfully!")
         print("=" * 70)
         print()
         print(f"The standalone executable is located at:")
@@ -88,7 +88,7 @@ def main():
     except subprocess.CalledProcessError as e:
         print()
         print("=" * 70)
-        print("✗ Build failed!")
+        print("[ERROR] Build failed!")
         print("=" * 70)
         print(f"Error: {e}")
         sys.exit(1)
