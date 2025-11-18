@@ -22,11 +22,8 @@ except ImportError:
     Repo = None
 
 # Import suggestion analyzer
-import sys
-from pathlib import Path as PathLib
-sys.path.insert(0, str(PathLib(__file__).parent.parent / "services"))
-from suggestion_analyzer import SuggestionAnalyzer
-from git_diff_utils import calculate_git_changes
+from arduino_ide.services.suggestion_analyzer import SuggestionAnalyzer
+from arduino_ide.services.git_diff_utils import calculate_git_changes
 from arduino_ide.data.arduino_api_reference import get_api_info
 from arduino_ide.services.contextual_help_service import (
     ContextualHelpService,
