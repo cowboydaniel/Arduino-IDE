@@ -24,7 +24,10 @@ def main():
     except ImportError:
         print("✗ PyInstaller not found!")
         print("  Installing PyInstaller...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller==6.3.0"])
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install",
+            "--break-system-packages", "pyinstaller==6.3.0"
+        ])
         print("✓ PyInstaller installed")
 
     print()
