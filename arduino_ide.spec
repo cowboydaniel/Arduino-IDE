@@ -1,16 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller spec file for Arduino IDE Modern
-Creates a standalone Windows .exe with all dependencies bundled
+Creates a standalone executable with all dependencies bundled
 """
 
 import os
+import sys
 from pathlib import Path
 
 block_cipher = None
 
 # Base directory of the project
 base_dir = Path(SPECPATH)
+
+# Determine executable name based on platform
+if sys.platform == 'win32':
+    exe_name = 'Arduino-IDE.exe'
+else:
+    exe_name = 'Arduino-IDE'
 
 # Collect all data files that need to be bundled
 datas = [
@@ -64,7 +71,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='Arduino-IDE',
+    name=exe_name,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

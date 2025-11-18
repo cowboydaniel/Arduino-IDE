@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-Build script for creating standalone Arduino IDE .exe
-This script builds a Windows executable that works without Python installed.
+Build script for creating standalone Arduino IDE executable
+This script builds a platform-specific executable that works without Python installed.
+For Windows .exe: Must be run on Windows
+For Linux binary: Must be run on Linux
 """
 
 import subprocess
@@ -12,8 +14,11 @@ from pathlib import Path
 
 def main():
     """Build the standalone executable"""
+    platform_name = "Windows .exe" if sys.platform == "win32" else "Linux binary"
+    exe_name = "Arduino-IDE.exe" if sys.platform == "win32" else "Arduino-IDE"
+
     print("=" * 70)
-    print("Arduino IDE Modern - Standalone .exe Builder")
+    print(f"Arduino IDE Modern - Standalone {platform_name} Builder")
     print("=" * 70)
     print()
 
@@ -67,10 +72,17 @@ def main():
         print("=" * 70)
         print()
         print(f"The standalone executable is located at:")
-        print(f"  {dist_dir.absolute() / 'Arduino-IDE.exe'}")
+        print(f"  {dist_dir.absolute() / exe_name}")
         print()
-        print("You can now distribute this .exe file to any Windows PC,")
-        print("even if they don't have Python installed!")
+        if sys.platform == "win32":
+            print("You can now distribute this .exe file to any Windows PC,")
+            print("even if they don't have Python installed!")
+        else:
+            print("You can now distribute this binary to Linux systems,")
+            print("even if they don't have Python installed!")
+            print()
+            print("Note: To build a Windows .exe, run this script on Windows")
+            print("or use the GitHub Actions workflow to build automatically.")
         print()
 
     except subprocess.CalledProcessError as e:
