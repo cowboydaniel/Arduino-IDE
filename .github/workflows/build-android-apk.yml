@@ -47,16 +47,33 @@ jobs:
           pip install buildozer
           pip install cython
 
+      - name: Setup Android SDK
+        run: |
+          # Create SDK directories
+          mkdir -p $HOME/.buildozer/android/platform/android-sdk
+          cd $HOME/.buildozer/android/platform
+
+          # Download and extract command line tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip
+          mkdir -p android-sdk/cmdline-tools
+          mv cmdline-tools android-sdk/cmdline-tools/latest
+
+          # Set up environment
+          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+
+          # Accept licenses
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+          # Install required SDK components
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
       - name: Build APK with buildozer
         working-directory: android
         env:
-          ANDROID_SDK_ACCEPT_LICENSES: "y"
+          ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
         run: |
-          # Accept all SDK licenses automatically
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
-          # Build the APK
           buildozer -v android debug
 
       - name: Find APK file
