@@ -6,12 +6,12 @@ This guide explains how to package Arduino IDE Modern as a standalone Windows ex
 
 ### On Windows
 
-Simply double-click `build_exe.bat` in Windows Explorer.
+Simply double-click `dist/build_exe.bat` in Windows Explorer.
 
 ### On Any Platform
 
 ```bash
-python build_exe.py
+python dist/build_exe.py
 ```
 
 ## Requirements
@@ -61,7 +61,7 @@ Simply copy `Arduino-IDE.exe` to the target computer and run it.
 
 ### Custom Build
 
-To customize the build, edit `arduino_ide.spec`:
+To customize the build, edit `dist/arduino_ide.spec`:
 
 - **Add icon**: Set `icon='path/to/icon.ico'` in the `EXE()` section
 - **Enable console**: Set `console=True` to show a console window (useful for debugging)
@@ -77,7 +77,7 @@ To build manually without the script:
 pip install pyinstaller==6.3.0
 
 # Build using the spec file
-pyinstaller arduino_ide.spec --clean
+pyinstaller dist/arduino_ide.spec --clean
 ```
 
 ## Troubleshooting
@@ -98,7 +98,7 @@ pyinstaller arduino_ide.spec --clean
 
 If the .exe runs but is missing snippets, templates, or other resources:
 
-1. Check that all data files are listed in `arduino_ide.spec`
+1. Check that all data files are listed in `dist/arduino_ide.spec`
 2. Verify the resource paths in the spec file are correct
 3. Rebuild with `--clean` flag
 
@@ -116,7 +116,7 @@ To reduce the .exe size:
 
 To bundle additional files:
 
-1. Edit `arduino_ide.spec`
+1. Edit `dist/arduino_ide.spec`
 2. Add entries to the `datas` list:
    ```python
    datas = [

@@ -417,10 +417,10 @@ For Windows users who don't have Python installed, you can build a standalone .e
 
 ```bash
 # Build the standalone executable
-python build_exe.py
+python dist/build_exe.py
 ```
 
-Or on Windows, simply double-click `build_exe.bat`.
+Or on Windows, simply double-click `dist/build_exe.bat`.
 
 The generated `Arduino-IDE.exe` in the `dist/` folder can run on any Windows PC without Python installed. See [BUILD.md](BUILD.md) for detailed instructions and advanced options.
 
