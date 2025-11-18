@@ -22,6 +22,7 @@ Whether you're prototyping on the go, teaching Arduino in classrooms without com
 ### Current Status
 
 - ✅ **Phase 1: Android Foundation & Basic Editor** – Initial PySide6-based Android shell with touch-friendly editor, syntax highlighting, file management, tabbed editing, keyboard toolbar, and theme support.
+- ✅ **Phase 2: Arduino Build System Integration** – Integrated Arduino CLI-powered verification with board selection, core installation, library management, build console, and clickable compiler errors.
 
 ### Why Android?
 
