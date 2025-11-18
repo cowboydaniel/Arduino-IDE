@@ -9,7 +9,7 @@
 
 ## Overview
 
-This roadmap outlines the complete development process for bringing Arduino IDE Modern to Android with **100% feature parity** to the desktop version, optimized for mobile devices. Each phase is a complete, shippable increment that delivers tangible value.
+This roadmap outlines the complete development process for bringing Arduino IDE Modern to Android with **100% feature parity** to the desktop version, optimized for mobile devices. The Android client is delivered as a **native Kotlin** app built with the Android Gradle plugin so CI/CD can produce installable APKs without any Python or Qt staging. Each phase is a complete, shippable increment that delivers tangible value.
 
 **Total Estimated Timeline**: 12-18 months
 **Team Size**: 2-4 developers
@@ -23,22 +23,22 @@ This roadmap outlines the complete development process for bringing Arduino IDE 
 
 ### What Gets Built
 - Gradle wrapper committed with project-level and app/module `build.gradle` files
-- Android Studio project structure (settings, modules, and Qt/PySide6 artifacts) pre-generated and committed
-- Bundled assets required to assemble the Android app, including the PySide6/Qt runtime output and Arduino CLI binaries/assets
-- Consistent project configuration aligned with the existing Qt for Android deployment pipeline
+- Android Studio project structure (settings, modules, and Kotlin source sets) pre-generated and committed
+- Kotlin entry Activity, Material 3 resources, and Arduino CLI integration stubs staged for future feature work
+- Consistent project configuration aligned with the Android Gradle plugin and CI-friendly signing hooks
 
 ### Success Criteria
-- ✅ Project opens in Android Studio and syncs successfully without invoking `pyside6-android-deploy` or other generation commands
+- ✅ Project opens in Android Studio and syncs successfully without invoking any Python deployment tooling
 - ✅ Builds from Android Studio (debug variant) complete using the committed Gradle wrapper and modules
-- ✅ PySide6/Qt runtime and Arduino CLI assets are resolved from the repository contents (no external downloads beyond Gradle/Maven dependencies)
+- ✅ Kotlin sources, resources, and Arduino CLI placeholders are resolved from the repository contents (no external downloads beyond Gradle/Maven dependencies)
 - ✅ New contributors can clone and immediately build/install from Android Studio following the documented steps
 
 ### Dependencies
-- Packaging and committing the PySide6/Qt runtime artifacts produced by the Qt for Android toolchain
+- Android SDK/NDK installation and Gradle plugin alignment
 - Packaging and committing Arduino CLI binaries and support assets needed for builds
 
 ### Deliverable
-A ready-to-import Android Studio project with Gradle wrapper, modules, and runtime assets included so new contributors can open, sync, and build immediately.
+A ready-to-import Android Studio project with Gradle wrapper, modules, Kotlin sources, and CLI placeholders included so new contributors can open, sync, and build immediately.
 
 ---
 
@@ -47,10 +47,10 @@ A ready-to-import Android Studio project with Gradle wrapper, modules, and runti
 **Goal**: Get a functional text editor running on Android
 
 ### What Gets Built
-- Android app structure using Qt for Android with PySide6, generated via `pyside6-android-deploy` and Gradle
-- Gradle packaging config (`android-deploy.json`) for reproducible arm64-v8a debug builds
-- PySide6/Qt for Android UI framework integration
-- Basic code editor with syntax highlighting for Arduino C/C++
+- Android app structure using the Android Gradle plugin with Kotlin source sets
+- Gradle configuration for reproducible arm64-v8a debug builds
+- Native Kotlin UI foundation with Material 3 styling
+- Basic code editor shell ready for Arduino C/C++ authoring
 - File management (new, open, save, delete)
 - Material Design 3 UI with dark/light themes
 - Touch-optimized text editing with virtual keyboard
@@ -60,7 +60,7 @@ A ready-to-import Android Studio project with Gradle wrapper, modules, and runti
 - Scoped storage compliance (Android 11+)
 
 ### Success Criteria
-- ✅ Debug APK assembles via the Qt for Android/Gradle pipeline and installs on Android 7.0+ devices
+- ✅ Debug APK assembles via the Android Gradle pipeline and installs on Android 7.0+ devices
 - ✅ Can create and edit Arduino sketches
 - ✅ Syntax highlighting works smoothly
 - ✅ App launches in < 3 seconds
@@ -69,7 +69,7 @@ A ready-to-import Android Studio project with Gradle wrapper, modules, and runti
 - ✅ No Buildozer/python-for-android dependencies required to reproduce the build
 
 ### Deliverable
-A basic Arduino code editor app that lets you write sketches on Android, packaged with the Qt for Android + Gradle toolchain.
+A basic Arduino code editor app that lets you write sketches on Android, packaged with the Android Gradle toolchain.
 
 ---
 
@@ -79,7 +79,7 @@ A basic Arduino code editor app that lets you write sketches on Android, package
 
 ### What Gets Built
 - Arduino CLI compiled for ARM64 architecture
-- Gradle packaging of Arduino CLI and assets using the Qt for Android deployment pipeline
+- Gradle packaging of Arduino CLI and assets using the Android build pipeline
 - Sketch verification (compile without upload)
 - Build output console with error parsing
 - Compiler error detection with clickable line numbers
@@ -93,7 +93,7 @@ A basic Arduino code editor app that lets you write sketches on Android, package
 
 ### Success Criteria
 - ✅ Can compile "Blink" sketch in < 15 seconds
-- ✅ Qt/Gradle build continues to assemble installable APKs with the bundled CLI assets
+- ✅ Android Gradle build continues to assemble installable APKs with the bundled CLI assets
 - ✅ Compiler errors are clickable and jump to code
 - ✅ Board cores install successfully (Arduino AVR, ESP32, etc.)
 - ✅ Libraries install from Arduino registry
@@ -493,7 +493,7 @@ Some phases can run in parallel to reduce total timeline:
 
 **Core Team** (Full-time):
 - 1x Senior Android Developer (Java/Kotlin, Android SDK)
-- 1x Senior Python Developer (PySide6, Qt, Python)
+- 1x Senior Backend/Tooling Developer (cloud services, Arduino CLI integration, CI/CD)
 - 1x Full-Stack Developer (Cloud services, backend, CI/CD)
 - 1x QA Engineer (Testing, automation, device compatibility)
 
