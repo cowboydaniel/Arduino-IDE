@@ -19,6 +19,10 @@
 
 Whether you're prototyping on the go, teaching Arduino in classrooms without computers, or debugging projects in the field, Arduino IDE Modern for Android provides a professional-grade development experience optimized for touchscreen interfaces.
 
+### Current Status
+
+- ✅ **Phase 1: Android Foundation & Basic Editor** – Initial PySide6-based Android shell with touch-friendly editor, syntax highlighting, file management, tabbed editing, keyboard toolbar, and theme support.
+
 ### Why Android?
 
 - **Portability**: Develop anywhere with just your phone or tablet
