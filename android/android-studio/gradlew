@@ -112,12 +112,45 @@ case "$( uname )" in                #(
 esac
 
 WRAPPER_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+WRAPPER_SHARED_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper-shared.jar
+WRAPPER_JAR_TXT=$WRAPPER_JAR.txt
+WRAPPER_SHARED_JAR_TXT=$WRAPPER_SHARED_JAR.txt
 
-ensure_gradle_wrapper_jar() {
-    if [ -f "$WRAPPER_JAR" ]; then
-        return
+decode_wrapper_txt() {
+    jar_path=$1
+    txt_path=$2
+
+    if [ -f "$jar_path" ]; then
+        return 0
     fi
 
+    if [ ! -f "$txt_path" ]; then
+        return 1
+    fi
+
+    if command -v python3 >/dev/null 2>&1 && GRADLE_WRAPPER_JAR=$jar_path GRADLE_WRAPPER_TXT=$txt_path python3 - <<'PY'
+import base64
+import os
+import sys
+
+jar_path = os.environ["GRADLE_WRAPPER_JAR"]
+txt_path = os.environ["GRADLE_WRAPPER_TXT"]
+
+with open(txt_path, "r", encoding="utf-8") as src:
+    encoded = src.read().strip()
+
+os.makedirs(os.path.dirname(jar_path), exist_ok=True)
+with open(jar_path, "wb") as dst:
+    dst.write(base64.b64decode(encoded))
+PY
+    then
+        return 0
+    fi
+
+    return 1
+}
+
+enhance_gradle_wrapper_download() {
     wrapper_props=$APP_HOME/gradle/wrapper/gradle-wrapper.properties
     if [ ! -f "$wrapper_props" ]; then
         die "Missing Gradle wrapper properties at $wrapper_props"
@@ -127,13 +160,14 @@ ensure_gradle_wrapper_jar() {
         die "Python 3 is required to download Gradle wrapper jar automatically"
     fi
 
-    if ! GRADLE_WRAPPER_JAR="$WRAPPER_JAR" WRAPPER_PROPERTIES="$wrapper_props" python3 - <<'PY'
+    if ! GRADLE_WRAPPER_JAR="$WRAPPER_JAR" WRAPPER_SHARED_JAR="$WRAPPER_SHARED_JAR" WRAPPER_PROPERTIES="$wrapper_props" python3 - <<'PY'
 import os
 import sys
 import urllib.request
 import zipfile
 
 jar_path = os.environ["GRADLE_WRAPPER_JAR"]
+shared_path = os.environ.get("WRAPPER_SHARED_JAR")
 props_path = os.environ["WRAPPER_PROPERTIES"]
 
 distribution_url = None
@@ -153,8 +187,29 @@ with urllib.request.urlopen(distribution_url) as resp, open(tmp_zip, "wb") as ou
     out.write(resp.read())
 
 with zipfile.ZipFile(tmp_zip) as archive:
-    with archive.open("gradle/wrapper/gradle-wrapper.jar") as src, open(jar_path, "wb") as dst:
+    entries = archive.namelist()
+
+    jar_entry = None
+    for candidate in (
+        "gradle/wrapper/gradle-wrapper.jar",
+        next((name for name in entries if name.endswith("gradle-wrapper.jar")), None),
+        next((name for name in entries if "gradle-wrapper-" in name and name.endswith(".jar")), None),
+    ):
+        if candidate:
+            jar_entry = candidate
+            break
+
+    if not jar_entry:
+        raise SystemExit("Gradle wrapper jar not found in distribution")
+
+    with archive.open(jar_entry) as src, open(jar_path, "wb") as dst:
         dst.write(src.read())
+
+    if shared_path:
+        shared_entry = next((name for name in entries if "gradle-wrapper-shared" in name and name.endswith(".jar")), None)
+        if shared_entry:
+            with archive.open(shared_entry) as src, open(shared_path, "wb") as dst:
+                dst.write(src.read())
 
 os.remove(tmp_zip)
 PY
@@ -163,9 +218,23 @@ PY
     fi
 }
 
+ensure_gradle_wrapper_jar() {
+    GRADLE_WRAPPER_JAR=$WRAPPER_JAR GRADLE_WRAPPER_TXT=$WRAPPER_JAR_TXT decode_wrapper_txt
+    GRADLE_WRAPPER_JAR=$WRAPPER_SHARED_JAR GRADLE_WRAPPER_TXT=$WRAPPER_SHARED_JAR_TXT decode_wrapper_txt
+
+    if [ -f "$WRAPPER_JAR" ] && { [ ! -f "$WRAPPER_SHARED_JAR_TXT" ] || [ -f "$WRAPPER_SHARED_JAR" ]; }; then
+        return
+    fi
+
+    enhance_gradle_wrapper_download
+}
+
 ensure_gradle_wrapper_jar
 
 CLASSPATH=$WRAPPER_JAR
+if [ -f "$WRAPPER_SHARED_JAR" ]; then
+    CLASSPATH=$CLASSPATH:$WRAPPER_SHARED_JAR
+fi
 
 
 # Determine the Java command to use to start the JVM.
