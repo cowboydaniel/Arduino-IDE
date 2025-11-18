@@ -6,3 +6,4 @@ GitPython==3.1.43
 requests==2.32.3
 jedi==0.19.1
 packaging==24.1
+pyinstaller==6.3.0
