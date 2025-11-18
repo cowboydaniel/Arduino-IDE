@@ -44,6 +44,8 @@ hiddenimports = [
     'pygments.lexers.python',
     'pygments.formatters.html',
     'jedi',
+    'arduino_ide.services.suggestion_analyzer',
+    'arduino_ide.services.git_diff_utils',
 ]
 
 a = Analysis(
