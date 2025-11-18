@@ -157,40 +157,72 @@ Coming Soon - Currently in Beta Testing
 
 #### Prerequisites
 
-Before building, install required system dependencies:
+The Android build is now based on Qt for Android with a Gradle toolchain. **Buildozer and python-for-android are not used or supported.** Make sure the following components are installed and available on your system:
+
+- Python 3.10+ with `pip`
+- Java 11 or 17 (for the Gradle Android plugin)
+- Android SDK (API 34 recommended) and command-line tools
+- Android NDK r25c or newer
+- CMake 3.22+ and Ninja (installed with the Android SDK, or system packages)
+- Qt 6.6+ for Android (arm64-v8a at minimum) and the matching host Qt used by PySide6
+
+Environment variables expected by the tooling:
 
 ```bash
-# On Ubuntu/Debian
-sudo apt update
-sudo apt install -y python3 python3-pip git
+export ANDROID_SDK_ROOT=/path/to/android-sdk
+export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/25.2.9519653   # or your installed version
+export JAVA_HOME=/path/to/jdk-17
+export QT_ANDROID=/path/to/Qt/6.6.2/android_arm64_v8a
+export QT_HOST_PATH=/path/to/Qt/6.6.2/gcc_64   # host Qt used to build PySide6
+```
 
-# IMPORTANT: Install autotools (required for libffi compilation)
-sudo apt install -y autoconf automake libtool pkg-config
+Install Python dependencies in your existing Python environment (no virtual environment is required):
 
-# Install build essentials
-sudo apt install -y build-essential openjdk-11-jdk
+```bash
+pip install -r ../requirements.txt
+# Ensure PySide6/Shiboken match your Qt version
+pip install "pyside6==6.6.*" "shiboken6==6.6.*"
 ```
 
 #### Build Steps
 
 ```bash
-# Install Buildozer
-pip3 install --user buildozer
-
 # Clone the repository
 git clone https://github.com/cowboydaniel/Arduino-IDE.git
 cd Arduino-IDE/android
 
-# Build APK (first build takes 30-60 minutes)
-buildozer android debug
+# Generate the Qt/Gradle deployment configuration for Android
+pyside6-android-deploy --init android-deploy.json
 
-# Install to connected device
-buildozer android deploy run
+# Build the APK with the Gradle-based Qt toolchain
+pyside6-android-deploy \
+  --config android-deploy.json \
+  --android-sdk "$ANDROID_SDK_ROOT" \
+  --android-ndk "$ANDROID_NDK_ROOT" \
+  --qt-host-path "$QT_HOST_PATH" \
+  --qt-target-path "$QT_ANDROID" \
+  --build-type debug
+
+# The generated Gradle project lives under ./.build/android/gradle
+cd .build/android/gradle
+./gradlew assembleDebug    # produces app/build/outputs/apk/debug/*.apk
 ```
 
-**Note**: The `autoconf`, `automake`, and `libtool` packages are required for building libffi (a core dependency). Without these, the build will fail with "autoreconf: not found".
+To produce a release-signed build, pass `--build-type release` to `pyside6-android-deploy` and configure your signing keystore in the generated `android-deploy.json` before running `./gradlew assembleRelease`.
 
-See [BUILD_ANDROID.md](BUILD_ANDROID.md) for complete build instructions, troubleshooting, and advanced options.
+**Notes**
+
+- The entire pipeline is driven by Qt for Android and Gradle; Buildozer and python-for-android are intentionally unsupported.
+- If the Android SDK tools are installed via Android Studio, ensure `cmdline-tools`, `platform-tools`, `build-tools 34.x`, and the selected NDK are installed.
+- The deploy tool may create the Gradle wrapper during the first run; subsequent builds are faster because SDK/NDK artifacts are cached.
+
+Deployment to a device or emulator can be done directly from Gradle:
+
+```bash
+# From .build/android/gradle
+./gradlew installDebug    # installs the debug APK on a connected device/emulator
+./gradlew installRelease  # installs a release build (requires signing config)
+```
 
 ---
 
@@ -480,33 +512,31 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ### Technology Stack
 
-- **Python 3.11**: Core application logic (via python-for-android)
-- **PySide6**: Qt 6 framework for Android
-- **Kivy**: Alternative UI framework for some components
+- **Python 3.11**: Core application logic embedded via PySide6/Qt for Android
+- **PySide6 + Qt for Android**: Qt 6 framework with the Qt Android deploy + Gradle toolchain
+- **Gradle + Android SDK/NDK**: Packaging, signing, and APK generation
 - **Arduino CLI ARM64**: Native ARM compilation binary
-- **Buildozer**: Build system for creating APK
+- **Kivy**: Alternative UI framework for some components
 
 ### App Structure
 
 ```
 android/
-├── buildozer.spec          # Build configuration
-├── main.py                 # Android application entry point
-├── ui_mobile/              # Mobile-optimized UI components
-│   ├── touch_editor.py     # Touch-friendly code editor
-│   ├── mobile_toolbar.py   # Compact toolbar for phones
-│   └── gesture_handler.py  # Touch gesture recognition
-├── services_mobile/        # Android-specific services
-│   ├── usb_service.py      # USB OTG communication
-│   ├── bluetooth_service.py # BLE and Classic Bluetooth
-│   └── storage_service.py  # Scoped storage handling
-├── res/                    # Android resources
-│   ├── drawable/           # Icons and images
-│   ├── values/             # Strings and styles
-│   └── xml/                # Android manifests
-└── libs/                   # Native libraries
-    ├── arm64-v8a/          # 64-bit ARM binaries
-    └── armeabi-v7a/        # 32-bit ARM binaries (legacy)
+├── README.md                 # This guide
+├── BUILD_ANDROID.md          # Additional build notes
+├── ANDROID_ROADMAP.md        # Feature roadmap
+├── main.py                   # Android application entry point
+├── ui_mobile/                # Mobile-optimized UI components
+│   ├── touch_editor.py       # Touch-friendly code editor
+│   ├── mobile_toolbar.py     # Compact toolbar for phones
+│   └── gesture_handler.py    # Touch gesture recognition
+├── services_mobile/          # Android-specific services
+│   ├── usb_service.py        # USB OTG communication
+│   ├── bluetooth_service.py  # BLE and Classic Bluetooth
+│   └── storage_service.py    # Scoped storage handling
+├── p4a-recipes/              # Legacy p4a recipes (not used by the Qt/Gradle toolchain)
+└── .build/android/gradle/    # Generated Gradle project from `pyside6-android-deploy`
+                              # (created during the build; not committed)
 ```
 
 ---
@@ -537,7 +567,7 @@ This project is licensed under the MIT License, same as the desktop version. See
 
 - **Arduino Team**: For the Arduino platform and Arduino CLI
 - **Qt for Android**: For excellent cross-platform mobile framework
-- **python-for-android**: For enabling Python apps on Android
+- **PySide6 + Qt for Android**: For enabling Python apps on Android with Qt
 - **Kivy Community**: For mobile UI components
 - **Beta Testers**: Everyone testing on their Android devices
 
