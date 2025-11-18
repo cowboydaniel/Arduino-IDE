@@ -2,4 +2,8 @@
     <color name="arduino_primary">#00979D</color>
     <color name="arduino_on_primary">#FFFFFFFF</color>
     <color name="arduino_surface">#FF121212</color>
+    <color name="arduino_surface_card">#FF1E1E1E</color>
+    <color name="arduino_text_secondary">#B3FFFFFF</color>
+    <color name="arduino_chip_status">#1A00E6D2</color>
+    <color name="arduino_divider">#33FFFFFF</color>
 </resources>

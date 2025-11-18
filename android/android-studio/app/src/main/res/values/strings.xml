@@ -1,5 +1,18 @@
 <resources>
-    <string name="app_name">Arduino IDE Modern</string>
+    <string name="app_name">Arduino IDE</string>
+    <string name="app_tagline">Mobile workspace preview</string>
     <string name="welcome_headline">Kotlin-first Android build</string>
     <string name="welcome_body">This mobile shell is implemented natively in Kotlin so CI can assemble installable APKs without Python or Qt runtime staging.</string>
+    <string name="sketch_title">Blink</string>
+    <string name="sketch_subtitle">Examples &gt; 01.Basics &gt; Blink</string>
+    <string name="board_label">Arduino Nano ESP32</string>
+    <string name="port_label">/dev/tty.usbmodem1140</string>
+    <string name="status_label">Connected</string>
+    <string name="status_connected">Board ready on COM</string>
+    <string name="code_preview_title">Sketch preview</string>
+    <string name="sketch_path">/Users/you/Documents/Arduino/Blink/Blink.ino</string>
+    <string name="serial_monitor_title">Serial monitor</string>
+    <string name="serial_monitor_device">115200 baud · No line ending</string>
+    <string name="action_upload">Upload</string>
+    <string name="action_verify">Verify</string>
 </resources>
