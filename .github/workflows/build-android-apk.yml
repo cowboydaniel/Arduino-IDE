@@ -23,6 +23,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Cache buildozer downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle
+          key: buildozer-${{ runner.os }}-${{ hashFiles('android/buildozer.spec') }}
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -44,47 +52,44 @@ jobs:
             gettext \
             texinfo
 
-      - name: Install buildozer and dependencies
+      - name: Install buildozer and Python dependencies
         run: |
-          pip install --upgrade pip
-          pip install buildozer
-          pip install cython
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install "cython<3" buildozer
+
+      - name: Prepare Android SDK licenses
+        run: |
+          mkdir -p $HOME/.buildozer/android/platform/android-sdk/licenses
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
+          echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $HOME/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
 
       - name: Build APK with buildozer
         working-directory: android
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          # Auto-accept all prompts during buildozer execution
-          yes | buildozer -v android debug || true
-
-          # If first attempt had issues with licenses, accept them and retry
-          if [ ! -f bin/*.apk ]; then
-            mkdir -p $HOME/.buildozer/android/platform/android-sdk/licenses
-            echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-            echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-            echo "84831b9409646a918e30573bab4c9c91346d8abd" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
-            echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $HOME/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
-            buildozer -v android debug
+          set -euo pipefail
+          buildozer -v android debug
+          APK_PATH=$(find bin -name "*.apk" -print -quit)
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK produced"
+            exit 1
           fi
-
-      - name: Find APK file
-        id: find_apk
-        working-directory: android
-        run: |
-          APK_PATH=$(find bin -name "*.apk" | head -n 1)
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-          echo "apk_name=$(basename $APK_PATH)" >> $GITHUB_OUTPUT
+          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: arduino-ide-android-${{ github.sha }}
-          path: android/${{ steps.find_apk.outputs.apk_path }}
+          path: android/${{ env.APK_PATH }}
           retention-days: 90
 
       - name: Create Release (if tagged)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: android/${{ steps.find_apk.outputs.apk_path }}
+          files: android/${{ env.APK_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
