@@ -15,8 +15,10 @@ from services_mobile.build_service import (  # noqa: E402
     BuildService,
     LibraryManager,
 )
+from services_mobile.bluetooth_service import BluetoothService  # noqa: E402
 from services_mobile.storage_service import StorageService  # noqa: E402
 from services_mobile.usb_service import USBDevice, USBService  # noqa: E402
+from services_mobile.wifi_service import WiFiService  # noqa: E402
 from ui_mobile.board_library_dialogs import BoardSelectionDialog, LibraryManagerDialog  # noqa: E402
 from ui_mobile.build_console import BuildConsole  # noqa: E402
 from ui_mobile.gesture_handler import GestureHandler  # noqa: E402
@@ -56,6 +58,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.library_manager = LibraryManager()
         self.build_service = BuildService()
         self.usb_service = USBService(self.build_service.cli)
+        self.bluetooth_service = BluetoothService(self.build_service.cli)
+        self.wifi_service = WiFiService(self.build_service.cli)
         self.connected_device: USBDevice | None = None
         self.build_worker: BuildWorker | None = None
         self.tab_widget = QtWidgets.QTabWidget()
@@ -83,7 +87,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(container)
 
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.build_dock)
-        self.serial_monitor = SerialMonitorWidget(self.usb_service)
+        self.serial_monitor = SerialMonitorWidget(
+            self.usb_service, self.bluetooth_service, self.wifi_service
+        )
         self.serial_plotter = SerialPlotterWidget()
         self.serial_monitor.line_received.connect(self.serial_plotter.append_line)
         self.serial_monitor.connection_changed.connect(self._handle_serial_connection_changed)
@@ -322,22 +328,51 @@ class MainWindow(QtWidgets.QMainWindow):
             if not editor.file_path:
                 return
 
-        device = self.serial_monitor.current_device()
+        transport, device = self.serial_monitor.current_connection()
         if not device:
             self.serial_monitor.refresh_devices()
-            QtWidgets.QMessageBox.information(self, "USB not detected", "Connect an Arduino via USB OTG and refresh the list.")
+            QtWidgets.QMessageBox.information(
+                self,
+                "No device",
+                "Select a USB, Bluetooth, or WiFi target before uploading.",
+            )
             return
 
         board = self.board_manager.selected_board()
-        self.build_console.append_output(f"Uploading {editor.file_path.name} to {device.port} ({board['fqbn']})")
-        result = self.usb_service.upload_sketch(editor.file_path, board["fqbn"], device)
-        self.build_console.append_output(result.output)
-        self.build_status_label.setText("Uploaded" if result.success else "Upload failed")
-
-        if result.success:
-            QtWidgets.QMessageBox.information(self, "Upload complete", f"Sketch uploaded to {device.description}.")
+        if transport == "usb":
+            self.build_console.append_output(
+                f"Uploading {editor.file_path.name} to {getattr(device, 'port', '?')} ({board['fqbn']})"
+            )
+            usb_result = self.usb_service.upload_sketch(editor.file_path, board["fqbn"], device)
+            self.build_console.append_output(usb_result.output)
+            success = usb_result.success
+            output = usb_result.output
+            target_desc = getattr(device, "description", "USB device")
+        elif transport == "bluetooth":
+            self.build_console.append_output(
+                f"Uploading {editor.file_path.name} to {getattr(device, 'name', 'Bluetooth device')} ({board['fqbn']})"
+            )
+            output = self.bluetooth_service.upload_sketch(editor.file_path, board["fqbn"], device)
+            success = "complete" in output.lower()
+            target_desc = getattr(device, "name", "Bluetooth device")
+        elif transport == "wifi":
+            self.build_console.append_output(
+                f"Uploading {editor.file_path.name} to {getattr(device, 'host', 'WiFi board')} ({board['fqbn']})"
+            )
+            output = self.wifi_service.ota_upload(editor.file_path, board["fqbn"], device)
+            success = "complete" in output.lower() or "upload complete" in output.lower()
+            target_desc = getattr(device, "name", "WiFi board")
         else:
-            QtWidgets.QMessageBox.warning(self, "Upload failed", result.output)
+            QtWidgets.QMessageBox.warning(self, "Upload", "Unsupported transport selected")
+            return
+
+        self.build_console.append_output(output)
+        self.build_status_label.setText("Uploaded" if success else "Upload failed")
+
+        if success:
+            QtWidgets.QMessageBox.information(self, "Upload complete", f"Sketch uploaded to {target_desc}.")
+        else:
+            QtWidgets.QMessageBox.warning(self, "Upload failed", output)
 
     def _jump_to_error(self, error: object) -> None:
         if not hasattr(error, "line"):
@@ -378,10 +413,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _refresh_usb_devices(self) -> None:
         self.serial_monitor.refresh_devices()
-        device = self.serial_monitor.current_device()
-        if device:
+        transport, device = self.serial_monitor.current_connection()
+        if transport == "usb" and isinstance(device, USBDevice):
             self.usb_label.setText(f"USB: {device.description} ({device.port})")
             self.connected_device = device
+        elif transport == "bluetooth":
+            self.usb_label.setText(f"Bluetooth: {getattr(device, 'name', 'disconnected')}")
+            self.connected_device = None
+        elif transport == "wifi":
+            self.usb_label.setText(f"WiFi: {getattr(device, 'host', 'disconnected')}")
+            self.connected_device = None
         else:
             self.usb_label.setText("USB: disconnected")
             self.connected_device = None
@@ -427,10 +468,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.serial_plotter_dock.setVisible(visible)
 
     def _handle_serial_connection_changed(self, connected: bool) -> None:
-        device = self.serial_monitor.current_device()
-        if connected and device:
+        transport, device = self.serial_monitor.current_connection()
+        if connected and transport == "usb" and isinstance(device, USBDevice):
             self.usb_label.setText(f"USB: {device.description} ({device.port})")
             self.connected_device = device
+        elif connected and transport == "bluetooth":
+            self.connected_device = None
+            self.usb_label.setText(f"Bluetooth: {getattr(device, 'name', 'connected')}")
+        elif connected and transport == "wifi":
+            self.connected_device = None
+            self.usb_label.setText(f"WiFi: {getattr(device, 'host', 'connected')}")
         else:
             self.connected_device = None
             self.usb_label.setText("USB: disconnected")
