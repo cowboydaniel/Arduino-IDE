@@ -6,4 +6,8 @@
     <color name="arduino_text_secondary">#B3FFFFFF</color>
     <color name="arduino_chip_status">#1A00E6D2</color>
     <color name="arduino_divider">#33FFFFFF</color>
+    <color name="arduino_code_keyword">#5FD3FF</color>
+    <color name="arduino_code_function">#F4BF75</color>
+    <color name="arduino_code_constant">#8AE234</color>
+    <color name="arduino_code_comment">#6A9955</color>
 </resources>

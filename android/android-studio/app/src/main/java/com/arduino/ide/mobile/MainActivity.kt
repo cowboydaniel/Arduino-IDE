@@ -1,11 +1,16 @@
 package com.arduino.ide.mobile
 
 import android.os.Bundle
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.content.ContextCompat
 import com.arduino.ide.mobile.databinding.ActivityMainBinding
+import java.util.regex.Pattern
 
 class MainActivity : AppCompatActivity() {
 
@@ -44,7 +49,7 @@ class MainActivity : AppCompatActivity() {
         """.trimIndent()
 
         binding.lineNumbers.text = codeLines
-        binding.codeListing.text = codeListing
+        binding.codeListing.text = applySyntaxHighlighting(codeListing)
 
         binding.serialMonitorLog.text = """
             [12:00:01] Opening serial monitor...
@@ -52,5 +57,40 @@ class MainActivity : AppCompatActivity() {
             [12:00:03] Upload complete
             [12:00:05] Hello, world!
         """.trimIndent()
+    }
+
+    private fun applySyntaxHighlighting(code: String): SpannableStringBuilder {
+        val builder = SpannableStringBuilder(code)
+
+        val keywordColor = ContextCompat.getColor(this, R.color.arduino_code_keyword)
+        val functionColor = ContextCompat.getColor(this, R.color.arduino_code_function)
+        val constantColor = ContextCompat.getColor(this, R.color.arduino_code_constant)
+        val commentColor = ContextCompat.getColor(this, R.color.arduino_code_comment)
+
+        highlightPattern(builder, code, "\\b(void|int|float|double|bool|return)\\b", keywordColor)
+        highlightPattern(builder, code, "\\b(pinMode|digitalWrite|delay)\\b", functionColor)
+        highlightPattern(builder, code, "\\b(LED_BUILTIN|OUTPUT|HIGH|LOW)\\b", constantColor)
+        highlightPattern(builder, code, "//.*$", commentColor, Pattern.MULTILINE)
+
+        return builder
+    }
+
+    private fun highlightPattern(
+        builder: SpannableStringBuilder,
+        source: String,
+        pattern: String,
+        color: Int,
+        flags: Int = 0
+    ) {
+        val regex = Pattern.compile(pattern, flags)
+        val matcher = regex.matcher(source)
+        while (matcher.find()) {
+            builder.setSpan(
+                ForegroundColorSpan(color),
+                matcher.start(),
+                matcher.end(),
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
     }
 }
