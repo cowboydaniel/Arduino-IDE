@@ -9,7 +9,7 @@ venv/
 ENV/
 build/
 develop-eggs/
-# dist/ - Commented out to allow distributing pre-built executables
+dist/  # Ignore build artifacts - use GitHub Actions artifacts instead
 downloads/
 eggs/
 .eggs/

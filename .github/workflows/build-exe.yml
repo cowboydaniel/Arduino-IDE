@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - 'claude/**'
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
@@ -37,11 +36,3 @@ jobs:
         name: Arduino-IDE-Windows
         path: dist/Arduino-IDE.exe
         retention-days: 90
-
-    - name: Commit executable to repository
-      run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        git add dist/Arduino-IDE.exe
-        git commit -m "Add Windows executable [skip ci]" || echo "No changes to commit"
-        git push || echo "Nothing to push"
