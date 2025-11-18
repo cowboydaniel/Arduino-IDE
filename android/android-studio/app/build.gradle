@@ -3,28 +3,6 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-tasks.register('stageQtRuntimeJniLibs', Sync) {
-    into(generatedJniLibs)
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    if (qtRuntimeLibDir.exists()) {
-        from(qtRuntimeRoot) {
-            include '**/*.so'
-            includeEmptyDirs = false
-            eachFile { details ->
-                def detectedAbi = details.relativePath.segments.find { abiNames.contains(it) }
-                if (detectedAbi) {
-                    details.relativePath = new RelativePath(true, detectedAbi, details.name)
-                } else {
-                    details.exclude()
-                }
-            }
-        }
-    } else {
-        logger.lifecycle("[android-studio] Skipping JNI staging because ${qtRuntimeLibDir} is missing")
-    }
-}
-
 android {
     namespace 'com.arduino.ide.mobile'
     compileSdk 34
@@ -35,13 +13,6 @@ android {
         targetSdk 34
         versionCode 1
         versionName '0.1.0'
-
-        if (!qtRuntimeAbis.isEmpty()) {
-            ndk {
-                abiFilters.clear()
-                abiFilters.addAll(qtRuntimeAbis)
-            }
-        }
     }
 
     buildTypes {
