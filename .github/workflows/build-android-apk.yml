@@ -32,6 +32,7 @@ jobs:
             unzip \
             openjdk-17-jdk \
             autoconf \
+            automake \
             libtool \
             pkg-config \
             zlib1g-dev \
@@ -39,7 +40,9 @@ jobs:
             libncursesw5-dev \
             cmake \
             libffi-dev \
-            libssl-dev
+            libssl-dev \
+            gettext \
+            texinfo
 
       - name: Install buildozer and dependencies
         run: |
