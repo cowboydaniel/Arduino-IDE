@@ -64,8 +64,7 @@ class ArduinoHighlighter(QtGui.QSyntaxHighlighter):
         self.comment_end = QtCore.QRegularExpression(r"\*/")
         self.comment_format = comment_format
 
-        self.highlighting_rules.append((QtCore.QRegularExpression(r"//[^
-]*"), comment_format))
+        self.highlighting_rules.append((QtCore.QRegularExpression(r"//[^\n]*"), comment_format))
         self.highlighting_rules.append((QtCore.QRegularExpression(r'"[^"\\]*(?:\\.[^"\\]*)*"'), string_format))
 
     def highlightBlock(self, text: str) -> None:  # noqa: N802
