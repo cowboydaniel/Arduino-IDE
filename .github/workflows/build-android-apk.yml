@@ -59,6 +59,10 @@ jobs:
           mkdir -p android-sdk/cmdline-tools
           mv cmdline-tools android-sdk/cmdline-tools/latest
 
+          # Create symlink for backwards compatibility with buildozer
+          mkdir -p android-sdk/tools
+          ln -s ../cmdline-tools/latest/bin android-sdk/tools/bin
+
           # Set up environment
           export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
