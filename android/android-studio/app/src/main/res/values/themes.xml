@@ -1,0 +1,10 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.ArduinoIDEAndroid" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/arduino_primary</item>
+        <item name="colorOnPrimary">@color/arduino_on_primary</item>
+        <item name="android:windowBackground">@color/arduino_surface</item>
+        <item name="android:windowSplashScreenBackground">@color/arduino_primary</item>
+        <item name="android:forceDarkAllowed">true</item>
+        <item name="android:statusBarColor" tools:targetApi="l">?attr/colorPrimaryVariant</item>
+    </style>
+</resources>

@@ -1,0 +1,5 @@
+<resources>
+    <color name="arduino_primary">#00979D</color>
+    <color name="arduino_on_primary">#FFFFFFFF</color>
+    <color name="arduino_surface">#FF121212</color>
+</resources>
