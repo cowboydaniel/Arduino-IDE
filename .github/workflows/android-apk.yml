@@ -36,7 +36,10 @@ jobs:
       - name: Set up Android SDK/NDK
         uses: android-actions/setup-android@v3
         with:
-          cmdline-tools-version: latest
+          # Pinning the command line tools version avoids the malformed
+          # "commandlinetools-linux-latest_latest.zip" URL that can occur when
+          # specifying "latest". 11076708 corresponds to r11.
+          cmdline-tools-version: 11076708
           packages: >-
             platform-tools
             platforms;android-34
