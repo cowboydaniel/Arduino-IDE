@@ -15,7 +15,7 @@
 
 ## Overview
 
-**Arduino IDE Modern for Android** brings the complete power of the desktop Arduino development environment to mobile devices. Built using Python and Qt for Android (PySide6), this port enables developers to write, compile, and upload Arduino code directly from smartphones and tablets.
+**Arduino IDE Modern for Android** brings the complete power of the desktop Arduino development environment to mobile devices. The mobile client is implemented natively in **Kotlin** with the standard Android toolchain so GitHub Actions (and your local Android Studio) can assemble installable APKs without any Python or Qt deployment steps.
 
 Whether you're prototyping on the go, teaching Arduino in classrooms without computers, or debugging projects in the field, Arduino IDE Modern for Android provides a professional-grade development experience optimized for touchscreen interfaces.
 
@@ -23,9 +23,9 @@ For local builds, see [BUILD_ANDROID.md](./BUILD_ANDROID.md) for the Android Stu
 
 ### Current Status
 
-- ✅ **Phase 0: Importable Android Studio Project** – Checked-in Gradle wrapper, staged Qt/PySide6 runtime placeholders, and bundled Arduino CLI binary so the project opens and syncs with no extra generation steps.
-- ✅ **Phase 1: Android Foundation & Basic Editor** – Initial PySide6-based Android shell with touch-friendly editor, syntax highlighting, file management, tabbed editing, keyboard toolbar, and theme support.
-- ✅ **Phase 2: Arduino Build System Integration** – Integrated Arduino CLI-powered verification with board selection, core installation, library management, build console, and clickable compiler errors.
+- ✅ **Phase 0: Importable Android Studio Project** – Checked-in Gradle wrapper and Kotlin entrypoint so the project opens and syncs with no generation steps.
+- ✅ **Phase 1: Android Foundation & Basic Editor** – Native Kotlin Activity with touch-friendly UI foundations, view binding, and Material 3 theme support.
+- ✅ **Phase 2: Arduino Build System Integration** – Kotlin groundwork for Arduino CLI-powered verification with board selection, core installation, library management, build console, and clickable compiler errors.
 
 ### Why Android?
 
@@ -160,40 +160,27 @@ Coming Soon - Currently in Beta Testing
 
 #### Prerequisites
 
-The Android build is now driven by a committed Android Studio/Gradle project under `android/android-studio/`. **Buildozer and python-for-android remain unsupported.** Install the following:
+The Android build is now driven by a committed Android Studio/Gradle project under `android/android-studio/`. **Everything is native Kotlin**—no Buildozer, `python-for-android`, or Qt deployment is required. Install the following:
 
-- Python 3.10+ with `pip`
 - Java 11 or 17 (for the Gradle Android plugin)
 - Android SDK (API 34 recommended) and command-line tools
 - Android NDK r25c or newer
 - CMake 3.22+ and Ninja (installed with the Android SDK, or system packages)
-- Qt 6.6+ for Android (arm64-v8a at minimum) and the matching host Qt used by PySide6
 
-Environment variables commonly used by Qt for Android:
+Environment variables commonly used by Android builds:
 
 ```bash
 export ANDROID_SDK_ROOT=/path/to/android-sdk
 export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/25.2.9519653   # or your installed version
 export JAVA_HOME=/path/to/jdk-17
-export QT_ANDROID=/path/to/Qt/6.6.2/android_arm64_v8a
-export QT_HOST_PATH=/path/to/Qt/6.6.2/gcc_64   # host Qt used to build PySide6
-```
-
-Install Python dependencies in your existing Python environment (no virtual environment is required):
-
-```bash
-pip install -r ../requirements.txt
-# Ensure PySide6/Shiboken match your Qt version
-pip install "pyside6==6.6.*" "shiboken6==6.6.*"
 ```
 
 #### Android Studio Project
 
-The Gradle wrapper, sources, manifests, and resources are checked in at `android/android-studio/`. Open that folder directly in Android Studio to work on, run, or debug the Android build without running `pyside6-android-deploy` first.
+The Gradle wrapper, Kotlin sources, manifests, and resources are checked in at `android/android-studio/`. Open that folder directly in Android Studio to work on, run, or debug the Android build.
 
-- The `preparePythonAssets` Gradle task (wired into `preBuild`) copies `arduino_ide/main.py`, the full `arduino_ide/` package, and any `ui_mobile/` or `services_mobile/` modules from the repository root into `app/src/main/assets/python/` so the PySide6 bootstrapper can find them inside the APK.
-- The assets task copies sources verbatim from your checkout; rebuild after changing `arduino_ide/`, `ui_mobile/`, or `services_mobile/` so the updated Python files are staged into the APK.
-- To avoid committing binaries, `gradlew` downloads the Gradle wrapper JAR on first use based on `gradle/wrapper/gradle-wrapper.properties` (requires Python 3 and network access).
+- The Kotlin Activity and view-binding layout live under `app/src/main/java/com/arduino/ide/mobile/` and `app/src/main/res/layout/`.
+- To avoid committing binaries, `gradlew` downloads the Gradle wrapper JAR on first use based on `gradle/wrapper/gradle-wrapper.properties`.
 - Set SDK/NDK paths in **Android Studio → Settings → Appearance & Behavior → System Settings → Android SDK** or via a `local.properties` file with `sdk.dir`/`ndk.dir` entries.
 
 #### Build Steps

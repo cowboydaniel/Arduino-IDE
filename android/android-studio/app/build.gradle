@@ -1,44 +1,6 @@
-import org.gradle.api.file.DuplicatesStrategy
-
 plugins {
     id 'com.android.application'
-}
-
-// Stage the Python entry point and mobile-specific modules inside assets so
-// the Qt/PySide6 bootstrapper can load them without an external deploy step.
-def repoRoot = rootProject.rootDir.toPath().resolve('..').resolve('..').normalize().toFile()
-def pythonInputs = [
-        [name: 'androidEntrypoint', path: new File(repoRoot, 'android/main.py'), dest: 'python'],
-        [name: 'desktopEntrypoint', path: new File(repoRoot, 'arduino_ide/main.py'), dest: 'python/arduino_ide'],
-        [name: 'workspaceMain', path: new File(repoRoot, 'main.py'), dest: 'python'],
-        [name: 'package', path: new File(repoRoot, 'arduino_ide'), dest: 'python/arduino_ide'],
-        [name: 'uiMobile', path: new File(repoRoot, 'android/ui_mobile'), dest: 'python/ui_mobile'],
-        [name: 'servicesMobile', path: new File(repoRoot, 'android/services_mobile'), dest: 'python/services_mobile'],
-]
-
-def runtimeInputs = [
-        [name: 'qtRuntime', path: new File(repoRoot, 'android/runtime/qt-runtime'), dest: 'runtime/qt-runtime'],
-        [name: 'pyside6Runtime', path: new File(repoRoot, 'android/runtime/pyside6'), dest: 'runtime/pyside6'],
-        [name: 'arduinoCli', path: new File(repoRoot, 'arduino-cli'), dest: 'runtime/arduino-cli'],
-]
-
-def generatedMobileAssets = layout.buildDirectory.dir('generated/mobileAssets')
-def mobileAssetDir = generatedMobileAssets.get().asFile
-
-tasks.register('prepareMobileAssets', Sync) {
-    into(mobileAssetDir)
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    (pythonInputs + runtimeInputs).each { entry ->
-        if (entry.path.exists()) {
-            from(entry.path) {
-                includeEmptyDirs = false
-                into(entry.dest)
-            }
-        } else {
-            logger.lifecycle("[android-studio] Skipping missing asset ${entry.path}")
-        }
-    }
+    id 'org.jetbrains.kotlin.android'
 }
 
 android {
@@ -55,8 +17,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro')
         }
     }
 
@@ -65,25 +27,25 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        viewBinding true
+    }
+
     packagingOptions {
         resources {
             excludes += ['/META-INF/{AL2.0,LGPL2.1}']
         }
     }
-
-    sourceSets {
-        named('main') {
-            assets.srcDir(mobileAssetDir)
-        }
-    }
-}
-
-tasks.named('preBuild').configure {
-    dependsOn('prepareMobileAssets')
 }
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.activity:activity-ktx:1.8.2'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 }
