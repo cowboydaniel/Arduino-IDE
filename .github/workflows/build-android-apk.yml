@@ -47,37 +47,24 @@ jobs:
           pip install buildozer
           pip install cython
 
-      - name: Setup Android SDK
+      - name: Pre-accept Android SDK licenses
         run: |
-          # Create SDK directories
-          mkdir -p $HOME/.buildozer/android/platform/android-sdk
-          cd $HOME/.buildozer/android/platform
+          # Create license directory
+          mkdir -p $HOME/.buildozer/android/platform/android-sdk/licenses
 
-          # Download and extract command line tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip
-          mkdir -p android-sdk/cmdline-tools
-          mv cmdline-tools android-sdk/cmdline-tools/latest
+          # Add license hashes
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
 
-          # Create symlink for backwards compatibility with buildozer
-          mkdir -p android-sdk/tools
-          ln -s ../cmdline-tools/latest/bin android-sdk/tools/bin
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > $HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
 
-          # Set up environment
-          export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
-
-          # Accept licenses
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
-          # Install required SDK components
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+          echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $HOME/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license
 
       - name: Build APK with buildozer
         working-directory: android
-        env:
-          ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
         run: |
+          # Let buildozer install SDK automatically with pre-accepted licenses
           buildozer -v android debug
 
       - name: Find APK file
