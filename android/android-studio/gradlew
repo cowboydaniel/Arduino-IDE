@@ -113,12 +113,44 @@ esac
 
 WRAPPER_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 WRAPPER_SHARED_JAR=$APP_HOME/gradle/wrapper/gradle-wrapper-shared.jar
+WRAPPER_JAR_TXT=$WRAPPER_JAR.txt
+WRAPPER_SHARED_JAR_TXT=$WRAPPER_SHARED_JAR.txt
 
-ensure_gradle_wrapper_jar() {
-    if [ -f "$WRAPPER_JAR" ] && { [ ! -f "$WRAPPER_SHARED_JAR" ] || [ -f "$WRAPPER_SHARED_JAR" ]; }; then
-        return
+decode_wrapper_txt() {
+    jar_path=$1
+    txt_path=$2
+
+    if [ -f "$jar_path" ]; then
+        return 0
     fi
 
+    if [ ! -f "$txt_path" ]; then
+        return 1
+    fi
+
+    if command -v python3 >/dev/null 2>&1 && GRADLE_WRAPPER_JAR=$jar_path GRADLE_WRAPPER_TXT=$txt_path python3 - <<'PY'
+import base64
+import os
+import sys
+
+jar_path = os.environ["GRADLE_WRAPPER_JAR"]
+txt_path = os.environ["GRADLE_WRAPPER_TXT"]
+
+with open(txt_path, "r", encoding="utf-8") as src:
+    encoded = src.read().strip()
+
+os.makedirs(os.path.dirname(jar_path), exist_ok=True)
+with open(jar_path, "wb") as dst:
+    dst.write(base64.b64decode(encoded))
+PY
+    then
+        return 0
+    fi
+
+    return 1
+}
+
+enhance_gradle_wrapper_download() {
     wrapper_props=$APP_HOME/gradle/wrapper/gradle-wrapper.properties
     if [ ! -f "$wrapper_props" ]; then
         die "Missing Gradle wrapper properties at $wrapper_props"
@@ -135,7 +167,7 @@ import urllib.request
 import zipfile
 
 jar_path = os.environ["GRADLE_WRAPPER_JAR"]
-shared_path = os.environ.get("GRADLE_WRAPPER_SHARED_JAR")
+shared_path = os.environ.get("WRAPPER_SHARED_JAR")
 props_path = os.environ["WRAPPER_PROPERTIES"]
 
 distribution_url = None
@@ -184,6 +216,17 @@ PY
     then
         die "Failed to download Gradle wrapper jar"
     fi
+}
+
+ensure_gradle_wrapper_jar() {
+    GRADLE_WRAPPER_JAR=$WRAPPER_JAR GRADLE_WRAPPER_TXT=$WRAPPER_JAR_TXT decode_wrapper_txt
+    GRADLE_WRAPPER_JAR=$WRAPPER_SHARED_JAR GRADLE_WRAPPER_TXT=$WRAPPER_SHARED_JAR_TXT decode_wrapper_txt
+
+    if [ -f "$WRAPPER_JAR" ] && { [ ! -f "$WRAPPER_SHARED_JAR_TXT" ] || [ -f "$WRAPPER_SHARED_JAR" ]; }; then
+        return
+    fi
+
+    enhance_gradle_wrapper_download
 }
 
 ensure_gradle_wrapper_jar
