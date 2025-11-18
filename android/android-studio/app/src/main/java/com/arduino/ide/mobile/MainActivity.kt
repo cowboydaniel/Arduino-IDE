@@ -23,7 +23,34 @@ class MainActivity : AppCompatActivity() {
             WindowInsetsCompat.CONSUMED
         }
 
-        binding.welcomeHeadline.text = getString(R.string.welcome_headline)
-        binding.welcomeBody.text = getString(R.string.welcome_body)
+        binding.boardChip.text = getString(R.string.board_label)
+        binding.portChip.text = getString(R.string.port_label)
+        binding.statusChip.text = getString(R.string.status_label)
+        binding.statusText.text = getString(R.string.status_connected)
+
+        val codeLines = (1..11).joinToString("\n") { it.toString().padStart(2, '0') }
+        val codeListing = """
+            // Blink an LED on pin 13
+            void setup() {
+              pinMode(LED_BUILTIN, OUTPUT);
+            }
+
+            void loop() {
+              digitalWrite(LED_BUILTIN, HIGH);
+              delay(1000);
+              digitalWrite(LED_BUILTIN, LOW);
+              delay(1000);
+            }
+        """.trimIndent()
+
+        binding.lineNumbers.text = codeLines
+        binding.codeListing.text = codeListing
+
+        binding.serialMonitorLog.text = """
+            [12:00:01] Opening serial monitor...
+            [12:00:02] Syncing board configuration
+            [12:00:03] Upload complete
+            [12:00:05] Hello, world!
+        """.trimIndent()
     }
 }
