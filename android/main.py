@@ -16,10 +16,13 @@ from services_mobile.build_service import (  # noqa: E402
     LibraryManager,
 )
 from services_mobile.storage_service import StorageService  # noqa: E402
+from services_mobile.usb_service import USBDevice, USBService  # noqa: E402
 from ui_mobile.board_library_dialogs import BoardSelectionDialog, LibraryManagerDialog  # noqa: E402
 from ui_mobile.build_console import BuildConsole  # noqa: E402
 from ui_mobile.gesture_handler import GestureHandler  # noqa: E402
 from ui_mobile.mobile_toolbar import KeyboardToolbar  # noqa: E402
+from ui_mobile.serial_monitor import SerialMonitorWidget  # noqa: E402
+from ui_mobile.serial_plotter import SerialPlotterWidget  # noqa: E402
 from ui_mobile.touch_editor import TouchEditor  # noqa: E402
 
 
@@ -52,6 +55,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.board_manager = BoardManager()
         self.library_manager = LibraryManager()
         self.build_service = BuildService()
+        self.usb_service = USBService(self.build_service.cli)
+        self.connected_device: USBDevice | None = None
         self.build_worker: BuildWorker | None = None
         self.tab_widget = QtWidgets.QTabWidget()
         self.tab_widget.setTabsClosable(True)
@@ -78,16 +83,38 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(container)
 
         self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.build_dock)
+        self.serial_monitor = SerialMonitorWidget(self.usb_service)
+        self.serial_plotter = SerialPlotterWidget()
+        self.serial_monitor.line_received.connect(self.serial_plotter.append_line)
+        self.serial_monitor.connection_changed.connect(self._handle_serial_connection_changed)
+
+        self.serial_monitor_dock = QtWidgets.QDockWidget("Serial Monitor", self)
+        self.serial_monitor_dock.setWidget(self.serial_monitor)
+        self.serial_monitor_dock.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable)
+        self.serial_monitor_dock.setVisible(False)
+        self.serial_monitor_dock.visibilityChanged.connect(self.serial_monitor_action.setChecked)
+
+        self.serial_plotter_dock = QtWidgets.QDockWidget("Serial Plotter", self)
+        self.serial_plotter_dock.setWidget(self.serial_plotter)
+        self.serial_plotter_dock.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable)
+        self.serial_plotter_dock.setVisible(False)
+        self.serial_plotter_dock.visibilityChanged.connect(self.serial_plotter_action.setChecked)
+
+        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.serial_monitor_dock)
+        self.addDockWidget(QtCore.Qt.BottomDockWidgetArea, self.serial_plotter_dock)
         self._init_status_bar()
 
         self._apply_theme("dark")
+        self._refresh_usb_devices()
 
     def _init_status_bar(self) -> None:
         status_bar = self.statusBar()
         status_bar.setSizeGripEnabled(False)
         self.board_label = QtWidgets.QLabel()
+        self.usb_label = QtWidgets.QLabel("USB: disconnected")
         self.build_status_label = QtWidgets.QLabel("Ready")
         status_bar.addPermanentWidget(self.board_label)
+        status_bar.addPermanentWidget(self.usb_label)
         status_bar.addPermanentWidget(self.build_status_label)
         self._refresh_board_label()
 
@@ -119,6 +146,11 @@ class MainWindow(QtWidgets.QMainWindow):
         verify_action.triggered.connect(self.verify_sketch)
         toolbar.addAction(verify_action)
 
+        upload_action = QtGui.QAction("Upload", self)
+        upload_action.setShortcut(QtGui.QKeySequence("Ctrl+U"))
+        upload_action.triggered.connect(self.upload_sketch)
+        toolbar.addAction(upload_action)
+
         board_action = QtGui.QAction("Select Board", self)
         board_action.triggered.connect(self.select_board)
         toolbar.addAction(board_action)
@@ -130,6 +162,22 @@ class MainWindow(QtWidgets.QMainWindow):
         library_action = QtGui.QAction("Manage Libraries", self)
         library_action.triggered.connect(self.manage_libraries)
         toolbar.addAction(library_action)
+
+        toolbar.addSeparator()
+
+        self.serial_monitor_action = QtGui.QAction("Serial Monitor", self)
+        self.serial_monitor_action.setCheckable(True)
+        self.serial_monitor_action.triggered.connect(self._toggle_serial_monitor)
+        toolbar.addAction(self.serial_monitor_action)
+
+        self.serial_plotter_action = QtGui.QAction("Serial Plotter", self)
+        self.serial_plotter_action.setCheckable(True)
+        self.serial_plotter_action.triggered.connect(self._toggle_serial_plotter)
+        toolbar.addAction(self.serial_plotter_action)
+
+        refresh_usb = QtGui.QAction("Refresh USB", self)
+        refresh_usb.triggered.connect(self._refresh_usb_devices)
+        toolbar.addAction(refresh_usb)
 
         toolbar.addSeparator()
 
@@ -263,6 +311,34 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             QtWidgets.QMessageBox.information(self, "Build succeeded", "Sketch compiled successfully.")
 
+    def upload_sketch(self) -> None:
+        editor = self.current_editor()
+        if not editor:
+            return
+
+        if not editor.file_path:
+            QtWidgets.QMessageBox.information(self, "Save sketch", "Please save the sketch before uploading.")
+            self.save_file()
+            if not editor.file_path:
+                return
+
+        device = self.serial_monitor.current_device()
+        if not device:
+            self.serial_monitor.refresh_devices()
+            QtWidgets.QMessageBox.information(self, "USB not detected", "Connect an Arduino via USB OTG and refresh the list.")
+            return
+
+        board = self.board_manager.selected_board()
+        self.build_console.append_output(f"Uploading {editor.file_path.name} to {device.port} ({board['fqbn']})")
+        result = self.usb_service.upload_sketch(editor.file_path, board["fqbn"], device)
+        self.build_console.append_output(result.output)
+        self.build_status_label.setText("Uploaded" if result.success else "Upload failed")
+
+        if result.success:
+            QtWidgets.QMessageBox.information(self, "Upload complete", f"Sketch uploaded to {device.description}.")
+        else:
+            QtWidgets.QMessageBox.warning(self, "Upload failed", result.output)
+
     def _jump_to_error(self, error: object) -> None:
         if not hasattr(error, "line"):
             return
@@ -300,6 +376,16 @@ class MainWindow(QtWidgets.QMainWindow):
         board = self.board_manager.selected_board()
         self.board_label.setText(f"Board: {board['name']} ({board['fqbn']})")
 
+    def _refresh_usb_devices(self) -> None:
+        self.serial_monitor.refresh_devices()
+        device = self.serial_monitor.current_device()
+        if device:
+            self.usb_label.setText(f"USB: {device.description} ({device.port})")
+            self.connected_device = device
+        else:
+            self.usb_label.setText("USB: disconnected")
+            self.connected_device = None
+
     # endregion
 
     # region Keyboard toolbar
@@ -330,6 +416,24 @@ class MainWindow(QtWidgets.QMainWindow):
     def toggle_theme(self) -> None:
         next_theme = "light" if getattr(self, "current_theme", "dark") == "dark" else "dark"
         self._apply_theme(next_theme)
+
+    # endregion
+
+    # region Serial monitor & plotter
+    def _toggle_serial_monitor(self, visible: bool) -> None:
+        self.serial_monitor_dock.setVisible(visible)
+
+    def _toggle_serial_plotter(self, visible: bool) -> None:
+        self.serial_plotter_dock.setVisible(visible)
+
+    def _handle_serial_connection_changed(self, connected: bool) -> None:
+        device = self.serial_monitor.current_device()
+        if connected and device:
+            self.usb_label.setText(f"USB: {device.description} ({device.port})")
+            self.connected_device = device
+        else:
+            self.connected_device = None
+            self.usb_label.setText("USB: disconnected")
 
     # endregion
 
