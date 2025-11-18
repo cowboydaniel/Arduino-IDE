@@ -23,15 +23,7 @@ class PyjniusRecipe(BasePyjniusRecipe):
         if "long = int" in content:
             return
 
-        updated = content.replace(
-            "cdef str_for_c(s):\n    return s.encode('utf-8')\n\n",
-            "cdef str_for_c(s):\n    return s.encode('utf-8')\n\n"
-            f"{marker}\ntry:\n    long\nexcept NameError:\n    long = int\n\n",
-            1,
-        )
-
-        if updated == content:
-            updated = f"{marker}\ntry:\n    long\nexcept NameError:\n    long = int\n\n" + content
+        updated = f"{marker}\ntry:\n    long\nexcept NameError:\n    long = int\n\n" + content
 
         with open(utils_path, "w", encoding="utf-8") as file:
             file.write(updated)
