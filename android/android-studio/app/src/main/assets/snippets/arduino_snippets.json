@@ -1,0 +1,84 @@
+[
+  {
+    "id": "basic-structure",
+    "title": "Basic Structure",
+    "description": "Standard Arduino sketch layout with setup and loop",
+    "category": "Basic Structure",
+    "trigger": "arduino-basic",
+    "body": [
+      "void setup() {",
+      "  ${1:// initialize pins}",
+      "}",
+      "",
+      "void loop() {",
+      "  ${2:// main loop}",
+      "}",
+      "$0"
+    ]
+  },
+  {
+    "id": "digital-write",
+    "title": "Digital Write",
+    "description": "Drive a digital pin HIGH or LOW",
+    "category": "Digital I/O",
+    "trigger": "digital-write",
+    "body": [
+      "pinMode(${1:pin}, OUTPUT);",
+      "digitalWrite(${1:pin}, ${2:state});",
+      "$0"
+    ]
+  },
+  {
+    "id": "digital-read",
+    "title": "Digital Read",
+    "description": "Read a digital pin with pull-up option",
+    "category": "Digital I/O",
+    "trigger": "digital-read",
+    "body": [
+      "pinMode(${1:pin}, INPUT_PULLUP);",
+      "int state = digitalRead(${1:pin});",
+      "$0"
+    ]
+  },
+  {
+    "id": "analog-read",
+    "title": "Analog Read",
+    "description": "Sample an analog input and compute voltage",
+    "category": "Analog I/O",
+    "trigger": "analog-read",
+    "body": [
+      "int raw = analogRead(${1:pin});",
+      "float voltage = (raw / 1023.0) * ${2:reference};",
+      "$0"
+    ]
+  },
+  {
+    "id": "serial-print",
+    "title": "Serial Print",
+    "description": "Send text and variables over Serial",
+    "category": "Serial",
+    "trigger": "serial-print",
+    "body": [
+      "Serial.begin(${1:115200});",
+      "Serial.print(${2:\"label\"});",
+      "Serial.println(${3:value});",
+      "$0"
+    ]
+  },
+  {
+    "id": "millis-timer",
+    "title": "Millis Interval",
+    "description": "Non-blocking timer loop",
+    "category": "Timing",
+    "trigger": "millis-loop",
+    "body": [
+      "const unsigned long interval = ${1:1000};",
+      "static unsigned long last = 0;",
+      "if (millis() - last >= interval) {",
+      "  last = millis();",
+      "  ${2:// work to repeat}",
+      "}",
+      "$0"
+    ]
+  }
+]
