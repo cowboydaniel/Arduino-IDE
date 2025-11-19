@@ -3,10 +3,18 @@ package com.arduino.ide.mobile
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.content.ContextCompat
+import androidx.compose.material3.MaterialTheme
+import com.arduino.ide.mobile.databinding.ActivityMainBinding
+import com.arduino.ide.mobile.snippets.SnippetRepository
+import com.arduino.ide.mobile.snippets.SnippetSheet
+import com.arduino.ide.mobile.snippets.SnippetViewModel
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import androidx.lifecycle.lifecycleScope
 import com.arduino.ide.mobile.databinding.ActivityMainBinding
 import com.arduino.ide.mobile.databinding.ViewEditorTabBinding
@@ -29,6 +37,10 @@ import java.util.regex.Pattern
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private val snippetRepository by lazy { SnippetRepository(this) }
+    private val snippetViewModel: SnippetViewModel by viewModels {
+        SnippetViewModel.factory(snippetRepository)
+    }
     private lateinit var tabMediator: TabLayoutMediator
     private lateinit var adapter: EditorTabAdapter
     private lateinit var project: SketchProject
@@ -104,6 +116,8 @@ class MainActivity : AppCompatActivity() {
             [12:00:03] Upload complete
             [12:00:05] Hello, world!
         """.trimIndent()
+
+        configureSnippetPanel()
     }
 
     private fun setupTabs(project: SketchProject) {
@@ -260,5 +274,28 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         tabStateRepository.saveOpenTabs(adapter.openFiles().map { it.path })
+    }
+
+    private fun configureSnippetPanel() {
+        val sheetBehavior = BottomSheetBehavior.from(binding.snippetBottomSheet)
+        val peekHeightPx = (260 * resources.displayMetrics.density).toInt()
+        sheetBehavior.peekHeight = peekHeightPx
+        sheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+
+        binding.snippetComposeView.setContent {
+            MaterialTheme {
+                SnippetSheet(
+                    uiState = snippetViewModel.uiState,
+                    editorValue = snippetViewModel.editorValue,
+                    onQueryChange = snippetViewModel::updateSearchQuery,
+                    onCategoryChange = snippetViewModel::filterByCategory,
+                    onInsertSnippet = snippetViewModel::insertSnippet,
+                    onPreviewChange = snippetViewModel::setPreview,
+                    onEditorChange = snippetViewModel::setEditorValue,
+                    onNextPlaceholder = snippetViewModel::moveToNextPlaceholder,
+                    onAddUserSnippet = snippetViewModel::addUserSnippetFromEditor
+                )
+            }
+        }
     }
 }
