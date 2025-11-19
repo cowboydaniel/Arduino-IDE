@@ -276,8 +276,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun configureSnippetPanel() {
         val sheetBehavior = BottomSheetBehavior.from(binding.snippetBottomSheet)
-        val peekHeightPx = (260 * resources.displayMetrics.density).toInt()
-        sheetBehavior.peekHeight = peekHeightPx
+        sheetBehavior.peekHeight = resources.getDimensionPixelSize(R.dimen.snippet_peek_height)
         sheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
 
         binding.snippetComposeView.setContent {
