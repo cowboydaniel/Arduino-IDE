@@ -176,35 +176,166 @@
                         android:textAppearance="@style/TextAppearance.Material3.BodySmall"
                         android:textColor="@color/arduino_text_secondary" />
 
-                    <LinearLayout
+                    <TextView
+                        android:id="@+id/breadcrumbs"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                        android:textColor="@android:color/white"
+                        android:contentDescription="@string/breadcrumbs_content_description"
+                        tools:text="Blink > src > loop" />
+
+                    <com.google.android.material.tabs.TabLayout
+                        android:id="@+id/tab_row"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:background="@drawable/code_block_background"
-                        android:padding="12dp"
+                        app:tabIndicatorFullWidth="false"
+                        app:tabMode="scrollable"
+                        app:tabTextColor="@color/arduino_on_primary"
+                        app:tabIndicatorColor="@color/arduino_on_primary" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="end"
                         android:orientation="horizontal">
 
-                        <TextView
-                            android:id="@+id/line_numbers"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="12dp"
-                            android:lineSpacingExtra="6dp"
-                            android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                            android:textColor="@color/arduino_text_secondary"
-                            android:fontFamily="monospace"
-                            tools:text="01\n02\n03\n04\n05\n06" />
+                        <ImageButton
+                            android:id="@+id/move_tab_left"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/move_tab_left"
+                            android:src="@android:drawable/ic_media_previous"
+                            android:tint="@color/arduino_on_primary" />
+
+                        <ImageButton
+                            android:id="@+id/move_tab_right"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/move_tab_right"
+                            android:src="@android:drawable/ic_media_next"
+                            android:tint="@color/arduino_on_primary" />
+                    </LinearLayout>
+
+                    <androidx.viewpager2.widget.ViewPager2
+                        android:id="@+id/editor_pager"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:contentDescription="@string/editor_tabs_content_description"
+                        tools:listitem="@layout/item_editor_page" />
+
+                    <LinearLayout
+                        android:id="@+id/find_replace_panel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="vertical"
+                        android:background="@drawable/console_background"
+                        android:padding="12dp">
 
                         <TextView
-                            android:id="@+id/code_listing"
-                            android:layout_width="0dp"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:lineSpacingExtra="6dp"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textColor="@android:color/white"
-                            android:fontFamily="monospace"
-                            tools:text="void setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n}" />
+                            android:text="@string/find_replace_title"
+                            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                            android:textColor="@android:color/white" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginTop="4dp">
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:hint="@string/find_query_label">
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/find_query"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:imeOptions="actionNext"
+                                    android:inputType="text"
+                                    android:contentDescription="@string/find_query_label" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="8dp"
+                                android:hint="@string/replace_with_label">
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/replace_query"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:imeOptions="actionDone"
+                                    android:inputType="text"
+                                    android:contentDescription="@string/replace_with_label" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <com.google.android.material.switchmaterial.SwitchMaterial
+                                android:id="@+id/regex_toggle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/regex_toggle"
+                                android:contentDescription="@string/regex_toggle" />
+
+                            <Spinner
+                                android:id="@+id/search_scope"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:contentDescription="@string/search_scope" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:gravity="end"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/find_next"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/action_find_next" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/replace"
+                                style="@style/Widget.Material3.Button"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:text="@string/action_replace" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/replace_all"
+                                style="@style/Widget.Material3.Button"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:text="@string/action_replace_all" />
+                        </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

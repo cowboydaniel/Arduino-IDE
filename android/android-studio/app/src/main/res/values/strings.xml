@@ -15,4 +15,24 @@
     <string name="serial_monitor_device">115200 baud · No line ending</string>
     <string name="action_upload">Upload</string>
     <string name="action_verify">Verify</string>
+    <string name="editor_content_description">Code editor content</string>
+    <string name="close_tab">Close tab</string>
+    <string name="move_tab_left">Move selected tab to the left</string>
+    <string name="move_tab_right">Move selected tab to the right</string>
+    <string name="breadcrumbs_content_description">Navigation breadcrumbs for the open file and active function</string>
+    <string name="editor_tabs_content_description">Open sketch files</string>
+    <string name="find_replace_title">Find &amp; replace</string>
+    <string name="find_query_label">Find</string>
+    <string name="replace_with_label">Replace with</string>
+    <string name="regex_toggle">Use regular expressions</string>
+    <string name="search_scope">Search scope</string>
+    <string name="action_find_next">Find next</string>
+    <string name="action_replace">Replace</string>
+    <string name="action_replace_all">Replace all</string>
+    <string name="scope_current_file">Current file</string>
+    <string name="scope_all_tabs">All open tabs</string>
+    <string name="search_result_message">%1$d matches in %2$s</string>
+    <string name="search_replaced_message">Replaced %1$d matches in %2$s</string>
+    <string name="help_dialog_title">Contextual help</string>
+    <string name="no_match_found">No matches found</string>
 </resources>
