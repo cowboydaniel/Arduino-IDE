@@ -21,6 +21,10 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.launch
+import com.arduino.ide.mobile.lsp.DemoLanguageServerTransport
+import com.arduino.ide.mobile.lsp.LanguageServerClient
+import kotlinx.coroutines.launch
+import java.util.regex.Pattern
 
 class MainActivity : AppCompatActivity() {
 
@@ -60,6 +64,40 @@ class MainActivity : AppCompatActivity() {
 
         setupTabs(project)
         setupSearchControls()
+        val languageServerClient = LanguageServerClient(DemoLanguageServerTransport())
+        lifecycleScope.launch {
+            languageServerClient.start(sessionId = "demo-session", rootUri = "file:///blink")
+            languageServerClient.openDocument("file:///blink/Blink.ino", "cpp", codeListing)
+
+            val completions = languageServerClient.requestCompletions(
+                uri = "file:///blink/Blink.ino",
+                line = 5,
+                character = 6
+            )
+            binding.completionList.text = completions.joinToString("\n") { item ->
+                buildString {
+                    append(item.label)
+                    item.detail?.let { append(" — ").append(it) }
+                    item.autoImportText?.let { append(" (auto-import: ").append(it).append(")") }
+                }
+            }
+
+            val hover = languageServerClient.requestHover(
+                uri = "file:///blink/Blink.ino",
+                line = 5,
+                character = 6
+            )
+            binding.hoverText.text = hover?.contents ?: getString(R.string.status_connected)
+        }
+
+        lifecycleScope.launch {
+            languageServerClient.diagnostics.collect { diagnostic ->
+                binding.diagnosticMessage.text = diagnostic.message
+                val hint = diagnostic.recoveryHint
+                binding.diagnosticHint.text = hint ?: getString(R.string.status_connected)
+            }
+        }
+
         binding.serialMonitorLog.text = """
             [12:00:01] Opening serial monitor...
             [12:00:02] Syncing board configuration
