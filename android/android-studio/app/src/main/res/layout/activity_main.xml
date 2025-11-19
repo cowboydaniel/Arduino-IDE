@@ -206,6 +206,79 @@
                             android:fontFamily="monospace"
                             tools:text="void setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n}" />
                     </LinearLayout>
+
+                    <com.google.android.material.divider.MaterialDivider
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        app:dividerColor="@color/arduino_divider" />
+
+                    <TextView
+                        android:id="@+id/completion_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/completion_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/completion_list"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/arduino_text_secondary"
+                        android:fontFamily="monospace"
+                        tools:text="digitalWrite – Set a digital pin\ndelay – Pause execution" />
+
+                    <TextView
+                        android:id="@+id/hover_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/hover_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/hover_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@color/arduino_text_secondary"
+                        android:fontFamily="monospace"
+                        tools:text="digitalWrite(pin, val) — writes a HIGH or LOW value" />
+
+                    <TextView
+                        android:id="@+id/diagnostic_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/diagnostic_title"
+                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/diagnostic_message"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                        android:textColor="@android:color/white"
+                        android:fontFamily="monospace"
+                        tools:text="Missing pinMode for LED_BUILTIN" />
+
+                    <TextView
+                        android:id="@+id/diagnostic_hint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                        android:textColor="@color/arduino_text_secondary"
+                        android:fontFamily="monospace"
+                        tools:text="Call pinMode(LED_BUILTIN, OUTPUT) in setup()" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

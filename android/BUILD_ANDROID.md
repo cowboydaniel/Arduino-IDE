@@ -17,6 +17,7 @@ assemble the debug APK is committed under `android/`.
 - `android/android-studio/app/src/main/java/` — Kotlin sources with the entry `MainActivity`
 - `android/android-studio/app/src/main/res/` — Material 3 theming and view-binding layouts
 - `arduino-cli` — Prebuilt Arduino CLI binary staged for future integration
+- `android/runtime/clangd` — Staging area for a mobile-friendly clangd binary used by the Kotlin LSP client
 
 ## Quick start (Android Studio)
 
@@ -28,6 +29,19 @@ assemble the debug APK is committed under `android/`.
    required.
 4. Select the **debug** build variant and click **Run ▶** to install on a device
    or emulator.
+
+### Packaging clangd for Android
+
+1. Build clangd for AArch64/ARM using the Android NDK r26b toolchain (`clangd`
+   target from `clang-tools-extra`).
+2. Strip the binary (`llvm-strip`) and copy it into `android/runtime/clangd`.
+3. The `ClangdRuntimeBridge` Kotlin helper copies this binary into the app's
+   private storage at startup and marks it executable.
+4. Hook the binary into a transport of your choice:
+   - JNI shim that passes file descriptors into clangd's stdio loop, or
+   - A lightweight gRPC sidecar that proxies JSON-RPC requests.
+5. The `LanguageServerClient` consumes either transport via the shared
+   `LanguageServerTransport` interface so UI components remain unchanged.
 
 ## Command line build
 
