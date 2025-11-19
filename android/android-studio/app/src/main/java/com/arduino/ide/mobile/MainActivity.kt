@@ -5,18 +5,16 @@ import android.widget.ArrayAdapter
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.material3.MaterialTheme
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.content.ContextCompat
-import androidx.compose.material3.MaterialTheme
+import androidx.lifecycle.lifecycleScope
 import com.arduino.ide.mobile.databinding.ActivityMainBinding
 import com.arduino.ide.mobile.snippets.SnippetRepository
 import com.arduino.ide.mobile.snippets.SnippetSheet
 import com.arduino.ide.mobile.snippets.SnippetViewModel
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import androidx.lifecycle.lifecycleScope
-import com.arduino.ide.mobile.databinding.ActivityMainBinding
 import com.arduino.ide.mobile.databinding.ViewEditorTabBinding
 import com.arduino.ide.mobile.editor.DocumentSymbolHelper
 import com.arduino.ide.mobile.editor.EditorTabAdapter
@@ -28,7 +26,6 @@ import com.arduino.ide.mobile.project.TabStateRepository
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayoutMediator
-import kotlinx.coroutines.launch
 import com.arduino.ide.mobile.lsp.DemoLanguageServerTransport
 import com.arduino.ide.mobile.lsp.LanguageServerClient
 import kotlinx.coroutines.launch
@@ -73,6 +70,7 @@ class MainActivity : AppCompatActivity() {
         tabStateRepository = TabStateRepository(this)
         project = SketchProject.demoProject(this)
         binding.codePath.text = project.basePath.absolutePath
+        val codeListing = project.files.firstOrNull()?.content.orEmpty()
 
         setupTabs(project)
         setupSearchControls()
