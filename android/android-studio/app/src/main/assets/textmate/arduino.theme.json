@@ -1,0 +1,13 @@
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "Arduino Dark",
+  "type": "dark",
+  "tokenColors": [
+    { "scope": "comment", "settings": { "foreground": "#7f848e" } },
+    { "scope": ["string", "constant.character.escape"], "settings": { "foreground": "#98c379" } },
+    { "scope": ["keyword", "storage.type"], "settings": { "foreground": "#c678dd" } },
+    { "scope": ["keyword.function.arduino", "support.function.arduino"], "settings": { "foreground": "#61afef" } },
+    { "scope": ["meta.preprocessor.arduino", "punctuation.definition.preprocessor.arduino"], "settings": { "foreground": "#e5c07b" } },
+    { "scope": ["variable", "entity.name.function"], "settings": { "foreground": "#dcdfe4" } }
+  ]
+}

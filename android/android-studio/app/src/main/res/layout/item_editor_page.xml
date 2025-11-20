@@ -7,28 +7,26 @@
     android:padding="12dp"
     android:background="@drawable/code_block_background">
 
-    <TextView
-        android:id="@+id/line_numbers"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="12dp"
-        android:lineSpacingExtra="6dp"
-        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-        android:textColor="@color/arduino_text_secondary"
-        android:fontFamily="monospace"
-        android:importantForAccessibility="no"
-        tools:text="01\n02\n03\n04\n05" />
-
-    <TextView
-        android:id="@+id/code_listing"
+    <FrameLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:lineSpacingExtra="6dp"
-        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-        android:textColor="@android:color/white"
-        android:fontFamily="monospace"
+        android:layout_weight="1">
+
+        <io.github.rosemoe.sora.widget.CodeEditor
+            android:id="@+id/code_editor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="12dp"
+            android:contentDescription="@string/editor_content_description"
+            tools:text="void setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n}\n" />
+    </FrameLayout>
+
+    <com.arduino.ide.mobile.editor.MinimapView
+        android:id="@+id/minimap"
+        android:layout_width="72dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="8dp"
         android:contentDescription="@string/editor_content_description"
-        tools:text="void setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}" />
+        tools:layout_height="160dp" />
 
 </LinearLayout>

@@ -1,0 +1,22 @@
+{
+  "indentationRules": {
+    "increaseIndentPattern": "^.*(\\{[^\}]*$|\\b(?:setup|loop)\\s*\\([^)]*\\)\\s*\\{)\s*$",
+    "decreaseIndentPattern": "^\s*\\}"
+  },
+  "comments": {
+    "lineComment": "//",
+    "blockComment": ["/*", "*/"]
+  },
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"" },
+    { "open": "'", "close": "'" }
+  ]
+}

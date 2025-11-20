@@ -125,6 +125,8 @@ class MainActivity : AppCompatActivity() {
             updateBreadcrumb(file, line)
             maybeShowHelp(file, line)
         }
+        adapter.loadState = { file -> tabStateRepository.loadEditorState(file.path) }
+        adapter.onStateChange = { file, state -> tabStateRepository.saveEditorState(file.path, state) }
         binding.editorPager.adapter = adapter
 
         tabMediator = TabLayoutMediator(binding.tabRow, binding.editorPager) { tab, position ->
