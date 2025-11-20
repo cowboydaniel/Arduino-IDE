@@ -15,7 +15,7 @@
 
 ## Overview
 
-**Arduino IDE Modern for Android** brings the complete power of the desktop Arduino development environment to mobile devices. The mobile client is implemented natively in **Kotlin** with the standard Android toolchain so GitHub Actions (and your local Android Studio) can assemble installable APKs without any Python or Qt deployment steps.
+**Arduino IDE Modern for Android** brings the complete power of the desktop Arduino development environment to mobile devices. The mobile client is implemented natively in **Kotlin** with the standard Android toolchain so GitHub Actions (and your local Android Studio) can assemble installable APKs without any external Python runtimes or Qt deployment steps.
 
 Whether you're prototyping on the go, teaching Arduino in classrooms without computers, or debugging projects in the field, Arduino IDE Modern for Android provides a professional-grade development experience optimized for touchscreen interfaces.
 
@@ -112,7 +112,7 @@ All major desktop features adapted for mobile:
 - **Debugging**: GDB/MI support via USB or WiFi debugging
 - **Version Control**: Git integration with visual diff viewer
 - **Collaboration**: Real-time multi-user editing sessions
-- **Plugin System**: Installable extensions via APK or Python packages
+- **Plugin System**: Installable extensions distributed as APK-delivered plugins
 - **Code Quality**: Real-time analysis and suggestions
 - **Examples Library**: 100+ pre-loaded Arduino examples
 
@@ -160,7 +160,7 @@ Coming Soon - Currently in Beta Testing
 
 #### Prerequisites
 
-The Android build is now driven by a committed Android Studio/Gradle project under `android/android-studio/`. **Everything is native Kotlin**—no Buildozer, `python-for-android`, or Qt deployment is required. Install the following:
+The Android build is driven by a committed Android Studio/Gradle project under `android/android-studio/`. **Everything is native Kotlin**—no Buildozer, `python-for-android`, or Qt deployment is required. Install the following:
 
 - Java 11 or 17 (for the Gradle Android plugin)
 - Android SDK (API 34 recommended) and command-line tools
@@ -437,7 +437,7 @@ A: Depends on your device's USB OTG power output. Most phones provide 5V at 500m
 ### App Questions
 
 **Q: Why is the app size so large?**
-A: The app bundles Python runtime, Qt framework, and Arduino CLI. Total size ~150-200 MB to ensure offline functionality.
+A: The app bundles Kotlin resources, Arduino CLI assets, and offline-friendly example content. Expect a footprint sized for on-device compilation while keeping native dependencies minimal.
 
 **Q: Does it drain battery quickly?**
 A: Normal editing uses minimal battery. Active serial monitoring or compilation increases usage. Enable battery saver mode in app settings.
@@ -491,30 +491,22 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ### Technology Stack
 
-- **Python 3.11**: Core application logic embedded via PySide6/Qt for Android
-- **PySide6 + Qt for Android**: Qt 6 framework with the Qt Android deploy + Gradle toolchain
+- **Kotlin + Jetpack**: Native Android application and UI layers
+- **Material 3**: Modern theming and components
 - **Gradle + Android SDK/NDK**: Packaging, signing, and APK generation
-- **Arduino CLI ARM64**: Native ARM compilation binary
-- **Kivy**: Alternative UI framework for some components
+- **Arduino CLI ARM64**: Native ARM compilation binary for verification and upload workflows
+- **View Binding**: Type-safe view access without synthetic imports
 
 ### App Structure
 
 ```
 android/
 ├── README.md                 # This guide
-├── BUILD_ANDROID.md          # Additional build notes
+├── BUILD_ANDROID.md          # Android Studio build notes
 ├── ANDROID_ROADMAP.md        # Feature roadmap
-├── main.py                   # Android application entry point
-├── ui_mobile/                # Mobile-optimized UI components
-│   ├── touch_editor.py       # Touch-friendly code editor
-│   ├── mobile_toolbar.py     # Compact toolbar for phones
-│   └── gesture_handler.py    # Touch gesture recognition
-├── services_mobile/          # Android-specific services
-│   ├── usb_service.py        # USB OTG communication
-│   ├── bluetooth_service.py  # BLE and Classic Bluetooth
-│   └── storage_service.py    # Scoped storage handling
-├── p4a-recipes/              # Legacy p4a recipes (not used by the Qt/Gradle toolchain)
-└── android-studio/           # Committed Android Studio/Gradle project (open directly in IDE)
+├── APK/                      # Legacy placeholder artifacts (not the current Kotlin build)
+├── android-studio/           # Committed Android Studio/Gradle project (open directly in IDE)
+└── runtime/                  # Legacy runtime staging (Qt/PySide6 placeholders; unused by Kotlin build)
 ```
 
 ---
@@ -544,9 +536,8 @@ This project is licensed under the MIT License, same as the desktop version. See
 ## Acknowledgments
 
 - **Arduino Team**: For the Arduino platform and Arduino CLI
-- **Qt for Android**: For excellent cross-platform mobile framework
-- **PySide6 + Qt for Android**: For enabling Python apps on Android with Qt
-- **Kivy Community**: For mobile UI components
+- **Jetpack + Android Studio teams**: For the Kotlin-first Android tooling
+- **Open-source library authors**: For the Android components that power the app
 - **Beta Testers**: Everyone testing on their Android devices
 
 ---
