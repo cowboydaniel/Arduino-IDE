@@ -41,7 +41,15 @@ sealed interface OutboundMessage {
 /** Inbound server-to-client signals we translate to UI models. */
 sealed interface InboundMessage {
     data class Ready(val clangdPath: String) : InboundMessage
+    data class ServerError(val message: String, val recoveryHint: String? = null) : InboundMessage
     data class CompletionResult(val requestId: Long, val items: List<CompletionItemUiModel>) : InboundMessage
     data class HoverResult(val requestId: Long, val hover: HoverUiModel?) : InboundMessage
     data class PublishDiagnostics(val uri: String, val diagnostics: List<DiagnosticUiModel>) : InboundMessage
+}
+
+/** High-level health state exposed to the UI for surfacing recovery hints. */
+sealed interface LanguageServerStatus {
+    data object Idle : LanguageServerStatus
+    data class Ready(val clangdPath: String) : LanguageServerStatus
+    data class Error(val message: String, val recoveryHint: String? = null) : LanguageServerStatus
 }

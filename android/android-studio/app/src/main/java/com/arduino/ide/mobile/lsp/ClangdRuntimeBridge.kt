@@ -14,12 +14,28 @@ class ClangdRuntimeBridge(private val context: Context) {
     suspend fun installClangd(binaryName: String = "clangd"): File = withContext(Dispatchers.IO) {
         val targetDir = File(context.filesDir, "lsp-runtime").apply { mkdirs() }
         val target = File(targetDir, binaryName)
-        if (!target.exists()) {
-            // In a real build we would stream the asset to disk. For now leave a placeholder so
-            // callers can reference the path without shipping a real binary in CI.
-            target.writeText("placeholder clangd binary; replace during packaging")
-            target.setExecutable(true)
+
+        // Always replace the on-disk copy to guarantee the packaged asset is used and to avoid
+        // silently running with an empty placeholder.
+        if (target.exists()) {
+            target.delete()
         }
+
+        val packaged = context.assets.list("")?.contains(binaryName) == true
+        if (!packaged) {
+            throw IllegalStateException("Packaged clangd asset '$binaryName' is missing; run build-clangd-android.sh")
+        }
+
+        context.assets.open(binaryName).use { input ->
+            target.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+
+        if (!target.setExecutable(true, false)) {
+            throw IllegalStateException("Failed to mark clangd executable")
+        }
+
         target
     }
 }

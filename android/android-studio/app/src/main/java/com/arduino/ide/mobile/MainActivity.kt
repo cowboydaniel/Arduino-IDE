@@ -26,8 +26,11 @@ import com.arduino.ide.mobile.project.TabStateRepository
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayoutMediator
-import com.arduino.ide.mobile.lsp.DemoLanguageServerTransport
+import com.arduino.ide.mobile.lsp.ClangdRuntimeBridge
 import com.arduino.ide.mobile.lsp.LanguageServerClient
+import com.arduino.ide.mobile.lsp.LanguageServerStatus
+import com.arduino.ide.mobile.lsp.RuntimeLanguageServerTransport
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.util.regex.Pattern
 
@@ -42,6 +45,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: EditorTabAdapter
     private lateinit var project: SketchProject
     private lateinit var tabStateRepository: TabStateRepository
+    private lateinit var languageServerClient: LanguageServerClient
+    private lateinit var activeFileUri: String
+    private var statusJob: Job? = null
+    private var diagnosticJob: Job? = null
 
     private val searchManager = SearchManager()
     private val docs = mapOf(
@@ -70,42 +77,18 @@ class MainActivity : AppCompatActivity() {
         tabStateRepository = TabStateRepository(this)
         project = SketchProject.demoProject(this)
         binding.codePath.text = project.basePath.absolutePath
-        val codeListing = project.files.firstOrNull()?.content.orEmpty()
+        val activeFile = project.files.firstOrNull()
+        activeFileUri = activeFile?.path?.let { java.io.File(it).toURI().toString() }
+            ?: "file://${project.basePath.absolutePath}/Sketch.ino"
+        val codeListing = activeFile?.content.orEmpty()
 
         setupTabs(project)
         setupSearchControls()
-        val languageServerClient = LanguageServerClient(DemoLanguageServerTransport())
+        languageServerClient = LanguageServerClient(
+            RuntimeLanguageServerTransport(ClangdRuntimeBridge(this))
+        )
         lifecycleScope.launch {
-            languageServerClient.start(sessionId = "demo-session", rootUri = "file:///blink")
-            languageServerClient.openDocument("file:///blink/Blink.ino", "cpp", codeListing)
-
-            val completions = languageServerClient.requestCompletions(
-                uri = "file:///blink/Blink.ino",
-                line = 5,
-                character = 6
-            )
-            binding.completionList.text = completions.joinToString("\n") { item ->
-                buildString {
-                    append(item.label)
-                    item.detail?.let { append(" — ").append(it) }
-                    item.autoImportText?.let { append(" (auto-import: ").append(it).append(")") }
-                }
-            }
-
-            val hover = languageServerClient.requestHover(
-                uri = "file:///blink/Blink.ino",
-                line = 5,
-                character = 6
-            )
-            binding.hoverText.text = hover?.contents ?: getString(R.string.status_connected)
-        }
-
-        lifecycleScope.launch {
-            languageServerClient.diagnostics.collect { diagnostic ->
-                binding.diagnosticMessage.text = diagnostic.message
-                val hint = diagnostic.recoveryHint
-                binding.diagnosticHint.text = hint ?: getString(R.string.status_connected)
-            }
+            attachLanguageServer(activeFile, codeListing)
         }
 
         binding.serialMonitorLog.text = """
@@ -244,6 +227,82 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private suspend fun attachLanguageServer(activeFile: SketchFile?, codeListing: String) {
+        if (activeFile == null) return
+        observeStatus(languageServerClient)
+        val status = languageServerClient.start(sessionId = "mobile-session", rootUri = project.basePath.toURI().toString())
+        if (status is LanguageServerStatus.Error) {
+            showLspError(status)
+            return
+        }
+        languageServerClient.openDocument(activeFileUri, "cpp", codeListing)
+        observeDiagnostics(languageServerClient)
+        refreshEditorInsights(activeFile)
+    }
+
+    private fun observeStatus(client: LanguageServerClient) {
+        statusJob?.cancel()
+        statusJob = lifecycleScope.launch {
+            client.status.collect { status ->
+                when (status) {
+                    is LanguageServerStatus.Ready -> {
+                        binding.statusText.text = getString(R.string.status_connected)
+                        binding.statusChip.text = getString(R.string.status_label)
+                    }
+                    is LanguageServerStatus.Error -> {
+                        binding.statusText.text = status.message
+                        binding.diagnosticHint.text = status.recoveryHint ?: getString(R.string.status_label)
+                        Snackbar.make(binding.root, status.message, Snackbar.LENGTH_LONG).show()
+                    }
+                    LanguageServerStatus.Idle -> {
+                        binding.statusText.text = getString(R.string.status_label)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun observeDiagnostics(client: LanguageServerClient) {
+        diagnosticJob?.cancel()
+        diagnosticJob = lifecycleScope.launch {
+            client.diagnostics.collect { diagnostic ->
+                binding.diagnosticMessage.text = diagnostic.message
+                val hint = diagnostic.recoveryHint
+                binding.diagnosticHint.text = hint ?: getString(R.string.status_connected)
+            }
+        }
+    }
+
+    private fun showLspError(status: LanguageServerStatus.Error) {
+        val message = status.recoveryHint ?: getString(R.string.status_connected)
+        Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+        binding.hoverText.text = getString(R.string.status_label)
+    }
+
+    private suspend fun refreshEditorInsights(activeFile: SketchFile) {
+        val line = activeFile.content.lines().size.coerceAtLeast(1)
+        val character = activeFile.content.lines().lastOrNull()?.length?.coerceAtLeast(0) ?: 0
+        val completions = languageServerClient.requestCompletions(
+            uri = activeFileUri,
+            line = line,
+            character = character
+        )
+        binding.completionList.text = completions.joinToString("\n") { item ->
+            buildString {
+                append(item.label)
+                item.detail?.let { append(" — ").append(it) }
+                item.autoImportText?.let { append(" (auto-import: ").append(it).append(")") }
+            }
+        }
+
+        val hover = languageServerClient.requestHover(
+            uri = activeFileUri,
+            line = line,
+            character = character
+        )
+        binding.hoverText.text = hover?.contents ?: getString(R.string.status_connected)
+    }
+
     private fun updateBreadcrumb(file: SketchFile, line: Int) {
         val function = DocumentSymbolHelper.contextForCursor(file.content, line)
         val breadcrumb = buildString {
@@ -260,14 +319,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun maybeShowHelp(file: SketchFile, line: Int) {
         val function = DocumentSymbolHelper.contextForCursor(file.content, line)
-        val symbol = docs.keys.firstOrNull { file.content.contains(it) && function?.contains(it) == true }
-        val description = symbol?.let { docs[it] }
-        if (description != null) {
-            MaterialAlertDialogBuilder(this)
-                .setTitle(getString(R.string.help_dialog_title))
-                .setMessage(description)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
+        val lineText = file.content.lines().getOrNull(line - 1)
+        val character = lineText?.indexOfFirst { !it.isWhitespace() }?.coerceAtLeast(0) ?: 0
+        lifecycleScope.launch {
+            val hover = if (::languageServerClient.isInitialized) {
+                languageServerClient.requestHover(activeFileUri, line, character)
+            } else null
+            if (hover != null) {
+                MaterialAlertDialogBuilder(this@MainActivity)
+                    .setTitle(getString(R.string.help_dialog_title))
+                    .setMessage(hover.contents)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            } else {
+                val symbol = docs.keys.firstOrNull { file.content.contains(it) && function?.contains(it) == true }
+                val description = symbol?.let { docs[it] }
+                if (description != null) {
+                    MaterialAlertDialogBuilder(this@MainActivity)
+                        .setTitle(getString(R.string.help_dialog_title))
+                        .setMessage(description)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
+            }
         }
     }
 
