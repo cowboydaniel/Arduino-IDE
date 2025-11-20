@@ -1,22 +1,24 @@
 package com.arduino.ide.mobile.editor
 
 import android.content.Context
+import android.os.Bundle
 import io.github.rosemoe.sora.lang.Language
+import io.github.rosemoe.sora.lang.analysis.AnalyzeManager
+import io.github.rosemoe.sora.lang.completion.CompletionPublisher
+import io.github.rosemoe.sora.lang.format.Formatter
 import io.github.rosemoe.sora.lang.smartEnter.NewlineHandleResult
 import io.github.rosemoe.sora.lang.smartEnter.NewlineHandler
+import io.github.rosemoe.sora.lang.styling.Styles
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.FileProviderRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.GrammarRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
 import io.github.rosemoe.sora.langs.textmate.registry.model.DefaultGrammarDefinition
-import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.langs.textmate.registry.model.ThemeModel
-import io.github.rosemoe.sora.text.ContentReference
-import io.github.rosemoe.sora.text.Content
+import io.github.rosemoe.sora.langs.textmate.registry.provider.AssetsFileResolver
 import io.github.rosemoe.sora.text.CharPosition
-import io.github.rosemoe.sora.lang.analysis.AnalyzeManager
-import io.github.rosemoe.sora.lang.completion.CompletionPublisher
-import io.github.rosemoe.sora.lang.format.Formatter
+import io.github.rosemoe.sora.text.Content
+import io.github.rosemoe.sora.text.ContentReference
 import io.github.rosemoe.sora.widget.SymbolPairMatch
 import org.eclipse.tm4e.core.registry.IGrammarSource
 import org.eclipse.tm4e.core.registry.IThemeSource
@@ -83,7 +85,7 @@ object ArduinoLanguageDefinition {
             content: ContentReference,
             position: CharPosition,
             publisher: CompletionPublisher,
-            extra: android.os.Bundle?
+            extra: Bundle
         ) {
             delegate.requireAutoComplete(content, position, publisher, extra)
         }
@@ -126,13 +128,13 @@ object ArduinoLanguageDefinition {
         override fun matchesRequirement(
             content: Content,
             cursor: CharPosition,
-            styles: io.github.rosemoe.sora.lang.styling.Styles
+            styles: Styles?
         ): Boolean = true
 
         override fun handleNewline(
             content: Content,
             cursor: CharPosition,
-            styles: io.github.rosemoe.sora.lang.styling.Styles,
+            styles: Styles?,
             tabLength: Int
         ): NewlineHandleResult {
             val delegateResult = delegate.newlineHandler.handleNewline(content, cursor, styles, tabLength)
