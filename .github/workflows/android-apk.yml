@@ -51,7 +51,9 @@ jobs:
 
       - name: Assemble debug APK
         working-directory: android/android-studio
-        run: ./gradlew --no-daemon assembleDebug
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/26.1.10909125
+        run: ../runtime/clangd/build-clangd-android.sh && ./gradlew --no-daemon assembleDebug
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
