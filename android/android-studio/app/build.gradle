@@ -46,6 +46,30 @@ android {
             excludes += ['/META-INF/{AL2.0,LGPL2.1}']
         }
     }
+
+    sourceSets {
+        main {
+            // Package the clangd runtime asset directly from the checked-in staging directory.
+            assets.srcDirs += ['../../runtime/clangd']
+        }
+    }
+}
+
+// Fail fast if the clangd runtime is missing to prevent shipping a non-functional language server.
+tasks.register('verifyClangdRuntime') {
+    doLast {
+        def clangdPath = project.rootDir.toPath().resolve('../runtime/clangd/clangd').normalize().toFile()
+        if (!clangdPath.exists() || clangdPath.length() < 1024) {
+            throw new GradleException("Packaged clangd binary is missing or empty. Run build-clangd-android.sh first.")
+        }
+        if (!clangdPath.canExecute()) {
+            throw new GradleException("Packaged clangd binary is not executable. Re-run build-clangd-android.sh.")
+        }
+    }
+}
+
+tasks.matching { it.name.startsWith('assemble') || it.name.startsWith('bundle') }.configureEach {
+    dependsOn tasks.named('verifyClangdRuntime')
 }
 
 dependencies {

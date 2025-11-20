@@ -16,6 +16,7 @@ class LanguageServerClientTest {
     fun `diagnostics emit recovery hints`() = runTest(dispatcher) {
         val transport = InMemoryLanguageServerTransport()
         val client = LanguageServerClient(transport, dispatcher)
+        transport.emitInbound(InboundMessage.Ready("/tmp/clangd"))
         transport.emitInbound(
             InboundMessage.PublishDiagnostics(
                 uri = "file:///Blink.ino",
@@ -63,10 +64,38 @@ class LanguageServerClientTest {
         }
 
         val client = LanguageServerClient(transport, dispatcher)
+        transport.emitInbound(InboundMessage.Ready("/tmp/clangd"))
         val completions = client.requestCompletions("file:///Blink.ino", 3, 2)
 
         assertEquals(1, completions.size)
         assertEquals("digitalWrite", completions.first().label)
         assertEquals("#include <Arduino.h>", completions.first().autoImportText)
+    }
+
+    @Test
+    fun `status surfaces runtime errors and retries`() = runTest(dispatcher) {
+        val transport = object : LanguageServerTransport {
+            private val inbound = MutableSharedFlow<InboundMessage>(replay = 1)
+            private var startCount = 0
+            override val incoming = inbound
+            override suspend fun start() {
+                startCount++
+                if (startCount == 1) {
+                    inbound.emit(InboundMessage.ServerError("Missing runtime"))
+                } else {
+                    inbound.emit(InboundMessage.Ready("/tmp/clangd"))
+                }
+            }
+
+            override suspend fun send(message: OutboundMessage) {}
+            override suspend fun stop() {}
+        }
+
+        val client = LanguageServerClient(transport, dispatcher)
+        val firstStatus = client.start("session", "root")
+        assertEquals(LanguageServerStatus.Error("Missing runtime"), firstStatus)
+
+        val secondStatus = client.start("session", "root")
+        assertEquals(LanguageServerStatus.Ready("/tmp/clangd"), secondStatus)
     }
 }

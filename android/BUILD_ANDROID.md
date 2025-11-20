@@ -30,18 +30,32 @@ assemble the debug APK is committed under `android/`.
 4. Select the **debug** build variant and click **Run ▶** to install on a device
    or emulator.
 
-### Packaging clangd for Android
+### Packaging clangd for Android (required)
 
-1. Build clangd for AArch64/ARM using the Android NDK r26b toolchain (`clangd`
-   target from `clang-tools-extra`).
-2. Strip the binary (`llvm-strip`) and copy it into `android/runtime/clangd`.
-3. The `ClangdRuntimeBridge` Kotlin helper copies this binary into the app's
-   private storage at startup and marks it executable.
-4. Hook the binary into a transport of your choice:
-   - JNI shim that passes file descriptors into clangd's stdio loop, or
-   - A lightweight gRPC sidecar that proxies JSON-RPC requests.
-5. The `LanguageServerClient` consumes either transport via the shared
-   `LanguageServerTransport` interface so UI components remain unchanged.
+The Android app will not start language services unless a real clangd binary is
+packaged. Run the checked-in helper script to stage it before assembling:
+
+```bash
+# From the repository root with ANDROID_NDK_HOME pointing at NDK r26b+
+./android/runtime/clangd/build-clangd-android.sh
+```
+
+Under the hood the script configures CMake for `arm64-v8a`, builds clangd from
+`clang-tools-extra`, strips symbols, and copies the binary into
+`android/runtime/clangd`. Android Studio packages that file as an asset and the
+Kotlin runtime marks it executable inside the sandbox via `ClangdRuntimeBridge`.
+Gradle tasks that produce APKs will fail fast if `android/runtime/clangd/clangd`
+is missing or empty so you never ship a placeholder.
+
+Teams that prefer a manual flow can follow the same steps:
+
+1. Configure CMake with `-DLLVM_ENABLE_PROJECTS=clang;clang-tools-extra` and set
+   `-DLLVM_TARGETS_TO_BUILD=AArch64;ARM` using the Android toolchain file.
+2. Build clangd with `ninja clangd` and strip symbols via `llvm-strip`.
+3. Drop the resulting `clangd` binary into `android/runtime/clangd`.
+
+`LanguageServerClient` consumes either a JNI-based stdio bridge or a gRPC shim
+implementing `LanguageServerTransport`, so UI code remains transport-agnostic.
 
 ## Command line build
 

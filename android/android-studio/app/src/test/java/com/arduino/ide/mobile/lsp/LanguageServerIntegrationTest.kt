@@ -16,7 +16,8 @@ class LanguageServerIntegrationTest {
         val transport = DemoLanguageServerTransport()
         val client = LanguageServerClient(transport, dispatcher)
 
-        client.start("session", "file:///workspace")
+        val status = client.start("session", "file:///workspace")
+        assertTrue(status is LanguageServerStatus.Ready)
         client.openDocument("file:///workspace/Blink.ino", "cpp", "void setup(){}")
 
         val completions = client.requestCompletions("file:///workspace/Blink.ino", 1, 1)

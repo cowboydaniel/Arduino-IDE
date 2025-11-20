@@ -1,20 +1,26 @@
 # Mobile clangd runtime
 
 This folder is reserved for a mobile-friendly clangd bundle. The Android build
-pipes the resulting binary into the APK via `ClangdRuntimeBridge`, which copies
-it into the app sandbox before launching the language server over JNI, gRPC, or
+*requires* a real binary here: Gradle will refuse to assemble the APK if the
+`clangd` file is missing, and `ClangdRuntimeBridge` copies the packaged asset
+into the app sandbox before launching the language server over JNI, gRPC, or
 stdio.
 
 ## Building
 
-1. Install the Android NDK r26b and LLVM toolchain from the Android SDK.
-2. Configure CMake with `-DLLVM_ENABLE_PROJECTS=clang;clang-tools-extra` and set
-   `-DLLVM_TARGETS_TO_BUILD=AArch64;ARM` so that clangd is compiled for mobile
-   ABIs.
-3. Build clangd with `ninja clangd` and strip symbols via `llvm-strip` to reduce
-   the APK footprint.
-4. Copy the resulting `clangd` binary into this directory before running the
-   Android Studio build. The Kotlin runtime will mark it executable at startup.
+You must produce a mobile-friendly build from an LLVM checkout that sits next to
+this repository:
+
+```bash
+# ANDROID_NDK_HOME must point at NDK r26b+ from the Android SDK Manager
+./android/runtime/clangd/build-clangd-android.sh
+```
+
+The helper script configures the NDK toolchain for `arm64-v8a`, compiles clangd
+with Ninja, strips symbols, and drops the result into this folder so the APK can
+pick it up. Gradle will package this asset into the APK unchanged and the
+runtime will refuse to start if the binary is absent. See `android/BUILD_ANDROID.md`
+for more context and manual steps if you prefer to drive the build yourself.
 
 ## JNI or gRPC shim
 
