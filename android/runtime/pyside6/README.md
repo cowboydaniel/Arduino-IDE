@@ -1,6 +1,6 @@
-# Bundled PySide6 runtime (placeholder)
+# Legacy PySide6 runtime placeholders
 
-Phase 0 commits a ready-to-import Android Studio project. The PySide6 runtime
-assets are staged here so Gradle can package them without needing to rerun the
-Qt deployment tooling. Replace these placeholders with the actual PySide6
-Android deployment output when generating a production build.
+The Android app ships as a Kotlin/Jetpack project and no longer embeds a Python
+runtime or PySide6/Qt stack. This folder is left over from earlier prototypes
+and is **not** referenced by the Gradle build. No action is required for modern
+Kotlin builds.

@@ -369,7 +369,7 @@ Full version control and team collaboration from your Android device.
 - Android plugin system architecture
 - Plugin discovery and loading
 - Plugin marketplace UI
-- Install plugins from APK or Python packages
+- Install plugins from APK-delivered extensions
 - 8 plugin types:
   - Editor extensions
   - Board packages
@@ -526,7 +526,7 @@ Some phases can run in parallel to reduce total timeline:
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
-| PySide6 performance issues on Android | Medium | High | Use Kivy as fallback; optimize rendering; profile early |
+| Android API/Gradle regression risk | Medium | High | Track AGP releases early; pin known-good toolchains; run CI matrix |
 | Arduino CLI ARM64 compatibility | Low | High | Cross-compile early; test on real devices; maintain alternatives |
 | USB OTG reliability varies by device | High | Medium | Extensive device testing; clear compatibility list; Bluetooth fallback |
 | Battery drain from background services | Medium | Medium | Aggressive power management; foreground services only when needed |

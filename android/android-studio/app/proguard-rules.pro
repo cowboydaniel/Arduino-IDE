@@ -1,3 +1,2 @@
-# Keep PySide6 entry points and Qt bindings if minification is enabled.
-#-keep class org.qtproject.** { *; }
-#-keep class com.arduino.ide.** { *; }
+# No custom ProGuard rules are required for the Kotlin-only build.
+# Add keep rules here if future libraries require them.
