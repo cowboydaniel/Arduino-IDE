@@ -1,6 +1,7 @@
 package com.arduino.ide.mobile.snippets
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -62,15 +63,20 @@ class SnippetRepository(
         .map { prefs -> parseUserSnippets(prefs) }
 
     private suspend fun loadBundledSnippets(): List<Snippet> = withContext(dispatcher) {
-        val assetManager = context.assets
-        val directories = assetManager.list("snippets") ?: emptyArray()
-        val snippets = mutableListOf<Snippet>()
-        directories.forEach { assetFile ->
-            val stream = assetManager.open("snippets/$assetFile")
-            val content = stream.bufferedReader().use { it.readText() }
-            snippets += parseSnippetArray(JSONArray(content), isUserDefined = false)
+        runCatching {
+            val assetManager = context.assets
+            val directories = assetManager.list("snippets") ?: emptyArray()
+            val snippets = mutableListOf<Snippet>()
+            directories.forEach { assetFile ->
+                val stream = assetManager.open("snippets/$assetFile")
+                val content = stream.bufferedReader().use { it.readText() }
+                snippets += parseSnippetArray(JSONArray(content), isUserDefined = false)
+            }
+            snippets
+        }.getOrElse { error ->
+            Log.e("SnippetRepository", "Failed to load bundled snippets", error)
+            emptyList()
         }
-        snippets
     }
 
     private fun parseUserSnippets(prefs: Preferences): List<Snippet> {
