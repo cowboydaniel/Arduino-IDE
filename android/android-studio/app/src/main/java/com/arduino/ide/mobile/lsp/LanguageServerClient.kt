@@ -64,6 +64,7 @@ class LanguageServerClient(
             is InboundMessage.ServerError -> {
                 _status.value = LanguageServerStatus.Error(statusMessage.message, statusMessage.recoveryHint)
             }
+            else -> Unit
         }
         return _status.value
     }
