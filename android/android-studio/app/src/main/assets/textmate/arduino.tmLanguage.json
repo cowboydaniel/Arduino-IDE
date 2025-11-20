@@ -1,0 +1,44 @@
+{
+  "name": "Arduino",
+  "scopeName": "source.arduino",
+  "patterns": [
+    { "name": "comment.line.double-slash.arduino", "match": "//.*$" },
+    { "name": "comment.block.arduino", "begin": "/\\*", "end": "\\*/" },
+    {
+      "name": "string.quoted.double.arduino",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.arduino", "match": "\\\\." }
+      ]
+    },
+    {
+      "name": "string.quoted.single.arduino",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        { "name": "constant.character.escape.arduino", "match": "\\\\." }
+      ]
+    },
+    {
+      "name": "keyword.control.arduino",
+      "match": "\\b(?:if|else|for|while|return|switch|case|break|continue)\\b"
+    },
+    { "name": "keyword.function.arduino", "match": "\\b(?:setup|loop)\\b" },
+    {
+      "name": "storage.type.arduino",
+      "match": "\\b(?:void|int|long|float|double|bool|char|byte|String)\\b"
+    },
+    {
+      "name": "support.function.arduino",
+      "match": "\\b(?:pinMode|digitalWrite|digitalRead|analogRead|analogWrite|delay|millis|attachInterrupt|detachInterrupt|Serial\\.begin|Serial\\.println)\\b"
+    },
+    {
+      "name": "meta.preprocessor.arduino",
+      "match": "#\\s*\\w+"
+    },
+    { "name": "punctuation.definition.preprocessor.arduino", "match": "#" }
+  ],
+  "repository": {},
+  "uuid": "1e6d4ba4-d5c1-4aa7-9bc8-arduino"
+}
