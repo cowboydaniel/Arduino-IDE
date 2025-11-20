@@ -1,6 +1,7 @@
 package com.arduino.ide.mobile.project
 
 import android.content.Context
+import android.util.Log
 import java.io.File
 
 /**
@@ -83,10 +84,15 @@ class SketchProject(
                 """.trimIndent()
             )
 
-            val sketchFiles = files.map { (name, body) ->
+            val sketchFiles = files.mapNotNull { (name, body) ->
                 val file = File(demoRoot, name)
-                file.writeText(body)
-                SketchFile(name = name, path = file.absolutePath, content = body)
+                runCatching {
+                    file.writeText(body)
+                    SketchFile(name = name, path = file.absolutePath, content = body)
+                }.getOrElse { error ->
+                    Log.e("SketchProject", "Failed to seed demo sketch file $name", error)
+                    null
+                }
             }
 
             return SketchProject("Blink", demoRoot, sketchFiles)
