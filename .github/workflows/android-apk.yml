@@ -17,12 +17,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install build tooling
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
+
+      - name: Checkout LLVM sources
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          path: llvm-project
+          ref: llvmorg-17.0.6
 
       - name: Prepare Android SDK directory
         run: mkdir -p "$ANDROID_SDK_ROOT"
@@ -51,7 +61,9 @@ jobs:
 
       - name: Assemble debug APK
         working-directory: android/android-studio
-        run: ./gradlew --no-daemon assembleDebug
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/26.1.10909125
+        run: ../runtime/clangd/build-clangd-android.sh && ./gradlew --no-daemon assembleDebug
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
