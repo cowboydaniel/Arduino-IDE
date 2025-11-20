@@ -17,12 +17,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install build tooling
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
+
+      - name: Checkout LLVM sources
+        uses: actions/checkout@v4
+        with:
+          repository: llvm/llvm-project
+          path: llvm-project
+          ref: llvmorg-17.0.6
 
       - name: Prepare Android SDK directory
         run: mkdir -p "$ANDROID_SDK_ROOT"
