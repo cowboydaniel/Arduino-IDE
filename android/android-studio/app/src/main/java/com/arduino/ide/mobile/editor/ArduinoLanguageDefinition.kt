@@ -26,12 +26,22 @@ import java.nio.charset.StandardCharsets
 
 object ArduinoLanguageDefinition {
 
+    private const val TAG = "ArduinoLanguageDef"
     private const val GRAMMAR_PATH = "textmate/arduino.tmLanguage.json"
     private const val LANGUAGE_CONFIGURATION_PATH = "textmate/arduino-language-configuration.json"
     private const val THEME_PATH = "textmate/arduino.theme.json"
     private const val SCOPE_NAME = "source.arduino"
 
     fun create(context: Context): Language {
+        return try {
+            createTextMateLanguage(context)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to initialize TextMate language, using fallback", e)
+            FallbackLanguage()
+        }
+    }
+
+    private fun createTextMateLanguage(context: Context): Language {
         val assets = context.assets
         val fileResolver = AssetsFileResolver(assets)
         FileProviderRegistry.getInstance().addFileProvider(fileResolver)
@@ -154,5 +164,50 @@ object ArduinoLanguageDefinition {
             val additionalIndent = if (prefersExtraIndent) " ".repeat(tabLength) else ""
             return NewlineHandleResult("\n" + delegateResult.text + additionalIndent, delegateResult.shiftLeft)
         }
+    }
+
+    /**
+     * Minimal fallback language used when TextMate initialization fails.
+     * Provides basic editing functionality without syntax highlighting.
+     */
+    private class FallbackLanguage : Language {
+        override fun getAnalyzeManager(): AnalyzeManager = object : AnalyzeManager {
+            override fun setReceiver(receiver: io.github.rosemoe.sora.lang.styling.StyleReceiver?) {}
+            override fun insert(p0: CharPosition, p1: CharPosition, p2: CharSequence) {}
+            override fun delete(p0: CharPosition, p1: CharPosition, p2: CharSequence) {}
+            override fun rerun() {}
+            override fun reset(content: Content, extraArguments: Bundle) {}
+            override fun isDestroyed(): Boolean = false
+            override fun destroy() {}
+        }
+
+        override fun getInterruptionLevel(): Int = Language.INTERRUPTION_LEVEL_STRONG
+
+        override fun requireAutoComplete(
+            content: ContentReference,
+            position: CharPosition,
+            publisher: CompletionPublisher,
+            extra: Bundle
+        ) {
+            // No completions in fallback mode
+        }
+
+        override fun getIndentAdvance(content: ContentReference, line: Int, column: Int): Int = 0
+
+        override fun useTab(): Boolean = false
+
+        override fun getFormatter(): Formatter = object : Formatter {
+            override fun format(text: Content, cursorRange: io.github.rosemoe.sora.text.TextRange) {}
+            override fun formatRegion(text: Content, start: Int, end: Int, cursorRange: io.github.rosemoe.sora.text.TextRange) {}
+            override fun setReceiver(receiver: io.github.rosemoe.sora.lang.format.FormatResultReceiver?) {}
+            override fun isRunning(): Boolean = false
+            override fun destroy() {}
+        }
+
+        override fun getSymbolPairs(): SymbolPairMatch = SymbolPairMatch.DefaultSymbolPairs()
+
+        override fun getNewlineHandlers(): Array<NewlineHandler> = emptyArray()
+
+        override fun destroy() {}
     }
 }
