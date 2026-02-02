@@ -141,7 +141,7 @@ object ArduinoLanguageDefinition {
             tabLength: Int
         ): NewlineHandleResult {
             // Access the handlers array (plural) and find a matching handler
-            val delegateHandlers = delegate.newlineHandlers
+            val delegateHandlers = delegate.newlineHandlers ?: emptyArray()
             val delegateResult = if (delegateHandlers.isNotEmpty()) {
                 val handler = delegateHandlers.firstOrNull { it.matchesRequirement(content, cursor, styles) }
                 handler?.handleNewline(content, cursor, styles, tabLength)
