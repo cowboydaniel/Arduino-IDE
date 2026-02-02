@@ -1036,6 +1036,13 @@ class ArduinoCLI:
             '-I' + str(variant_path),
         ])
 
+        # Add sketch include paths (headers next to the .ino or in src/)
+        sketch_dir = sketch_file.parent
+        compile_flags.append('-I' + str(sketch_dir))
+        sketch_src_dir = sketch_dir / 'src'
+        if sketch_src_dir.exists():
+            compile_flags.append('-I' + str(sketch_src_dir))
+
         # Add custom library include paths
         for lib_dir in library_dirs:
             if lib_dir.exists():
