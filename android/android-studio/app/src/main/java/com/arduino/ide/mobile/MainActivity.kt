@@ -122,9 +122,9 @@ class MainActivity : AppCompatActivity() {
         handleUsbIntent(intent)
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent?.let { handleUsbIntent(it) }
+        handleUsbIntent(intent)
     }
 
     private fun handleUsbIntent(intent: Intent) {
