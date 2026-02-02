@@ -85,23 +85,28 @@ class UsbDeviceManager(private val context: Context) {
      * Refresh the list of connected USB devices.
      */
     fun refreshDevices() {
-        val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
-        val devices = drivers.map { driver ->
-            val device = driver.device
-            val vendorName = ARDUINO_VENDORS[device.vendorId] ?: "Unknown"
-            ArduinoDevice(
-                usbDevice = device,
-                driver = driver,
-                vendorId = device.vendorId,
-                productId = device.productId,
-                vendorName = vendorName,
-                productName = device.productName ?: "USB Serial Device",
-                serialNumber = device.serialNumber,
-                portCount = driver.ports.size
-            )
+        try {
+            val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
+            val devices = drivers.map { driver ->
+                val device = driver.device
+                val vendorName = ARDUINO_VENDORS[device.vendorId] ?: "Unknown"
+                ArduinoDevice(
+                    usbDevice = device,
+                    driver = driver,
+                    vendorId = device.vendorId,
+                    productId = device.productId,
+                    vendorName = vendorName,
+                    productName = device.productName ?: "USB Serial Device",
+                    serialNumber = device.serialNumber,
+                    portCount = driver.ports.size
+                )
+            }
+            _connectedDevices.value = devices
+            Log.d(TAG, "Found ${devices.size} USB serial devices")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to probe USB devices: ${e.message}", e)
+            _connectedDevices.value = emptyList()
         }
-        _connectedDevices.value = devices
-        Log.d(TAG, "Found ${devices.size} USB serial devices")
     }
 
     /**
