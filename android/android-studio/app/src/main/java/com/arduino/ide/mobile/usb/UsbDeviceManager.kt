@@ -54,7 +54,7 @@ class UsbDeviceManager(private val context: Context) {
         )
     }
 
-    private val usbManager: UsbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+    private val usbManager: UsbManager? = context.getSystemService(Context.USB_SERVICE) as? UsbManager
 
     private val _connectedDevices = MutableStateFlow<List<ArduinoDevice>>(emptyList())
     val connectedDevices: StateFlow<List<ArduinoDevice>> = _connectedDevices.asStateFlow()
@@ -85,8 +85,14 @@ class UsbDeviceManager(private val context: Context) {
      * Refresh the list of connected USB devices.
      */
     fun refreshDevices() {
+        val manager = usbManager
+        if (manager == null) {
+            Log.w(TAG, "USB service not available on this device")
+            _connectedDevices.value = emptyList()
+            return
+        }
         try {
-            val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
+            val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
             val devices = drivers.map { driver ->
                 val device = driver.device
                 val vendorName = ARDUINO_VENDORS[device.vendorId] ?: "Unknown"
@@ -113,7 +119,12 @@ class UsbDeviceManager(private val context: Context) {
      * Request permission to access a USB device.
      */
     fun requestPermission(device: ArduinoDevice, onResult: (Boolean) -> Unit) {
-        if (usbManager.hasPermission(device.usbDevice)) {
+        val manager = usbManager
+        if (manager == null) {
+            onResult(false)
+            return
+        }
+        if (manager.hasPermission(device.usbDevice)) {
             onResult(true)
             return
         }
@@ -133,27 +144,35 @@ class UsbDeviceManager(private val context: Context) {
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 if (intent?.action == ACTION_USB_PERMISSION) {
                     val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                    context.unregisterReceiver(this)
+                    try {
+                        context.unregisterReceiver(this)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error unregistering permission receiver: ${e.message}")
+                    }
                     onResult(granted)
                 }
             }
         }
 
         val filter = IntentFilter(ACTION_USB_PERMISSION)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, filter)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(receiver, filter)
+            }
+            manager.requestPermission(device.usbDevice, permissionIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to request USB permission: ${e.message}", e)
+            onResult(false)
         }
-
-        usbManager.requestPermission(device.usbDevice, permissionIntent)
     }
 
     /**
      * Check if we have permission to access a device.
      */
     fun hasPermission(device: ArduinoDevice): Boolean {
-        return usbManager.hasPermission(device.usbDevice)
+        return usbManager?.hasPermission(device.usbDevice) ?: false
     }
 
     /**
@@ -166,12 +185,14 @@ class UsbDeviceManager(private val context: Context) {
         stopBits: Int = UsbSerialPort.STOPBITS_1,
         parity: Int = UsbSerialPort.PARITY_NONE
     ): Result<SerialConnection> {
+        val manager = usbManager
+            ?: return Result.failure(Exception("USB service not available"))
         if (!hasPermission(device)) {
             return Result.failure(SecurityException("USB permission not granted"))
         }
 
         try {
-            val connection = usbManager.openDevice(device.usbDevice)
+            val connection = manager.openDevice(device.usbDevice)
                 ?: return Result.failure(Exception("Failed to open USB device"))
 
             val port = device.driver.ports.firstOrNull()
@@ -297,6 +318,7 @@ class UsbDeviceManager(private val context: Context) {
                     }
                     UsbManager.ACTION_USB_DEVICE_DETACHED -> {
                         Log.d(TAG, "USB device detached")
+                        @Suppress("DEPRECATION")
                         val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
                         if (currentConnection?.device?.usbDevice == device) {
                             disconnect()
@@ -312,10 +334,15 @@ class UsbDeviceManager(private val context: Context) {
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(permissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(permissionReceiver, filter)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(permissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(permissionReceiver, filter)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register USB receiver: ${e.message}", e)
+            permissionReceiver = null
         }
     }
 

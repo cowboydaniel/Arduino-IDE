@@ -51,7 +51,10 @@ class SketchProject(
         fun demoProject(context: Context): SketchProject {
             val demoRoot = File(context.cacheDir, "demo-sketch")
             if (!demoRoot.exists()) {
-                demoRoot.mkdirs()
+                if (!demoRoot.mkdirs()) {
+                    Log.e("SketchProject", "Failed to create demo sketch directory: ${demoRoot.absolutePath}")
+                    return SketchProject("Blink", demoRoot, emptyList())
+                }
             }
 
             val files = listOf(
