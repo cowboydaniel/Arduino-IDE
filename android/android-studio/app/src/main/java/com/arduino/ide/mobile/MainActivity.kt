@@ -10,6 +10,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import com.arduino.ide.mobile.compiler.ArduinoBuildService
+import com.arduino.ide.mobile.compiler.BoardConfig
+import com.arduino.ide.mobile.compiler.BuildMessage
+import com.arduino.ide.mobile.compiler.BuildResult
+import com.arduino.ide.mobile.compiler.BuildState
 import com.arduino.ide.mobile.databinding.ActivityMainBinding
 import com.arduino.ide.mobile.snippets.SnippetRepository
 import com.arduino.ide.mobile.snippets.SnippetSheet
@@ -49,6 +54,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var activeFileUri: String
     private var statusJob: Job? = null
     private var diagnosticJob: Job? = null
+    private var buildJob: Job? = null
+    private lateinit var buildService: ArduinoBuildService
+    private var currentBoard = BoardConfig(
+        fqbn = "arduino:avr:nano",
+        name = "Arduino Nano ESP32",
+        platform = "arduino:avr"
+    )
+    private var currentPort = "/dev/ttyUSB0"
 
     private val searchManager = SearchManager()
     private val docs = mapOf(
@@ -91,14 +104,114 @@ class MainActivity : AppCompatActivity() {
             attachLanguageServer(activeFile, codeListing)
         }
 
-        binding.serialMonitorLog.text = """
-            [12:00:01] Opening serial monitor...
-            [12:00:02] Syncing board configuration
-            [12:00:03] Upload complete
-            [12:00:05] Hello, world!
-        """.trimIndent()
+        binding.serialMonitorLog.text = getString(R.string.build_ready_message)
+
+        buildService = ArduinoBuildService(this)
+        setupBuildButtons()
+        observeBuildState()
 
         configureSnippetPanel()
+    }
+
+    private fun setupBuildButtons() {
+        binding.uploadButton.setOnClickListener {
+            performUpload()
+        }
+        binding.verifyButton.setOnClickListener {
+            performVerify()
+        }
+    }
+
+    private fun performVerify() {
+        if (buildJob?.isActive == true) {
+            Snackbar.make(binding.root, R.string.build_already_running, Snackbar.LENGTH_SHORT).show()
+            return
+        }
+
+        val currentFile = adapter.getFile(binding.editorPager.currentItem)
+        buildJob = lifecycleScope.launch {
+            binding.verifyButton.isEnabled = false
+            binding.uploadButton.isEnabled = false
+
+            val result = buildService.verify(currentFile.path, currentBoard)
+            when (result) {
+                is BuildResult.Success -> {
+                    Snackbar.make(binding.root, result.message, Snackbar.LENGTH_SHORT).show()
+                }
+                is BuildResult.Failure -> {
+                    Snackbar.make(binding.root, result.message, Snackbar.LENGTH_LONG).show()
+                }
+            }
+
+            binding.verifyButton.isEnabled = true
+            binding.uploadButton.isEnabled = true
+        }
+    }
+
+    private fun performUpload() {
+        if (buildJob?.isActive == true) {
+            Snackbar.make(binding.root, R.string.build_already_running, Snackbar.LENGTH_SHORT).show()
+            return
+        }
+
+        val currentFile = adapter.getFile(binding.editorPager.currentItem)
+        buildJob = lifecycleScope.launch {
+            binding.verifyButton.isEnabled = false
+            binding.uploadButton.isEnabled = false
+
+            val result = buildService.upload(currentFile.path, currentBoard, currentPort)
+            when (result) {
+                is BuildResult.Success -> {
+                    Snackbar.make(binding.root, result.message, Snackbar.LENGTH_SHORT).show()
+                }
+                is BuildResult.Failure -> {
+                    Snackbar.make(binding.root, result.message, Snackbar.LENGTH_LONG).show()
+                }
+            }
+
+            binding.verifyButton.isEnabled = true
+            binding.uploadButton.isEnabled = true
+        }
+    }
+
+    private fun observeBuildState() {
+        lifecycleScope.launch {
+            buildService.buildState.collect { state ->
+                when (state) {
+                    BuildState.Idle -> {
+                        binding.statusChip.text = getString(R.string.status_label)
+                    }
+                    BuildState.Compiling -> {
+                        binding.statusChip.text = getString(R.string.status_compiling)
+                    }
+                    BuildState.Uploading -> {
+                        binding.statusChip.text = getString(R.string.status_uploading)
+                    }
+                    BuildState.Failed -> {
+                        binding.statusChip.text = getString(R.string.status_failed)
+                    }
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            buildService.buildOutput.collect { messages ->
+                val logText = messages.joinToString("\n") { msg ->
+                    val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                        .format(java.util.Date())
+                    when (msg) {
+                        is BuildMessage.Info -> "[$timestamp] ${msg.text}"
+                        is BuildMessage.Warning -> "[$timestamp] WARNING: ${msg.text}"
+                        is BuildMessage.Error -> "[$timestamp] ERROR: ${msg.text}"
+                        is BuildMessage.Success -> "[$timestamp] ${msg.text}"
+                        is BuildMessage.Progress -> "[$timestamp] ${msg.text}"
+                    }
+                }
+                if (logText.isNotEmpty()) {
+                    binding.serialMonitorLog.text = logText
+                }
+            }
+        }
     }
 
     private fun setupTabs(project: SketchProject) {
