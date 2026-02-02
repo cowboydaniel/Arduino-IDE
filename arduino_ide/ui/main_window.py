@@ -5,6 +5,8 @@ Main window for Arduino IDE Modern
 from functools import partial
 import getpass
 import os
+import shutil
+from datetime import datetime
 from typing import Dict, List, Optional, Set
 
 from PySide6.QtWidgets import (
@@ -1750,6 +1752,10 @@ void loop() {
         path = Path(file_path)
         self.settings.setValue("lastOpenDir", str(path.parent))
 
+        # Handle .ino files with special folder validation
+        if path.suffix == '.ino':
+            path = self._validate_and_fix_ino_folder(path)
+
         self._open_file_path(path)
 
     def save_file(self, checked=False, *, index=None, save_as=False):
@@ -1841,6 +1847,12 @@ void loop() {
             editor_container.set_file_path(path)
             self._sync_editor_breakpoints(editor_container)
 
+        # Create tmp directory for .ino files
+        if path.suffix == '.ino':
+            self._create_tmp_directory(path)
+            # Open all files in the folder
+            self._open_all_files_in_folder(path.parent, exclude_path=path)
+
         self.add_recent_file(path)
         self.status_bar.set_status(f"Opened {path.name}")
         # Explicitly update pin usage after opening file
@@ -1853,6 +1865,46 @@ void loop() {
         self._update_unit_testing_target(force_discover=True)
 
         return True
+
+    def _validate_and_fix_ino_folder(self, ino_path: Path) -> Path:
+        """Validate that .ino file is in a folder with the same name, create if needed."""
+        expected_folder_name = ino_path.stem
+        actual_folder = ino_path.parent
+        
+        if actual_folder.name != expected_folder_name:
+            # Need to create folder and move file
+            new_folder = actual_folder / expected_folder_name
+            new_folder.mkdir(exist_ok=True)
+            
+            new_path = new_folder / ino_path.name
+            shutil.move(str(ino_path), str(new_path))
+            
+            self.status_bar.set_status(f"Moved {ino_path.name} to {new_folder}")
+            return new_path
+        
+        return ino_path
+
+    def _create_tmp_directory(self, ino_path: Path):
+        """Create a tmp directory for the .ino file with timestamp."""
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        tmp_dir_name = f"tmp-{timestamp}-{ino_path.stem}"
+        tmp_dir = ino_path.parent / tmp_dir_name
+        tmp_dir.mkdir(exist_ok=True)
+        
+        # Store the tmp directory path for later use
+        if not hasattr(self, 'tmp_directories'):
+            self.tmp_directories = {}
+        self.tmp_directories[str(ino_path)] = tmp_dir
+        
+        self.status_bar.set_status(f"Created tmp directory: {tmp_dir_name}")
+
+    def _open_all_files_in_folder(self, folder_path: Path, exclude_path: Path):
+        """Open all files in the given folder except the excluded one."""
+        for file_path in folder_path.iterdir():
+            if file_path.is_file() and file_path != exclude_path:
+                # Only open relevant source files
+                if file_path.suffix in ['.ino', '.pde', '.cpp', '.c', '.h']:
+                    self._open_file_path(file_path)
 
     def save_file_as(self, checked=False):
         """Save the current file with a new name"""
