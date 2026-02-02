@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import json
 import re
+import shutil
 import subprocess
 import time
 
@@ -132,6 +133,54 @@ class PerformanceComparisonResult:
     highlights: List[str]
 
 
+class HostProfilingTool:
+    """Helper for running host-based profiling commands."""
+
+    def __init__(self, project_path: Path):
+        self.project_path = project_path
+        self.build_dir = self.project_path / "build" / "profile"
+        self.profile_exe = self.build_dir / "profile_exe"
+        self.gmon_path = self.build_dir / "gmon.out"
+
+    def ensure_tools_available(self) -> Optional[str]:
+        missing_tools = [tool for tool in ("g++", "gprof") if shutil.which(tool) is None]
+        if missing_tools:
+            return f"Host profiling error: missing tool(s): {', '.join(missing_tools)}."
+        return None
+
+    def sources(self) -> List[Path]:
+        return list((self.project_path / "src").glob("*.cpp"))
+
+    def compile(self, sources: List[Path]) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["g++", "-pg", "-O0", "-g",
+             "-o", str(self.profile_exe),
+             *sources],
+            cwd=str(self.project_path),
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+    def run_profile(self) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [str(self.profile_exe)],
+            cwd=str(self.build_dir),
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+    def run_gprof(self) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["gprof", str(self.profile_exe), str(self.gmon_path)],
+            cwd=str(self.build_dir),
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+
 class PerformanceProfilerService(QObject):
     """
     Service for performance profiling
@@ -230,39 +279,57 @@ class PerformanceProfilerService(QObject):
     def _start_host_profiling(self):
         """Start host-based profiling using gprof or similar"""
         # Compile with profiling flags
-        build_dir = self.project_path / "build" / "profile"
-        build_dir.mkdir(parents=True, exist_ok=True)
+        tool = HostProfilingTool(self.project_path)
+        tool.build_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate instrumented code
         self._instrument_code_for_profiling()
 
         # Compile with profiling
         try:
-            subprocess.run(
-                ["g++", "-pg", "-O0", "-g",
-                 "-o", str(build_dir / "profile_exe"),
-                 *list((self.project_path / "src").glob("*.cpp"))],
-                cwd=str(self.project_path),
-                capture_output=True,
-                timeout=60
-            )
+            tool_error = tool.ensure_tools_available()
+            if tool_error:
+                print(tool_error)
+                return
+
+            sources = tool.sources()
+            if not sources:
+                print("Host profiling error: no C++ source files found in src/.")
+                return
+
+            compile_result = tool.compile(sources)
+            if compile_result.returncode != 0:
+                print(
+                    "Host profiling error: compilation failed.\n"
+                    f"{compile_result.stderr or compile_result.stdout}"
+                )
+                return
+
+            if not tool.profile_exe.exists():
+                print("Host profiling error: profile_exe was not generated.")
+                return
 
             # Run with profiling
-            subprocess.run(
-                [str(build_dir / "profile_exe")],
-                cwd=str(build_dir),
-                capture_output=True,
-                timeout=30
-            )
+            run_result = tool.run_profile()
+            if run_result.returncode != 0:
+                print(
+                    "Host profiling error: profile run failed.\n"
+                    f"{run_result.stderr or run_result.stdout}"
+                )
+                return
+
+            if not tool.gmon_path.exists():
+                print("Host profiling error: gmon.out was not generated.")
+                return
 
             # Generate profile data
-            result = subprocess.run(
-                ["gprof", str(build_dir / "profile_exe"), "gmon.out"],
-                cwd=str(build_dir),
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            result = tool.run_gprof()
+            if result.returncode != 0:
+                print(
+                    "Host profiling error: gprof failed.\n"
+                    f"{result.stderr or result.stdout}"
+                )
+                return
 
             self._parse_gprof_output(result.stdout)
 
