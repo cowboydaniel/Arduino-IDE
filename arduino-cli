@@ -256,9 +256,27 @@ class ArduinoCLI:
             print(f"✗ Failed to uninstall {platform}", file=sys.stderr)
             return 1
 
-    def core_list(self):
+    def core_list(self, format: str = "text"):
         """List installed board platforms"""
         packages = self.board_manager.search_packages(installed_only=True)
+
+        if format == "json":
+            package_lookup = {pkg.name: pkg for pkg in packages}
+            cores = []
+            installed_packages = self.board_manager.installed_packages
+            for platform_id, installed_version in installed_packages.items():
+                package_name = platform_id.split(":", 1)[0]
+                package = package_lookup.get(package_name)
+                cores.append(
+                    {
+                        "id": platform_id,
+                        "installed": installed_version,
+                        "latest": package.latest_version if package else None,
+                        "name": package.name if package else package_name,
+                    }
+                )
+            print(json.dumps(cores, indent=2))
+            return 0
 
         if not packages:
             print("No platforms installed")
@@ -1625,6 +1643,7 @@ def main():
 
     # core list
     core_list_parser = core_subparsers.add_parser('list', help='List platforms')
+    core_list_parser.add_argument('--format', choices=['text', 'json'], default='text', help='Output format')
 
     # Compile command
     compile_parser = subparsers.add_parser('compile', help='Compile sketch')
@@ -1706,7 +1725,7 @@ def main():
                 return cli.core_uninstall(args.platform)
 
             elif args.core_command == 'list':
-                return cli.core_list()
+                return cli.core_list(format=args.format)
 
         elif args.command == 'board':
             if args.board_command == 'list':
