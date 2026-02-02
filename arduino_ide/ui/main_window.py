@@ -2,6 +2,7 @@
 Main window for Arduino IDE Modern
 """
 
+import tempfile
 from functools import partial
 import getpass
 import os
@@ -453,6 +454,9 @@ class MainWindow(QMainWindow):
         self.create_toolbars()
         self.create_dock_widgets()
 
+        # Restore session
+        QTimer.singleShot(1000, self._restore_session)  # Delay to ensure UI is fully loaded
+
         # Don't restore window geometry, always start maximized
         # Only restore dock widget positions
         state = self.settings.value("windowState")
@@ -463,8 +467,8 @@ class MainWindow(QMainWindow):
         # off the maximize retry loop.
         self._enforce_initial_maximize()
 
-        # Create initial editor (after dock widgets are created)
-        self.create_new_editor("sketch.ino")
+        # Create initial editor only if no session to restore
+        QTimer.singleShot(1100, self._create_initial_editor_if_needed)  # After session restore
 
         # Setup port auto-refresh timer
         self.setup_port_refresh()
@@ -1433,6 +1437,11 @@ void loop() {
                     return
 
         self._detach_debugger_from_editor(widget)
+        
+        # Clean up tmp directories for this file when tab is closed
+        if hasattr(widget, 'file_path') and widget.file_path:
+            self._cleanup_tmp_directories(widget.file_path)
+        
         self.editor_tabs.removeTab(index)
 
     def prompt_unsaved_changes(self, editor_container):
@@ -1885,10 +1894,14 @@ void loop() {
         return ino_path
 
     def _create_tmp_directory(self, ino_path: Path):
-        """Create a tmp directory for the .ino file with timestamp."""
+        """Create a tmp directory for the .ino file with timestamp in OS temp directory."""
         timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         tmp_dir_name = f"tmp-{timestamp}-{ino_path.stem}"
-        tmp_dir = ino_path.parent / tmp_dir_name
+        
+        # Use OS temp directory
+        temp_base = Path(tempfile.gettempdir()) / "arduino-ide-tmp"
+        temp_base.mkdir(exist_ok=True)
+        tmp_dir = temp_base / tmp_dir_name
         tmp_dir.mkdir(exist_ok=True)
         
         # Store the tmp directory path for later use
@@ -1897,6 +1910,37 @@ void loop() {
         self.tmp_directories[str(ino_path)] = tmp_dir
         
         self.status_bar.set_status(f"Created tmp directory: {tmp_dir_name}")
+
+    def _cleanup_tmp_directories(self, file_path=None):
+        """Clean up tmp directories for a specific file or all tmp directories."""
+        if not hasattr(self, 'tmp_directories'):
+            return
+        
+        if file_path:
+            # Clean up tmp directory for specific file
+            tmp_dir = self.tmp_directories.get(str(file_path))
+            if tmp_dir and tmp_dir.exists():
+                try:
+                    shutil.rmtree(tmp_dir)
+                    del self.tmp_directories[str(file_path)]
+                    self.status_bar.set_status(f"Cleaned up tmp directory for {Path(file_path).name}")
+                except Exception as exc:
+                    self.status_bar.set_status(f"Failed to cleanup tmp directory: {exc}")
+        else:
+            # Clean up all tmp directories
+            for tmp_dir in self.tmp_directories.values():
+                if tmp_dir.exists():
+                    try:
+                        shutil.rmtree(tmp_dir)
+                    except Exception:
+                        pass  # Ignore cleanup errors
+            self.tmp_directories.clear()
+
+    def _cleanup_tmp_directories_for_current_file(self):
+        """Clean up tmp directories for the currently active file."""
+        current_widget = self.editor_tabs.currentWidget()
+        if current_widget and hasattr(current_widget, 'file_path') and current_widget.file_path:
+            self._cleanup_tmp_directories(current_widget.file_path)
 
     def _open_all_files_in_folder(self, folder_path: Path, exclude_path: Path):
         """Open all files in the given folder except the excluded one."""
@@ -1994,6 +2038,8 @@ void loop() {
                     self.console_panel.append_output("✔ Compilation completed successfully.", color="#6A9955")
                     self.status_bar.set_status("Compilation Succeeded")
                     QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+                    # Clean up tmp directories on successful compile
+                    self._cleanup_tmp_directories_for_current_file()
                 else:
                     # Background compile succeeded - show brief status
                     self.status_bar.set_status("Memory updated")
@@ -2007,6 +2053,8 @@ void loop() {
             elif operation == "upload":
                 self.console_panel.append_output("✔ Upload completed successfully.", color="#6A9955")
                 self.status_bar.set_status("Upload Succeeded")
+                # Clean up tmp directories on successful upload
+                self._cleanup_tmp_directories_for_current_file()
                 if self._open_monitor_after_upload:
                     self.toggle_serial_monitor()
                 self._open_monitor_after_upload = False
@@ -3528,8 +3576,57 @@ void loop() {
 
     def closeEvent(self, event):
         """Handle window close"""
+        self._save_session()
+        # Clean up all tmp directories when closing the program
+        self._cleanup_tmp_directories()
         self.save_state()
         event.accept()
+
+    def _save_session(self):
+        """Save current open files to settings for session restoration"""
+        open_files = []
+        current_index = self.editor_tabs.currentIndex()
+        
+        for i in range(self.editor_tabs.count()):
+            widget = self.editor_tabs.widget(i)
+            if widget and hasattr(widget, 'file_path') and widget.file_path:
+                open_files.append(str(widget.file_path))
+        
+        self.settings.setValue("session/openFiles", open_files)
+        if current_index >= 0 and current_index < len(open_files):
+            self.settings.setValue("session/currentFile", open_files[current_index])
+        else:
+            self.settings.remove("session/currentFile")
+
+    def _restore_session(self):
+        """Restore previously open files from settings"""
+        open_files = self.settings.value("session/openFiles", [])
+        current_file = self.settings.value("session/currentFile", "")
+        
+        if not open_files:
+            return
+        
+        # Restore each file
+        current_index = -1
+        for i, file_path in enumerate(open_files):
+            path = Path(file_path)
+            if path.exists():
+                self._open_file_path(path)
+                if file_path == current_file:
+                    current_index = i
+        
+        # Set the current tab
+        if current_index >= 0 and current_index < self.editor_tabs.count():
+            self.editor_tabs.setCurrentIndex(current_index)
+        
+        if open_files:
+            self.status_bar.set_status(f"Restored {len(open_files)} files from previous session")
+            QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
+
+    def _create_initial_editor_if_needed(self):
+        """Create initial empty editor only if no files were restored"""
+        if self.editor_tabs.count() == 0:
+            self.create_new_editor("sketch.ino")
 
     def _update_code_quality_panel(self):
         """Run static analysis on the current editor and refresh the panel."""
