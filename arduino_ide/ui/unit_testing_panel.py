@@ -375,8 +375,8 @@ class UnitTestingPanel(QWidget):
     - Mock management
     """
 
-    def __init__(self, testing_service: Optional[UnitTestingService] = None):
-        super().__init__()
+    def __init__(self, testing_service: Optional[UnitTestingService] = None, parent=None):
+        super().__init__(parent)
 
         self.testing_service = testing_service or UnitTestingService()
 
