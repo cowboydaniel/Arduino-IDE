@@ -1,5 +1,7 @@
 package com.arduino.ide.mobile
 
+import android.content.Intent
+import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import androidx.activity.enableEdgeToEdge
@@ -16,6 +18,8 @@ import com.arduino.ide.mobile.compiler.BuildMessage
 import com.arduino.ide.mobile.compiler.BuildResult
 import com.arduino.ide.mobile.compiler.BuildState
 import com.arduino.ide.mobile.databinding.ActivityMainBinding
+import com.arduino.ide.mobile.usb.ArduinoDevice
+import com.arduino.ide.mobile.usb.ConnectionState
 import com.arduino.ide.mobile.snippets.SnippetRepository
 import com.arduino.ide.mobile.snippets.SnippetSheet
 import com.arduino.ide.mobile.snippets.SnippetViewModel
@@ -57,11 +61,11 @@ class MainActivity : AppCompatActivity() {
     private var buildJob: Job? = null
     private lateinit var buildService: ArduinoBuildService
     private var currentBoard = BoardConfig(
-        fqbn = "arduino:avr:nano",
-        name = "Arduino Nano ESP32",
+        fqbn = "arduino:avr:uno",
+        name = "Arduino Uno",
         platform = "arduino:avr"
     )
-    private var currentPort = "/dev/ttyUSB0"
+    private var selectedDevice: ArduinoDevice? = null
 
     private val searchManager = SearchManager()
     private val docs = mapOf(
@@ -108,9 +112,155 @@ class MainActivity : AppCompatActivity() {
 
         buildService = ArduinoBuildService(this)
         setupBuildButtons()
+        setupBoardAndPortSelection()
         observeBuildState()
+        observeUsbDevices()
 
         configureSnippetPanel()
+
+        // Handle USB device if app was launched by USB attachment
+        handleUsbIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        intent?.let { handleUsbIntent(it) }
+    }
+
+    private fun handleUsbIntent(intent: Intent) {
+        if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) {
+            // Refresh device list when a USB device is attached
+            buildService.usbManager.refreshDevices()
+            Snackbar.make(binding.root, R.string.usb_device_attached, Snackbar.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun setupBoardAndPortSelection() {
+        // Board selection chip
+        binding.boardChip.text = currentBoard.name
+        binding.boardChip.setOnClickListener {
+            showBoardSelectionDialog()
+        }
+
+        // Port selection chip - shows connected devices
+        binding.portChip.setOnClickListener {
+            showPortSelectionDialog()
+        }
+    }
+
+    private fun showBoardSelectionDialog() {
+        val boards = buildService.getInstalledBoards()
+        val boardNames = boards.map { it.name }.toTypedArray()
+        val currentIndex = boards.indexOfFirst { it.fqbn == currentBoard.fqbn }.coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.select_board_title)
+            .setSingleChoiceItems(boardNames, currentIndex) { dialog, which ->
+                currentBoard = boards[which]
+                binding.boardChip.text = currentBoard.name
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showPortSelectionDialog() {
+        val devices = buildService.getConnectedDevices()
+
+        if (devices.isEmpty()) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.select_port_title)
+                .setMessage(R.string.no_devices_connected)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+
+        val deviceNames = devices.map { it.displayName }.toTypedArray()
+        val currentIndex = devices.indexOfFirst { it == selectedDevice }.coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.select_port_title)
+            .setSingleChoiceItems(deviceNames, currentIndex) { dialog, which ->
+                val device = devices[which]
+
+                // Request permission if needed
+                if (!buildService.usbManager.hasPermission(device)) {
+                    buildService.usbManager.requestPermission(device) { granted ->
+                        if (granted) {
+                            selectDevice(device)
+                        } else {
+                            Snackbar.make(binding.root, R.string.usb_permission_denied, Snackbar.LENGTH_LONG).show()
+                        }
+                    }
+                } else {
+                    selectDevice(device)
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun selectDevice(device: ArduinoDevice) {
+        selectedDevice = device
+        binding.portChip.text = device.productName
+        binding.statusText.text = getString(R.string.device_selected, device.displayName)
+    }
+
+    private fun observeUsbDevices() {
+        // Observe connected devices
+        lifecycleScope.launch {
+            buildService.usbManager.connectedDevices.collect { devices ->
+                updatePortChip(devices)
+            }
+        }
+
+        // Observe connection state
+        lifecycleScope.launch {
+            buildService.usbManager.connectionState.collect { state ->
+                when (state) {
+                    is ConnectionState.Connected -> {
+                        binding.statusIndicator.setBackgroundResource(R.drawable.status_indicator_connected)
+                        binding.statusText.text = getString(R.string.connected_to_device, state.device.displayName)
+                    }
+                    is ConnectionState.Disconnected -> {
+                        binding.statusIndicator.setBackgroundResource(R.drawable.status_indicator)
+                        if (selectedDevice == null) {
+                            binding.statusText.text = getString(R.string.no_device_selected)
+                        }
+                    }
+                    is ConnectionState.Error -> {
+                        binding.statusIndicator.setBackgroundResource(R.drawable.status_indicator_error)
+                        binding.statusText.text = state.message
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updatePortChip(devices: List<ArduinoDevice>) {
+        when {
+            devices.isEmpty() -> {
+                binding.portChip.text = getString(R.string.no_device)
+                selectedDevice = null
+            }
+            selectedDevice == null && devices.isNotEmpty() -> {
+                // Auto-select first device
+                val firstDevice = devices.first()
+                if (buildService.usbManager.hasPermission(firstDevice)) {
+                    selectDevice(firstDevice)
+                } else {
+                    binding.portChip.text = getString(R.string.tap_to_connect)
+                }
+            }
+            selectedDevice != null && !devices.contains(selectedDevice) -> {
+                // Selected device was disconnected
+                binding.portChip.text = getString(R.string.device_disconnected)
+                selectedDevice = null
+                Snackbar.make(binding.root, R.string.device_disconnected_message, Snackbar.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupBuildButtons() {
@@ -154,12 +304,34 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        val device = selectedDevice
+        if (device == null) {
+            Snackbar.make(binding.root, R.string.no_device_selected_for_upload, Snackbar.LENGTH_LONG).show()
+            return
+        }
+
+        // Request permission if needed
+        if (!buildService.usbManager.hasPermission(device)) {
+            buildService.usbManager.requestPermission(device) { granted ->
+                if (granted) {
+                    doUpload(device)
+                } else {
+                    Snackbar.make(binding.root, R.string.usb_permission_denied, Snackbar.LENGTH_LONG).show()
+                }
+            }
+            return
+        }
+
+        doUpload(device)
+    }
+
+    private fun doUpload(device: ArduinoDevice) {
         val currentFile = adapter.getFile(binding.editorPager.currentItem)
         buildJob = lifecycleScope.launch {
             binding.verifyButton.isEnabled = false
             binding.uploadButton.isEnabled = false
 
-            val result = buildService.upload(currentFile.path, currentBoard, currentPort)
+            val result = buildService.upload(currentFile.path, currentBoard, device)
             when (result) {
                 is BuildResult.Success -> {
                     Snackbar.make(binding.root, result.message, Snackbar.LENGTH_SHORT).show()
@@ -461,6 +633,11 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         tabStateRepository.saveOpenTabs(adapter.openFiles().map { it.path })
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        buildService.cleanup()
     }
 
     private fun configureSnippetPanel() {

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Arduino boards (Official) - Vendor ID: 0x2341 -->
+    <usb-device vendor-id="9025" />  <!-- Arduino SA -->
+
+    <!-- Arduino boards (Old bootloader) - Vendor ID: 0x2A03 -->
+    <usb-device vendor-id="10755" /> <!-- Arduino SRL -->
+
+    <!-- Sparkfun boards - Vendor ID: 0x1B4F -->
+    <usb-device vendor-id="6991" />
+
+    <!-- Adafruit boards - Vendor ID: 0x239A -->
+    <usb-device vendor-id="9114" />
+
+    <!-- FTDI chips (FT232, FT2232, etc.) - Vendor ID: 0x0403 -->
+    <usb-device vendor-id="1027" />
+
+    <!-- Silicon Labs CP210x - Vendor ID: 0x10C4 -->
+    <usb-device vendor-id="4292" />
+
+    <!-- Prolific PL2303 - Vendor ID: 0x067B -->
+    <usb-device vendor-id="1659" />
+
+    <!-- CH340/CH341 chips (common on Arduino clones) - Vendor ID: 0x1A86 -->
+    <usb-device vendor-id="6790" />
+
+    <!-- Espressif (ESP32, ESP8266) - Vendor ID: 0x303A -->
+    <usb-device vendor-id="12346" />
+
+    <!-- STMicroelectronics (STM32) - Vendor ID: 0x0483 -->
+    <usb-device vendor-id="1155" />
+
+    <!-- Microchip/Atmel - Vendor ID: 0x03EB -->
+    <usb-device vendor-id="1003" />
+
+    <!-- Teensy boards - Vendor ID: 0x16C0 -->
+    <usb-device vendor-id="5824" />
+
+    <!-- Seeed Studio - Vendor ID: 0x2886 -->
+    <usb-device vendor-id="10374" />
+
+    <!-- Raspberry Pi Pico - Vendor ID: 0x2E8A -->
+    <usb-device vendor-id="11914" />
+</resources>

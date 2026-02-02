@@ -45,4 +45,19 @@
     <string name="status_compiling">Compiling…</string>
     <string name="status_uploading">Uploading…</string>
     <string name="status_failed">Failed</string>
+
+    <!-- USB device strings -->
+    <string name="select_board_title">Select Board</string>
+    <string name="select_port_title">Select Port</string>
+    <string name="no_devices_connected">No Arduino devices connected.\n\nConnect a board via USB OTG cable.</string>
+    <string name="no_device">No device</string>
+    <string name="tap_to_connect">Tap to connect</string>
+    <string name="device_disconnected">Disconnected</string>
+    <string name="device_disconnected_message">Device disconnected</string>
+    <string name="usb_device_attached">USB device connected</string>
+    <string name="usb_permission_denied">USB permission denied</string>
+    <string name="no_device_selected">No device selected</string>
+    <string name="no_device_selected_for_upload">Please select a device before uploading</string>
+    <string name="device_selected">Selected: %1$s</string>
+    <string name="connected_to_device">Connected to %1$s</string>
 </resources>
