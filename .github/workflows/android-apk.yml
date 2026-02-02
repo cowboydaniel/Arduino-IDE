@@ -81,6 +81,7 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/26.1.10909125
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          LLVM_TARGETS_TO_BUILD: AArch64
         run: |
           ccache --zero-stats
           ../runtime/clangd/build-clangd-android.sh
