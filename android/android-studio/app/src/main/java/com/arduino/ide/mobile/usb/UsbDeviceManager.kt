@@ -216,13 +216,13 @@ class UsbDeviceManager(private val context: Context) {
     /**
      * Write data to the connected device.
      */
-    fun write(data: ByteArray): Result<Int> {
+    fun write(data: ByteArray): Result<Unit> {
         val conn = currentConnection
             ?: return Result.failure(Exception("Not connected"))
 
         return try {
-            val written = conn.port.write(data, 1000)
-            Result.success(written)
+            conn.port.write(data, 1000)
+            Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Write error: ${e.message}", e)
             Result.failure(e)
