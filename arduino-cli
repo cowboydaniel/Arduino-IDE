@@ -399,7 +399,7 @@ class ArduinoCLI:
 
     def _extract_and_remove_type_definitions(self, source: str) -> tuple:
         """
-        Extract struct, class, and enum definitions from the sketch source,
+        Extract struct, class, enum, and template definitions from the sketch source,
         and return both the definitions and the source with those definitions removed.
 
         This ensures type definitions appear before any code that uses them,
@@ -425,24 +425,67 @@ class ArduinoCLI:
         # Track line ranges to remove from original source
         lines_to_remove = set()
 
+        # Patterns to match type definitions:
+        # 1. Regular struct/class/enum: struct Name { ... }; or class Name { ... };
+        # 2. Template classes/structs: template<...> class Name { ... };
+        # 3. Typedef versions of the above
+        # 4. Template declaration on its own line (followed by class/struct on next line)
+        type_start_patterns = [
+            r'^\s*(?:typedef\s+)?(struct|class|enum)\s+\w+',
+            r'^\s*template\s*<[^>]*>\s*(struct|class)\s+\w*',
+            r'^\s*template\s*<',  # Template on its own line
+        ]
+
         i = 0
         while i < len(detection_lines):
             line = detection_lines[i].strip()
 
             # Check if this line starts a type definition
-            if re.match(r'^\s*(?:typedef\s+)?(struct|class|enum)\s+\w+', line):
+            is_type_def = False
+            is_template_start = False
+            for pattern in type_start_patterns:
+                if re.match(pattern, line):
+                    is_type_def = True
+                    # Check if this is just a template declaration (without class on same line)
+                    if re.match(r'^\s*template\s*<', line) and not re.match(r'^\s*template\s*<[^>]*>\s*(struct|class)', line):
+                        is_template_start = True
+                    break
+
+            if is_type_def:
                 # Check if this is a forward declaration (ends with semicolon, no braces)
                 # We only want to extract FULL definitions, not forward declarations
-                if ';' in line and '{' not in line:
+                if ';' in line and '{' not in line and not is_template_start:
                     # This is a forward declaration, skip it
                     i += 1
                     continue
+
+                # For template declarations on their own line, check if the next line
+                # is a class/struct definition (not a template function)
+                if is_template_start:
+                    # Look ahead to see if this is a template class/struct
+                    next_i = i + 1
+                    while next_i < len(detection_lines) and not detection_lines[next_i].strip():
+                        next_i += 1  # Skip empty lines
+                    if next_i < len(detection_lines):
+                        next_line = detection_lines[next_i].strip()
+                        # Check if next line starts with class/struct
+                        if not re.match(r'^\s*(class|struct)\s+\w+', next_line):
+                            # This is a template function, not a template class
+                            i += 1
+                            continue
 
                 # Found a type definition start
                 start_line = i
                 type_def_lines = [original_lines[i]]
                 brace_count = detection_lines[i].count('{') - detection_lines[i].count('}')
                 i += 1
+
+                # If no opening brace yet, continue until we find one
+                # (handles multi-line template declarations)
+                while i < len(detection_lines) and brace_count == 0 and '{' not in detection_lines[i - 1]:
+                    type_def_lines.append(original_lines[i])
+                    brace_count = detection_lines[i].count('{') - detection_lines[i].count('}')
+                    i += 1
 
                 # Continue collecting lines until braces are balanced
                 while i < len(detection_lines) and brace_count > 0:
@@ -498,6 +541,133 @@ class ArduinoCLI:
                 custom_types.add(match.group(1))
 
         return custom_types
+
+    def _extract_and_relocate_includes(self, source: str) -> tuple:
+        """
+        Extract all #include statements from the sketch source and return them
+        separately so they can be placed at the top of the generated .cpp file.
+
+        This mimics the behavior of the official Arduino IDE which moves all includes
+        to the top of the file, ensuring they are processed at file scope rather than
+        potentially ending up inside function bodies or after code that depends on them.
+
+        Args:
+            source: The sketch source code
+
+        Returns:
+            Tuple of (list_of_include_statements, source_without_includes)
+        """
+        import re
+
+        includes = []
+        lines = source.split('\n')
+        filtered_lines = []
+
+        # Pattern to match #include statements
+        # Matches: #include <header.h> or #include "header.h"
+        # Also handles optional whitespace and comments after the include
+        include_pattern = re.compile(r'^\s*#\s*include\s*[<"].*[>"]')
+
+        for line in lines:
+            if include_pattern.match(line):
+                # Extract just the include directive (strip trailing comments for cleanliness)
+                # but keep the original line for accuracy
+                includes.append(line.rstrip())
+            else:
+                filtered_lines.append(line)
+
+        source_without_includes = '\n'.join(filtered_lines)
+
+        return includes, source_without_includes
+
+    def _extract_and_relocate_defines(self, source: str) -> tuple:
+        """
+        Extract all #define statements from the sketch source and return them
+        separately so they can be placed at the top of the generated .cpp file.
+
+        This ensures macros are defined before any code that uses them, matching
+        the behavior of the official Arduino IDE preprocessor.
+
+        Args:
+            source: The sketch source code
+
+        Returns:
+            Tuple of (list_of_define_statements, source_without_defines)
+        """
+        import re
+
+        defines = []
+        lines = source.split('\n')
+        filtered_lines = []
+
+        # Pattern to match #define statements
+        # Matches: #define NAME value or #define NAME(args) value
+        # Also handles multi-line defines with backslash continuation
+        define_pattern = re.compile(r'^\s*#\s*define\s+')
+
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if define_pattern.match(line):
+                # Collect the define, including any continuation lines
+                define_lines = [line.rstrip()]
+                while define_lines[-1].endswith('\\') and i + 1 < len(lines):
+                    i += 1
+                    define_lines.append(lines[i].rstrip())
+                defines.append('\n'.join(define_lines))
+            else:
+                filtered_lines.append(line)
+            i += 1
+
+        source_without_defines = '\n'.join(filtered_lines)
+
+        return defines, source_without_defines
+
+    def _extract_global_constants(self, source: str) -> tuple:
+        """
+        Extract global constant definitions (const, constexpr, static const) from
+        the sketch source that appear at file scope.
+
+        This ensures global constants are defined before functions that use them.
+
+        Args:
+            source: The sketch source code
+
+        Returns:
+            Tuple of (list_of_constant_definitions, source_without_constants)
+        """
+        import re
+
+        constants = []
+        lines = source.split('\n')
+        filtered_lines = []
+
+        # Track brace depth to identify file scope
+        brace_depth = 0
+
+        # Pattern to match global constant declarations at file scope
+        # Matches: const type name = value; or constexpr type name = value;
+        # Also matches: static const type name = value;
+        const_pattern = re.compile(
+            r'^\s*(?:static\s+)?(?:const|constexpr)\s+\w+(?:\s*<[^>]*>)?\s+\w+\s*=\s*[^;]+;'
+        )
+
+        for line in lines:
+            # Update brace depth
+            brace_depth += line.count('{') - line.count('}')
+
+            # Only extract constants at file scope (brace_depth == 0 before processing this line)
+            # and when we're not inside a function/class
+            at_file_scope = brace_depth == 0 or (brace_depth == line.count('{') - line.count('}'))
+
+            if at_file_scope and const_pattern.match(line):
+                constants.append(line.rstrip())
+            else:
+                filtered_lines.append(line)
+
+        source_without_constants = '\n'.join(filtered_lines)
+
+        return constants, source_without_constants
 
     def _remove_invalid_global_control_flow(self, source: str) -> str:
         """
@@ -850,9 +1020,24 @@ class ArduinoCLI:
             print(f"✗ Failed to prepare build directory: {exc}", file=sys.stderr)
             return 1
 
-        # Extract type definitions (structs, classes, enums) from source
+        # Extract #include statements from the source and relocate them to the top
+        # This is critical: the official Arduino IDE moves all includes to the top
+        # of the generated .cpp file to ensure they're processed at file scope.
+        # Without this, includes can end up inside function bodies after other
+        # preprocessing steps rearrange the code.
+        sketch_includes, source_without_includes = self._extract_and_relocate_includes(source)
+
+        # Extract #define macros and relocate them to the top
+        # This ensures macros are defined before any code that uses them
+        sketch_defines, source_without_defines = self._extract_and_relocate_defines(source_without_includes)
+
+        # Extract global constants and relocate them after macros but before code
+        # This ensures constants like kJitterTrials are defined before use
+        global_constants, source_without_constants = self._extract_global_constants(source_without_defines)
+
+        # Extract type definitions (structs, classes, enums, templates) from source
         # These need to be placed early to avoid forward declaration issues
-        type_definitions, source_without_types = self._extract_and_remove_type_definitions(source)
+        type_definitions, source_without_types = self._extract_and_remove_type_definitions(source_without_constants)
 
         # Extract custom type names from the type definitions we found
         custom_types = self._extract_custom_type_names(type_definitions)
@@ -871,19 +1056,41 @@ class ArduinoCLI:
             print(f"DEBUG: Global control flow check complete", flush=True)
 
         # Generate function prototypes (will skip functions using custom types)
-        prototypes = self._generate_function_prototypes(source)
+        # Note: use source_without_includes to avoid generating prototypes for
+        # functions defined in included headers
+        prototypes = self._generate_function_prototypes(source_without_includes)
 
         # Create preprocessed sketch with Arduino wrappers
         cpp_file = build_dir / f"{sketch_file.stem}.cpp"
         try:
             # Build the .cpp file in the correct order:
             # 1. Arduino.h include
-            # 2. Type definitions (structs/classes/enums) - extracted from source
-            # 3. Function prototypes
-            # 4. Original sketch code (with type definitions removed to avoid redefinition)
-            cpp_content = '#include <Arduino.h>\n\n'
+            # 2. User's #include statements (relocated from sketch body)
+            # 3. User's #define macros (relocated from sketch body)
+            # 4. Global constants (relocated from sketch body)
+            # 5. Type definitions (structs/classes/enums/templates) - extracted from source
+            # 6. Function prototypes
+            # 7. Original sketch code (with all extracted elements removed)
+            cpp_content = '#include <Arduino.h>\n'
 
-            # Add extracted type definitions first
+            # Add user's includes (relocated to top of file)
+            if sketch_includes:
+                cpp_content += '\n// Sketch includes (relocated to file scope)\n'
+                cpp_content += '\n'.join(sketch_includes) + '\n'
+
+            # Add user's defines (relocated to top of file)
+            if sketch_defines:
+                cpp_content += '\n// Sketch macros (relocated to file scope)\n'
+                cpp_content += '\n'.join(sketch_defines) + '\n'
+
+            # Add global constants (relocated to top of file)
+            if global_constants:
+                cpp_content += '\n// Global constants (relocated to file scope)\n'
+                cpp_content += '\n'.join(global_constants) + '\n'
+
+            cpp_content += '\n'
+
+            # Add extracted type definitions
             if type_definitions:
                 cpp_content += '// Forward declarations for custom types\n'
                 cpp_content += type_definitions + '\n\n'
@@ -893,7 +1100,7 @@ class ArduinoCLI:
                 cpp_content += '// Function prototypes\n'
                 cpp_content += '\n'.join(prototypes) + '\n\n'
 
-            # Add the original sketch code (with type definitions removed)
+            # Add the original sketch code (with all extracted elements removed)
             cpp_content += source_without_types
             cpp_file.write_text(cpp_content, encoding="utf-8")
 
