@@ -77,6 +77,9 @@ object ArduinoLanguageDefinition {
     private class ArduinoLanguage(
         private val delegate: TextMateLanguage
     ) : Language {
+        // Default tab size for indentation calculations
+        private val defaultTabSize = 2
+
         override fun getAnalyzeManager(): AnalyzeManager = delegate.analyzeManager
 
         override fun getInterruptionLevel(): Int = delegate.interruptionLevel
@@ -102,8 +105,8 @@ object ArduinoLanguageDefinition {
             val opensControlBlock = previousLine.endsWith("{")
             val closesBlock = previousLine.startsWith("}")
             return when {
-                opensArduinoBlock || opensControlBlock -> base + delegate.tabSize
-                closesBlock -> (base - delegate.tabSize).coerceAtLeast(0)
+                opensArduinoBlock || opensControlBlock -> base + defaultTabSize
+                closesBlock -> (base - defaultTabSize).coerceAtLeast(0)
                 else -> base
             }
         }
@@ -137,7 +140,15 @@ object ArduinoLanguageDefinition {
             styles: Styles?,
             tabLength: Int
         ): NewlineHandleResult {
-            val delegateResult = delegate.newlineHandler.handleNewline(content, cursor, styles, tabLength)
+            // Access the handlers array (plural) and find a matching handler
+            val delegateHandlers = delegate.newlineHandlers
+            val delegateResult = if (delegateHandlers.isNotEmpty()) {
+                val handler = delegateHandlers.firstOrNull { it.matchesRequirement(content, cursor, styles) }
+                handler?.handleNewline(content, cursor, styles, tabLength)
+                    ?: NewlineHandleResult("", 0)
+            } else {
+                NewlineHandleResult("", 0)
+            }
             val currentLine = content.getLine(cursor.line).trimEnd()
             val prefersExtraIndent = currentLine.endsWith("{") || currentLine.contains("setup(") || currentLine.contains("loop(")
             val additionalIndent = if (prefersExtraIndent) " ".repeat(tabLength) else ""
