@@ -41,6 +41,7 @@ jobs:
           key: ${{ runner.os }}-llvm-build-android-${{ hashFiles('android/runtime/clangd/build-clangd-android.sh') }}
           restore-keys: |
             ${{ runner.os }}-llvm-build-android-
+          save-always: true
 
       - name: Cache ccache
         uses: actions/cache@v4
@@ -49,6 +50,7 @@ jobs:
           key: ${{ runner.os }}-ccache-llvm-${{ hashFiles('android/runtime/clangd/build-clangd-android.sh') }}
           restore-keys: |
             ${{ runner.os }}-ccache-llvm-
+          save-always: true
 
       - name: Prepare Android SDK directory
         run: mkdir -p "$ANDROID_SDK_ROOT"
@@ -58,6 +60,7 @@ jobs:
         with:
           path: ${{ env.ANDROID_SDK_ROOT }}
           key: ${{ runner.os }}-android-sdk-34-ndk26b-${{ hashFiles('android/BUILD_ANDROID.md') }}
+          save-always: true
 
       - name: Set up Android SDK/NDK
         uses: android-actions/setup-android@v3
