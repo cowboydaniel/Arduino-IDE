@@ -78,6 +78,9 @@ jobs:
       - name: Configure ccache
         run: |
           ccache --set-config=max_size=10G
+          ccache --set-config=base_dir="$GITHUB_WORKSPACE"
+          ccache --set-config=hash_dir=false
+          ccache --set-config=sloppiness=file_macro,time_macros,include_file_mtime,include_file_ctime
           ccache --zero-stats
 
       - name: Build clangd for Android
