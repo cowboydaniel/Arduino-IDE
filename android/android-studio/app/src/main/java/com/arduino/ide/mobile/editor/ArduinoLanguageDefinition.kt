@@ -170,6 +170,7 @@ object ArduinoLanguageDefinition {
      */
     private class FallbackLanguage : Language {
         override fun getAnalyzeManager(): AnalyzeManager = object : AnalyzeManager {
+            override fun setReceiver(receiver: io.github.rosemoe.sora.lang.styling.StyleReceiver?) {}
             override fun insert(p0: CharPosition, p1: CharPosition, p2: CharSequence) {}
             override fun delete(p0: CharPosition, p1: CharPosition, p2: CharSequence) {}
             override fun rerun() {}
@@ -193,6 +194,7 @@ object ArduinoLanguageDefinition {
         override fun useTab(): Boolean = false
 
         override fun getFormatter(): Formatter = object : Formatter {
+            override fun setReceiver(receiver: Formatter.FormatResultReceiver?) {}
             override fun format(text: Content, cursorRange: io.github.rosemoe.sora.text.TextRange) {}
             override fun formatRegion(text: Content, rangeToFormat: io.github.rosemoe.sora.text.TextRange, cursorRange: io.github.rosemoe.sora.text.TextRange) {}
             override fun isRunning(): Boolean = false
