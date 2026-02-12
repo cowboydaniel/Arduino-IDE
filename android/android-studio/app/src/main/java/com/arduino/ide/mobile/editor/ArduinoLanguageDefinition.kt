@@ -170,12 +170,10 @@ object ArduinoLanguageDefinition {
      */
     private class FallbackLanguage : Language {
         override fun getAnalyzeManager(): AnalyzeManager = object : AnalyzeManager {
-            override fun setReceiver(receiver: io.github.rosemoe.sora.lang.styling.StyleReceiver?) {}
             override fun insert(p0: CharPosition, p1: CharPosition, p2: CharSequence) {}
             override fun delete(p0: CharPosition, p1: CharPosition, p2: CharSequence) {}
             override fun rerun() {}
-            override fun reset(content: Content, extraArguments: Bundle) {}
-            override fun isDestroyed(): Boolean = false
+            override fun reset(content: ContentReference, extraArguments: Bundle) {}
             override fun destroy() {}
         }
 
@@ -196,8 +194,7 @@ object ArduinoLanguageDefinition {
 
         override fun getFormatter(): Formatter = object : Formatter {
             override fun format(text: Content, cursorRange: io.github.rosemoe.sora.text.TextRange) {}
-            override fun formatRegion(text: Content, start: Int, end: Int, cursorRange: io.github.rosemoe.sora.text.TextRange) {}
-            override fun setReceiver(receiver: io.github.rosemoe.sora.lang.format.FormatResultReceiver?) {}
+            override fun formatRegion(text: Content, rangeToFormat: io.github.rosemoe.sora.text.TextRange, cursorRange: io.github.rosemoe.sora.text.TextRange) {}
             override fun isRunning(): Boolean = false
             override fun destroy() {}
         }
