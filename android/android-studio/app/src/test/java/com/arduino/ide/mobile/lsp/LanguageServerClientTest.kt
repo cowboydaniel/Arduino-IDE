@@ -64,7 +64,7 @@ class LanguageServerClientTest {
         }
 
         val client = LanguageServerClient(transport, dispatcher)
-        transport.emitInbound(InboundMessage.Ready("/tmp/clangd"))
+        transport.inboundFlow.emit(InboundMessage.Ready("/tmp/clangd"))
         val completions = client.requestCompletions("file:///Blink.ino", 3, 2)
 
         assertEquals(1, completions.size)
