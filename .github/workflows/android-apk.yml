@@ -78,18 +78,26 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses
 
-      - name: Assemble debug APK
-        working-directory: android/android-studio
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=10G
+          ccache --zero-stats
+
+      - name: Build clangd for Android
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/26.1.10909125
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
           LLVM_TARGETS_TO_BUILD: AArch64
         run: |
-          ccache --zero-stats
-          ../runtime/clangd/build-clangd-android.sh
+          android/runtime/clangd/build-clangd-android.sh
           ccache --show-stats
-          ./gradlew --no-daemon assembleDebug
+
+      - name: Assemble debug APK
+        working-directory: android/android-studio
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/26.1.10909125
+        run: ./gradlew --no-daemon assembleDebug
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
