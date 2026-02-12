@@ -75,9 +75,7 @@ object ArduinoLanguageDefinition {
         themeRegistry.setTheme(themeModel.name)
 
         val textMateLanguage = TextMateLanguage.create(
-            definition,
-            grammarRegistry,
-            themeRegistry,
+            SCOPE_NAME,
             true
         )
 
