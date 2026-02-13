@@ -226,7 +226,7 @@ private fun SnippetActions(onAddUserSnippet: (String, String, String) -> Unit) {
 }
 
 private fun snippetPreview(body: String): AnnotatedString {
-    val regex = Regex("\\$\\{(\\d+):([^}]*)}|\\$(\\d+)|\\$0")
+    val regex = Regex("\\$\\{(\\d+):([^}]*)\\}|\\$(\\d+)|\\$0")
     return buildAnnotatedString {
         var cursor = 0
         regex.findAll(body).forEach { match ->
