@@ -4,33 +4,24 @@
 import json
 import subprocess
 import sys
-from pathlib import Path
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt, QTimer
 
-from arduino_ide.config import APP_NAME, APP_ORGANIZATION, APP_VERSION
+from arduino_ide.config import APP_NAME, APP_ORGANIZATION, APP_VERSION, get_arduino_cli_path
 from arduino_ide.ui.main_window import MainWindow
 
 
 def _ensure_default_core_installed() -> None:
     """Ensure the ``arduino:avr`` core is installed before the UI starts."""
 
-    # Handle PyInstaller bundled resources
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        # Running as PyInstaller bundle
-        base_path = Path(sys._MEIPASS)
-    else:
-        # Running as normal Python script
-        base_path = Path(__file__).resolve().parents[1]
-
-    cli_path = (base_path / "arduino-cli").resolve()
-    if not cli_path.exists():
-        print(f"arduino-cli helper not found at {cli_path}. Skipping core installation.")
+    cli_path = get_arduino_cli_path()
+    if cli_path is None:
+        print("arduino-cli binary not found on PATH. Skipping core installation.")
         return
 
     def run_cli(args, *, expect_json: bool = False):
         result = subprocess.run(
-            [sys.executable, str(cli_path), *args],
+            [str(cli_path), *args],
             capture_output=True,
             text=True,
         )
@@ -49,7 +40,8 @@ def _ensure_default_core_installed() -> None:
 
     try:
         cores = run_cli(["core", "list", "--format", "json"], expect_json=True)
-        installed = cores.get("installed", []) if isinstance(cores, dict) else []
+        # The official arduino-cli returns a list of platform objects directly
+        installed = cores if isinstance(cores, list) else cores.get("platforms", cores.get("installed", []))
         if any(core.get("id") == "arduino:avr" for core in installed):
             return
     except json.JSONDecodeError as exc:

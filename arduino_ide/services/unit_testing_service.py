@@ -235,11 +235,16 @@ class UnitTestingService(QObject):
     coverage_updated = Signal(TestCoverage)
     mock_created = Signal(MockFunction)
 
-    def __init__(self, project_path: str = "", arduino_cli_path: str = "arduino-cli"):
+    def __init__(self, project_path: str = "", arduino_cli_path: str = ""):
         super().__init__()
 
         self.project_path = Path(project_path) if project_path else Path.cwd()
-        self.arduino_cli_path = arduino_cli_path
+        if arduino_cli_path:
+            self.arduino_cli_path = arduino_cli_path
+        else:
+            from arduino_ide.config import get_arduino_cli_path
+            found = get_arduino_cli_path()
+            self.arduino_cli_path = str(found) if found else "arduino-cli"
 
         # Test data
         self.test_suites: Dict[str, TestSuite] = {}

@@ -1,18 +1,19 @@
-"""Utility for running Arduino CLI commands asynchronously."""
+"""Utility for running the official Arduino CLI commands asynchronously."""
 
 from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from PySide6.QtCore import QObject, QProcess, Signal
 
+from arduino_ide.config import get_arduino_cli_path
+
 
 class ArduinoCliService(QObject):
-    """Run the bundled ``arduino-cli`` helper asynchronously.
+    """Run the official ``arduino-cli`` binary asynchronously.
 
     The service wraps :class:`QProcess` so that long running operations such as
     compilation or uploads do not block the UI.  Output from the process is
@@ -27,7 +28,7 @@ class ArduinoCliService(QObject):
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._process: Optional[QProcess] = None
-        self._cli_path = (Path(__file__).resolve().parents[2] / "arduino-cli").resolve()
+        self._cli_path: Optional[Path] = get_arduino_cli_path()
         self._library_search_paths: List[Path] = []
 
         # Default to the IDE's managed libraries directory so bundled libraries
@@ -69,8 +70,6 @@ class ArduinoCliService(QObject):
             args.extend(["--build-path", build_path])
         if build_cache_path:
             args.extend(["--build-cache-path", build_cache_path])
-        if config:
-            args.extend(["--config", config])
         if verbose:
             args.append("-v")
         if export_binaries:
@@ -131,11 +130,10 @@ class ArduinoCliService(QObject):
         """Compile sketch with debug symbols and optimization disabled.
 
         This method configures compilation for debugging by:
-        - Enabling debug symbols (-g flag)
-        - Disabling optimizations (-O0)
-        - Using optimize_for_debug flag
         - Enabling verbose output by default
         - Exporting binaries with debug symbols
+        - Using optimize_for_debug flag
+        - Showing all warnings in debug mode
 
         Args:
             sketch_path: Path to the sketch file or directory
@@ -152,7 +150,6 @@ class ArduinoCliService(QObject):
             fqbn=fqbn,
             build_path=build_path,
             build_cache_path=build_cache_path,
-            config="Debug",  # Use Debug configuration
             verbose=verbose,
             export_binaries=export_binaries,
             warnings='all',  # Show all warnings in debug mode
@@ -194,7 +191,7 @@ class ArduinoCliService(QObject):
         Raises:
             RuntimeError: If arduino-cli command fails
         """
-        return self._run_sync_command(["board", "list", "--format", "json"])
+        return self._run_sync_command(["board", "listall", "--format", "json"])
 
     def list_platforms(self) -> List[Dict[str, Any]]:
         """List installed platforms/cores.
@@ -283,6 +280,20 @@ class ArduinoCliService(QObject):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    def _resolve_cli_path(self) -> Path:
+        """Return the path to the ``arduino-cli`` binary, raising if not found."""
+        if self._cli_path and self._cli_path.is_file():
+            return self._cli_path
+        # Re-probe in case the binary was installed after init
+        self._cli_path = get_arduino_cli_path()
+        if self._cli_path is None:
+            raise FileNotFoundError(
+                "arduino-cli binary not found. Install it from "
+                "https://arduino.github.io/arduino-cli/installation/ "
+                "or set the ARDUINO_CLI_PATH environment variable."
+            )
+        return self._cli_path
+
     def _run_sync_command(self, args: List[str], expect_json: bool = True) -> Any:
         """Run arduino-cli command synchronously and return output.
 
@@ -296,12 +307,11 @@ class ArduinoCliService(QObject):
         Raises:
             RuntimeError: If command fails or JSON parsing fails
         """
-        if not self._cli_path.exists():
-            raise FileNotFoundError(f"arduino-cli helper not found at {self._cli_path}")
+        cli_path = self._resolve_cli_path()
 
         try:
             result = subprocess.run(
-                [sys.executable, str(self._cli_path)] + args,
+                [str(cli_path)] + args,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -320,18 +330,18 @@ class ArduinoCliService(QObject):
             raise RuntimeError("arduino-cli command timed out")
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Failed to parse arduino-cli JSON output: {e}")
+
     def _start_process(self, args: Iterable[str]) -> None:
         if self.is_running():
             raise RuntimeError("A CLI command is already running")
 
-        if not self._cli_path.exists():
-            raise FileNotFoundError(f"arduino-cli helper not found at {self._cli_path}")
+        cli_path = self._resolve_cli_path()
 
         process = QProcess(self)
         self._process = process
 
-        process.setProgram(sys.executable)
-        process.setArguments([str(self._cli_path), *list(args)])
+        process.setProgram(str(cli_path))
+        process.setArguments(list(args))
         process.setProcessChannelMode(QProcess.SeparateChannels)
 
         process.readyReadStandardOutput.connect(self._read_stdout)  # type: ignore[attr-defined]

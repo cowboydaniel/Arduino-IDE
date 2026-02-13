@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 APP_NAME = "Arduino IDE Modern"
 APP_ORGANIZATION = "Arduino IDE Modern"
@@ -54,3 +55,27 @@ KICAD_PROJECT_CACHE_DIR = Path(
         Path.home() / ".arduino_ide" / "kicad_cache",
     )
 ).expanduser()
+
+
+# ---------------------------------------------------------------------------
+# Official Arduino CLI
+# ---------------------------------------------------------------------------
+
+def get_arduino_cli_path() -> Optional[Path]:
+    """Locate the official ``arduino-cli`` binary.
+
+    Resolution order:
+    1. ``ARDUINO_CLI_PATH`` environment variable (explicit override)
+    2. ``arduino-cli`` on the system ``PATH``
+    """
+    env_path = os.environ.get("ARDUINO_CLI_PATH")
+    if env_path:
+        candidate = Path(env_path).expanduser()
+        if candidate.is_file():
+            return candidate
+
+    found = shutil.which("arduino-cli")
+    if found:
+        return Path(found)
+
+    return None
