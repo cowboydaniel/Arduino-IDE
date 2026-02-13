@@ -200,11 +200,16 @@ class PerformanceProfilerService(QObject):
     memory_snapshot_taken = Signal(MemorySnapshot)
     bottleneck_detected = Signal(Bottleneck)
 
-    def __init__(self, project_path: str = "", arduino_cli_path: str = "arduino-cli"):
+    def __init__(self, project_path: str = "", arduino_cli_path: str = ""):
         super().__init__()
 
         self.project_path = Path(project_path) if project_path else Path.cwd()
-        self.arduino_cli_path = arduino_cli_path
+        if arduino_cli_path:
+            self.arduino_cli_path = arduino_cli_path
+        else:
+            from arduino_ide.config import get_arduino_cli_path
+            found = get_arduino_cli_path()
+            self.arduino_cli_path = str(found) if found else "arduino-cli"
 
         # Profiling state
         self.sessions: Dict[str, ProfilingSession] = {}
