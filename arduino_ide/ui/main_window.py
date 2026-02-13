@@ -2958,11 +2958,17 @@ void loop() {
         QTimer.singleShot(2000, lambda: self.status_bar.set_status("Ready"))
 
     def refresh_ports(self):
-        """Refresh available serial ports"""
-        current_port = self.port_selector.currentText() if hasattr(self, 'port_selector') else None
+        """Refresh available serial ports.
 
-        # Get list of available ports, filtering out generic "n/a" ports
-        # (e.g. /dev/ttyS* on Linux) and prioritising recognised devices.
+        Only rebuilds the combo box when the set of available ports has
+        actually changed (device plugged / unplugged).  A user-selected
+        port is never overwritten unless that port disappears.
+        """
+        if not hasattr(self, 'port_selector'):
+            return []
+
+        # Get list of available ports, prioritising recognised devices
+        # (those with a USB vendor ID) over generic ttyS / "n/a" ports.
         ports = serial.tools.list_ports.comports()
 
         recognised = []
@@ -2974,22 +2980,39 @@ void loop() {
             else:
                 recognised.append(port)
 
-        # Show recognised devices first, then generic ones
         ordered_ports = recognised + generic
         port_list = [f"{port.device} - {port.description}" for port in ordered_ports]
 
-        # Update combo box
-        if hasattr(self, 'port_selector'):
-            self.port_selector.clear()
-            if port_list:
-                self.port_selector.addItems(port_list)
-                # Try to restore previous selection
-                if current_port:
-                    index = self.port_selector.findText(current_port)
-                    if index >= 0:
-                        self.port_selector.setCurrentIndex(index)
-            else:
-                self.port_selector.addItem("No ports available")
+        # Build a comparable list of what is currently shown in the combo.
+        current_items = [
+            self.port_selector.itemText(i)
+            for i in range(self.port_selector.count())
+        ]
+
+        # Nothing changed — leave the combo (and the user's selection) alone.
+        if port_list == current_items:
+            return port_list
+
+        # --- Ports changed: rebuild the combo box ---
+        current_selection = self.port_selector.currentText()
+
+        self.port_selector.blockSignals(True)
+        self.port_selector.clear()
+        if port_list:
+            self.port_selector.addItems(port_list)
+            # Preserve the user's previous selection if the port still exists.
+            if current_selection:
+                index = self.port_selector.findText(current_selection)
+                if index >= 0:
+                    self.port_selector.setCurrentIndex(index)
+        else:
+            self.port_selector.addItem("No ports available")
+        self.port_selector.blockSignals(False)
+
+        # If the selected item actually changed (port removed), emit once.
+        new_selection = self.port_selector.currentText()
+        if new_selection != current_selection:
+            self.on_port_changed(new_selection)
 
         return port_list
 
