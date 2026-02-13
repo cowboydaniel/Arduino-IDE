@@ -8,509 +8,594 @@
     android:background="@color/arduino_surface"
     tools:context=".MainActivity">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:id="@+id/main_root"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/top_app_bar"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="@color/arduino_primary"
-        android:elevation="4dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:titleTextColor="@color/arduino_on_primary"
-        app:subtitleTextColor="@color/arduino_on_primary"
-        app:title="@string/app_name"
-        app:subtitle="@string/app_tagline" />
-
-    <ScrollView
-        android:id="@+id/content_scroll"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:padding="20dp"
-        android:paddingBottom="@dimen/snippet_peek_height"
-        app:layout_constraintTop_toBottomOf="@id/top_app_bar"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
+        <!-- ======== TITLE BAR (Teal) ======== -->
         <LinearLayout
+            android:id="@+id/title_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:dividerPadding="12dp"
-            android:showDividers="none">
+            android:background="@color/arduino_surface_titlebar"
+            android:gravity="center_vertical"
+            android:minHeight="32dp"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/sketch_overview_card"
-                android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/title_text"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="@color/arduino_surface_card"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="3dp">
+                android:layout_weight="1"
+                android:textColor="@color/arduino_on_primary"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="Blink | Arduino IDE 2.3.7" />
+        </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
+        <!-- ======== MENU BAR ======== -->
+        <HorizontalScrollView
+            android:id="@+id/menu_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/arduino_surface_menubar"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp">
+
+                <TextView
+                    android:id="@+id/menu_file"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:background="?attr/selectableItemBackground"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/menu_file"
+                    android:textColor="@color/arduino_text_primary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/menu_edit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/menu_edit"
+                    android:textColor="@color/arduino_text_primary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/menu_sketch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/menu_sketch"
+                    android:textColor="@color/arduino_text_primary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/menu_tools"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/menu_tools"
+                    android:textColor="@color/arduino_text_primary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/menu_help"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/menu_help"
+                    android:textColor="@color/arduino_text_primary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- ======== TOOLBAR (Verify, Upload, Board Selector) ======== -->
+        <LinearLayout
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/toolbar_height"
+            android:background="@drawable/toolbar_background"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+
+            <!-- Verify button -->
+            <ImageButton
+                android:id="@+id/verify_button"
+                android:layout_width="@dimen/toolbar_button_size"
+                android:layout_height="@dimen/toolbar_button_size"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/action_verify"
+                android:padding="@dimen/toolbar_icon_padding"
+                android:src="@drawable/ic_verify"
+                app:tint="@color/arduino_toolbar_icon" />
+
+            <!-- Upload button -->
+            <ImageButton
+                android:id="@+id/upload_button"
+                android:layout_width="@dimen/toolbar_button_size"
+                android:layout_height="@dimen/toolbar_button_size"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/action_upload"
+                android:padding="@dimen/toolbar_icon_padding"
+                android:src="@drawable/ic_upload"
+                app:tint="@color/arduino_toolbar_icon" />
+
+            <!-- Debug button -->
+            <ImageButton
+                android:id="@+id/debug_button"
+                android:layout_width="@dimen/toolbar_button_size"
+                android:layout_height="@dimen/toolbar_button_size"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/action_debug"
+                android:padding="@dimen/toolbar_icon_padding"
+                android:src="@drawable/ic_debug"
+                app:tint="@color/arduino_toolbar_icon" />
+
+            <!-- Separator -->
+            <View
+                android:layout_width="@dimen/toolbar_separator_width"
+                android:layout_height="24dp"
+                android:layout_marginStart="@dimen/toolbar_separator_margin"
+                android:layout_marginEnd="@dimen/toolbar_separator_margin"
+                android:background="@drawable/toolbar_separator" />
+
+            <!-- Board selector -->
+            <LinearLayout
+                android:id="@+id/board_selector"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/board_selector_height"
+                android:layout_weight="1"
+                android:background="@drawable/board_selector_background"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/board_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/board_label"
+                    android:textColor="@color/arduino_board_selector_text"
+                    android:textSize="@dimen/board_selector_text_size" />
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="@string/select_board"
+                    android:src="@drawable/ic_dropdown_arrow"
+                    app:tint="@color/arduino_toolbar_icon" />
+            </LinearLayout>
+
+            <!-- Separator -->
+            <View
+                android:layout_width="@dimen/toolbar_separator_width"
+                android:layout_height="24dp"
+                android:layout_marginStart="@dimen/toolbar_separator_margin"
+                android:layout_marginEnd="@dimen/toolbar_separator_margin"
+                android:background="@drawable/toolbar_separator" />
+
+            <!-- Serial Monitor -->
+            <ImageButton
+                android:id="@+id/serial_monitor_button"
+                android:layout_width="@dimen/toolbar_button_size"
+                android:layout_height="@dimen/toolbar_button_size"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/action_serial_monitor"
+                android:padding="@dimen/toolbar_icon_padding"
+                android:src="@drawable/ic_serial_monitor"
+                app:tint="@color/arduino_toolbar_icon" />
+
+            <!-- Serial Plotter -->
+            <ImageButton
+                android:id="@+id/serial_plotter_button"
+                android:layout_width="@dimen/toolbar_button_size"
+                android:layout_height="@dimen/toolbar_button_size"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/action_serial_plotter"
+                android:padding="@dimen/toolbar_icon_padding"
+                android:src="@drawable/ic_serial_plotter"
+                app:tint="@color/arduino_toolbar_icon" />
+
+            <!-- More options -->
+            <ImageButton
+                android:id="@+id/more_options_button"
+                android:layout_width="@dimen/toolbar_button_size"
+                android:layout_height="@dimen/toolbar_button_size"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/action_more_options"
+                android:padding="@dimen/toolbar_icon_padding"
+                android:src="@drawable/ic_more_options"
+                app:tint="@color/arduino_toolbar_icon" />
+        </LinearLayout>
+
+        <!-- Toolbar bottom border -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/arduino_border" />
+
+        <!-- ======== MAIN CONTENT AREA (Sidebar + Editor + Output) ======== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <!-- ======== LEFT SIDEBAR ======== -->
+            <LinearLayout
+                android:id="@+id/sidebar"
+                android:layout_width="@dimen/sidebar_width"
+                android:layout_height="match_parent"
+                android:background="@drawable/sidebar_background"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingTop="4dp">
+
+                <!-- Sketchbook / File Explorer -->
+                <ImageButton
+                    android:id="@+id/sidebar_sketchbook"
+                    android:layout_width="@dimen/sidebar_width"
+                    android:layout_height="@dimen/sidebar_width"
+                    android:background="@drawable/sidebar_active_indicator"
+                    android:contentDescription="@string/sidebar_sketchbook"
+                    android:padding="@dimen/sidebar_icon_padding"
+                    android:src="@drawable/ic_sketchbook"
+                    app:tint="@color/arduino_sidebar_icon_active" />
+
+                <!-- Board Manager -->
+                <ImageButton
+                    android:id="@+id/sidebar_boards"
+                    android:layout_width="@dimen/sidebar_width"
+                    android:layout_height="@dimen/sidebar_width"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/sidebar_board_manager"
+                    android:padding="@dimen/sidebar_icon_padding"
+                    android:src="@drawable/ic_board_manager"
+                    app:tint="@color/arduino_sidebar_icon" />
+
+                <!-- Library Manager -->
+                <ImageButton
+                    android:id="@+id/sidebar_libraries"
+                    android:layout_width="@dimen/sidebar_width"
+                    android:layout_height="@dimen/sidebar_width"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/sidebar_library_manager"
+                    android:padding="@dimen/sidebar_icon_padding"
+                    android:src="@drawable/ic_library_manager"
+                    app:tint="@color/arduino_sidebar_icon" />
+
+                <!-- Debug -->
+                <ImageButton
+                    android:id="@+id/sidebar_debug"
+                    android:layout_width="@dimen/sidebar_width"
+                    android:layout_height="@dimen/sidebar_width"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/sidebar_debug"
+                    android:padding="@dimen/sidebar_icon_padding"
+                    android:src="@drawable/ic_debug"
+                    app:tint="@color/arduino_sidebar_icon" />
+
+                <!-- Search -->
+                <ImageButton
+                    android:id="@+id/sidebar_search"
+                    android:layout_width="@dimen/sidebar_width"
+                    android:layout_height="@dimen/sidebar_width"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/sidebar_search"
+                    android:padding="@dimen/sidebar_icon_padding"
+                    android:src="@drawable/ic_search"
+                    app:tint="@color/arduino_sidebar_icon" />
+            </LinearLayout>
+
+            <!-- Sidebar right border -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:background="@color/arduino_border" />
+
+            <!-- ======== EDITOR AREA (Tabs + Code + Output) ======== -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <!-- Tab bar -->
+                <com.google.android.material.tabs.TabLayout
+                    android:id="@+id/tab_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/tab_height"
+                    android:background="@color/arduino_surface_tab_inactive"
+                    app:tabBackground="@color/arduino_surface_tab_inactive"
+                    app:tabGravity="start"
+                    app:tabIndicatorColor="@color/arduino_primary"
+                    app:tabIndicatorFullWidth="true"
+                    app:tabIndicatorHeight="2dp"
+                    app:tabMaxWidth="200dp"
+                    app:tabMinWidth="80dp"
+                    app:tabMode="scrollable"
+                    app:tabPaddingEnd="0dp"
+                    app:tabPaddingStart="0dp"
+                    app:tabSelectedTextColor="@color/arduino_text_tab_active"
+                    app:tabTextColor="@color/arduino_text_tab_inactive" />
+
+                <!-- Tab bar bottom border -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/arduino_border" />
+
+                <!-- Code editor (main content) -->
+                <androidx.viewpager2.widget.ViewPager2
+                    android:id="@+id/editor_pager"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:background="@color/arduino_surface_editor"
+                    android:contentDescription="@string/editor_tabs_content_description"
+                    tools:listitem="@layout/item_editor_page" />
+
+                <!-- ======== OUTPUT PANEL ======== -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/arduino_border" />
+
+                <!-- Output header -->
+                <LinearLayout
+                    android:id="@+id/output_header"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/output_header_height"
+                    android:background="@drawable/output_header_background"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="8dp">
 
                     <TextView
-                        android:id="@+id/sketch_title"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/sketch_title"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
-                        android:textColor="@android:color/white"
+                        android:layout_weight="1"
+                        android:text="@string/output_title"
+                        android:textColor="@color/arduino_text_primary"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
 
+                    <ImageButton
+                        android:id="@+id/output_toggle"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/output_toggle"
+                        android:src="@drawable/ic_more_options"
+                        app:tint="@color/arduino_toolbar_icon" />
+                </LinearLayout>
+
+                <!-- Output content -->
+                <ScrollView
+                    android:id="@+id/output_scroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/output_panel_min_height"
+                    android:background="@drawable/output_panel_background">
+
                     <TextView
-                        android:id="@+id/sketch_subtitle"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/output_log"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/sketch_subtitle"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="@color/arduino_text_secondary" />
+                        android:fontFamily="monospace"
+                        android:lineSpacingExtra="2dp"
+                        android:padding="8dp"
+                        android:textColor="@color/arduino_output_text"
+                        android:textSize="@dimen/output_text_size"
+                        tools:text="Compiling sketch...\nUsing board 'arduino:avr:uno' from platform in folder: ...\nUsing core 'arduino' from platform in folder: ..." />
+                </ScrollView>
+
+                <!-- ======== FIND/REPLACE PANEL (initially hidden) ======== -->
+                <LinearLayout
+                    android:id="@+id/find_replace_panel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/arduino_surface_toolbar"
+                    android:orientation="vertical"
+                    android:padding="8dp"
+                    android:visibility="gone">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:gravity="start"
-                        android:orientation="horizontal"
-                        android:weightSum="3">
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/board_chip"
-                            style="@style/Widget.Material3.Chip.Filter"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="8dp"
-                            android:layout_weight="1"
-                            android:text="@string/board_label"
-                            android:textAlignment="center" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/port_chip"
-                            style="@style/Widget.Material3.Chip.Filter"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="8dp"
-                            android:layout_weight="1"
-                            android:text="@string/port_label"
-                            android:textAlignment="center" />
-
-                        <com.google.android.material.chip.Chip
-                            android:id="@+id/status_chip"
-                            style="@style/Widget.Material3.Chip.Suggestion"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/status_label"
-                            android:textAlignment="center"
-                            app:chipBackgroundColor="@color/arduino_chip_status" />
-                    </LinearLayout>
-
-                    <com.google.android.material.divider.MaterialDivider
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        app:dividerColor="@color/arduino_divider" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
-                        <View
-                            android:id="@+id/status_indicator"
-                            android:layout_width="14dp"
-                            android:layout_height="14dp"
-                            android:background="@drawable/status_indicator" />
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:hint="@string/find_query_label">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/find_query"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:contentDescription="@string/find_query_label"
+                                android:imeOptions="actionNext"
+                                android:inputType="text"
+                                android:textSize="13sp" />
+                        </com.google.android.material.textfield.TextInputLayout>
 
-                        <TextView
-                            android:id="@+id/status_text"
-                            android:layout_width="wrap_content"
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
-                            android:text="@string/status_connected"
-                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                            android:textColor="@android:color/white" />
+                            android:layout_weight="1"
+                            android:hint="@string/replace_with_label">
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/replace_query"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:contentDescription="@string/replace_with_label"
+                                android:imeOptions="actionDone"
+                                android:inputType="text"
+                                android:textSize="13sp" />
+                        </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/code_preview_card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="@color/arduino_surface_card"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="3dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:id="@+id/code_preview_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/code_preview_title"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textColor="@android:color/white"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/code_path"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/sketch_path"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="@color/arduino_text_secondary" />
-
-                    <TextView
-                        android:id="@+id/breadcrumbs"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="@android:color/white"
-                        android:contentDescription="@string/breadcrumbs_content_description"
-                        tools:text="Blink > src > loop" />
-
-                    <com.google.android.material.tabs.TabLayout
-                        android:id="@+id/tab_row"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        app:tabIndicatorFullWidth="false"
-                        app:tabMode="scrollable"
-                        app:tabTextColor="@color/arduino_on_primary"
-                        app:tabIndicatorColor="@color/arduino_on_primary" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="4dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/regex_toggle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:contentDescription="@string/regex_toggle"
+                            android:text="@string/regex_toggle"
+                            android:textSize="12sp" />
+
+                        <Spinner
+                            android:id="@+id/search_scope"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:contentDescription="@string/search_scope" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
                         android:gravity="end"
                         android:orientation="horizontal">
 
-                        <ImageButton
-                            android:id="@+id/move_tab_left"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:contentDescription="@string/move_tab_left"
-                            android:src="@android:drawable/ic_media_previous"
-                            android:tint="@color/arduino_on_primary" />
-
-                        <ImageButton
-                            android:id="@+id/move_tab_right"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:background="?attr/selectableItemBackgroundBorderless"
-                            android:contentDescription="@string/move_tab_right"
-                            android:src="@android:drawable/ic_media_next"
-                            android:tint="@color/arduino_on_primary" />
-                    </LinearLayout>
-
-                    <androidx.viewpager2.widget.ViewPager2
-                        android:id="@+id/editor_pager"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:contentDescription="@string/editor_tabs_content_description"
-                        tools:listitem="@layout/item_editor_page" />
-
-                    <LinearLayout
-                        android:id="@+id/find_replace_panel"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:orientation="vertical"
-                        android:background="@drawable/console_background"
-                        android:padding="12dp">
-
-                        <TextView
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/find_next"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/find_replace_title"
-                            android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                            android:textColor="@android:color/white" />
+                            android:layout_height="36dp"
+                            android:text="@string/action_find_next"
+                            android:textSize="12sp" />
 
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginTop="4dp">
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/replace"
+                            style="@style/Widget.Material3.Button"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="4dp"
+                            android:text="@string/action_replace"
+                            android:textSize="12sp" />
 
-                            <com.google.android.material.textfield.TextInputLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:hint="@string/find_query_label">
-                                <com.google.android.material.textfield.TextInputEditText
-                                    android:id="@+id/find_query"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:imeOptions="actionNext"
-                                    android:inputType="text"
-                                    android:contentDescription="@string/find_query_label" />
-                            </com.google.android.material.textfield.TextInputLayout>
-
-                            <com.google.android.material.textfield.TextInputLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:layout_marginStart="8dp"
-                                android:hint="@string/replace_with_label">
-                                <com.google.android.material.textfield.TextInputEditText
-                                    android:id="@+id/replace_query"
-                                    android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:imeOptions="actionDone"
-                                    android:inputType="text"
-                                    android:contentDescription="@string/replace_with_label" />
-                            </com.google.android.material.textfield.TextInputLayout>
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <com.google.android.material.switchmaterial.SwitchMaterial
-                                android:id="@+id/regex_toggle"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/regex_toggle"
-                                android:contentDescription="@string/regex_toggle" />
-
-                            <Spinner
-                                android:id="@+id/search_scope"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="12dp"
-                                android:layout_weight="1"
-                                android:contentDescription="@string/search_scope" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:gravity="end"
-                            android:orientation="horizontal">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/find_next"
-                                style="@style/Widget.Material3.Button.OutlinedButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/action_find_next" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/replace"
-                                style="@style/Widget.Material3.Button"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:text="@string/action_replace" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/replace_all"
-                                style="@style/Widget.Material3.Button"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:text="@string/action_replace_all" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <com.google.android.material.divider.MaterialDivider
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        app:dividerColor="@color/arduino_divider" />
-
-                    <TextView
-                        android:id="@+id/completion_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/completion_title"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                        android:textColor="@android:color/white" />
-
-                    <TextView
-                        android:id="@+id/completion_list"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="@color/arduino_text_secondary"
-                        android:fontFamily="monospace"
-                        tools:text="digitalWrite – Set a digital pin\ndelay – Pause execution" />
-
-                    <TextView
-                        android:id="@+id/hover_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/hover_title"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                        android:textColor="@android:color/white" />
-
-                    <TextView
-                        android:id="@+id/hover_text"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="@color/arduino_text_secondary"
-                        android:fontFamily="monospace"
-                        tools:text="digitalWrite(pin, val) — writes a HIGH or LOW value" />
-
-                    <TextView
-                        android:id="@+id/diagnostic_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/diagnostic_title"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleSmall"
-                        android:textColor="@android:color/white" />
-
-                    <TextView
-                        android:id="@+id/diagnostic_message"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                        android:textColor="@android:color/white"
-                        android:fontFamily="monospace"
-                        tools:text="Missing pinMode for LED_BUILTIN" />
-
-                    <TextView
-                        android:id="@+id/diagnostic_hint"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="@color/arduino_text_secondary"
-                        android:fontFamily="monospace"
-                        tools:text="Call pinMode(LED_BUILTIN, OUTPUT) in setup()" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/serial_monitor_card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:cardBackgroundColor="@color/arduino_surface_card"
-                app:cardCornerRadius="14dp"
-                app:cardElevation="3dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:id="@+id/serial_monitor_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/serial_monitor_title"
-                        android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
-                        android:textColor="@android:color/white"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/serial_monitor_device"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/serial_monitor_device"
-                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                        android:textColor="@color/arduino_text_secondary" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:background="@drawable/console_background"
-                        android:orientation="vertical"
-                        android:padding="12dp">
-
-                        <TextView
-                            android:id="@+id/serial_monitor_log"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:lineSpacingExtra="4dp"
-                            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                            android:textColor="@android:color/white"
-                            android:fontFamily="monospace"
-                            tools:text="[12:00:01] Opening serial monitor...\n[12:00:02] Upload completed\n[12:00:05] Hello, world!" />
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/replace_all"
+                            style="@style/Widget.Material3.Button"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="4dp"
+                            android:text="@string/action_replace_all"
+                            android:textSize="12sp" />
                     </LinearLayout>
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <LinearLayout
-                android:id="@+id/action_row"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/upload_button"
-                    style="@style/Widget.Material3.Button"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="12dp"
-                    android:layout_weight="1"
-                    android:text="@string/action_upload"
-                    app:iconTint="@color/arduino_on_primary"
-                    app:rippleColor="@color/arduino_on_primary" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/verify_button"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/action_verify"
-                    app:strokeColor="@color/arduino_on_primary"
-                    app:strokeWidth="1dp" />
             </LinearLayout>
         </LinearLayout>
-    </ScrollView>
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+        <!-- ======== STATUS BAR (Teal) ======== -->
+        <LinearLayout
+            android:id="@+id/status_bar"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/status_bar_height"
+            android:background="@drawable/statusbar_background"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
+            <TextView
+                android:id="@+id/status_line_col"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/arduino_on_primary"
+                android:textSize="@dimen/status_text_size"
+                tools:text="Ln 1, Col 1" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- Board connection status -->
+            <View
+                android:id="@+id/status_indicator"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/status_indicator_connected" />
+
+            <TextView
+                android:id="@+id/status_board_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/arduino_on_primary"
+                android:textSize="@dimen/status_text_size"
+                tools:text="Arduino Yún on /dev/ttyACM0" />
+
+            <ImageView
+                android:id="@+id/status_notification"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="12dp"
+                android:contentDescription="@string/action_more_options"
+                android:src="@drawable/ic_notification"
+                app:tint="@color/arduino_on_primary" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ======== SNIPPET BOTTOM SHEET ======== -->
     <FrameLayout
         android:id="@+id/snippet_bottom_sheet"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        app:behavior_peekHeight="@dimen/snippet_peek_height"
+        app:behavior_peekHeight="0dp"
         app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
 
         <androidx.compose.ui.platform.ComposeView

@@ -1,29 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
+    android:layout_height="match_parent"
+    android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:gravity="center_vertical">
+    android:paddingStart="12dp"
+    android:paddingEnd="4dp">
 
     <TextView
         android:id="@+id/tab_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:paddingStart="12dp"
-        android:paddingEnd="8dp"
-        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-        android:textColor="@color/arduino_on_primary"
         android:maxLines="1"
+        android:textColor="@color/arduino_text_tab_active"
+        android:textSize="@dimen/tab_text_size"
         tools:text="Blink.ino" />
 
     <ImageButton
         android:id="@+id/tab_close"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:padding="4dp"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="8dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/close_tab"
-        android:tint="@color/arduino_on_primary"
-        android:src="@android:drawable/ic_menu_close_clear_cancel" />
+        android:padding="4dp"
+        android:src="@drawable/ic_close_tab"
+        app:tint="@color/arduino_text_muted" />
 </LinearLayout>

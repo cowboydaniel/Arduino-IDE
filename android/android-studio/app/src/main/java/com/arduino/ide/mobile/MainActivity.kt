@@ -3,7 +3,9 @@ package com.arduino.ide.mobile
 import android.content.Intent
 import android.hardware.usb.UsbManager
 import android.os.Bundle
+import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.PopupMenu
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -66,6 +68,8 @@ class MainActivity : AppCompatActivity() {
         platform = "arduino:avr"
     )
     private var selectedDevice: ArduinoDevice? = null
+    private var currentLine = 1
+    private var currentCol = 1
 
     private val searchManager = SearchManager()
     private val docs = mapOf(
@@ -86,21 +90,35 @@ class MainActivity : AppCompatActivity() {
             WindowInsetsCompat.CONSUMED
         }
 
-        binding.boardChip.text = getString(R.string.board_label)
-        binding.portChip.text = getString(R.string.port_label)
-        binding.statusChip.text = getString(R.string.status_label)
-        binding.statusText.text = getString(R.string.status_connected)
-
         tabStateRepository = TabStateRepository(this)
         project = SketchProject.demoProject(this)
-        binding.codePath.text = project.basePath.absolutePath
         val activeFile = project.files.firstOrNull()
         activeFileUri = activeFile?.path?.let { java.io.File(it).toURI().toString() }
             ?: "file://${project.basePath.absolutePath}/Sketch.ino"
         val codeListing = activeFile?.content.orEmpty()
 
+        // Setup title bar
+        updateTitleBar()
+
+        // Setup menu bar
+        setupMenuBar()
+
+        // Setup toolbar (board selector)
+        setupBoardSelector()
+
+        // Setup sidebar
+        setupSidebar()
+
+        // Setup tabs and editor
         setupTabs(project)
+
+        // Setup search controls (hidden by default)
         setupSearchControls()
+
+        // Setup status bar
+        updateStatusBar()
+
+        // Language server
         languageServerClient = LanguageServerClient(
             RuntimeLanguageServerTransport(ClangdRuntimeBridge(this))
         )
@@ -108,19 +126,140 @@ class MainActivity : AppCompatActivity() {
             attachLanguageServer(activeFile, codeListing)
         }
 
-        binding.serialMonitorLog.text = getString(R.string.build_ready_message)
+        // Output panel
+        binding.outputLog.text = getString(R.string.build_ready_message)
 
+        // Build service
         buildService = ArduinoBuildService(this)
         setupBuildButtons()
-        setupBoardAndPortSelection()
         observeBuildState()
         observeUsbDevices()
 
+        // Snippet panel (hidden by default)
         configureSnippetPanel()
 
         // Handle USB device if app was launched by USB attachment
         handleUsbIntent(intent)
     }
+
+    // ── Title bar ──────────────────────────────────────────────
+
+    private fun updateTitleBar() {
+        val sketchName = project.files.firstOrNull()?.name?.removeSuffix(".ino") ?: "Untitled"
+        binding.titleText.text = getString(R.string.title_format, sketchName, getString(R.string.app_version))
+    }
+
+    // ── Menu bar ───────────────────────────────────────────────
+
+    private fun setupMenuBar() {
+        binding.menuFile.setOnClickListener { showFileMenu(it) }
+        binding.menuEdit.setOnClickListener { showEditMenu(it) }
+        binding.menuSketch.setOnClickListener { showSketchMenu(it) }
+        binding.menuTools.setOnClickListener { showToolsMenu(it) }
+        binding.menuHelp.setOnClickListener {
+            Snackbar.make(binding.root, "Help menu", Snackbar.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showFileMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add(getString(R.string.menu_new_sketch))
+        popup.menu.add(getString(R.string.menu_open))
+        popup.menu.add(getString(R.string.menu_save))
+        popup.menu.add(getString(R.string.menu_save_as))
+        popup.menu.add(getString(R.string.menu_preferences))
+        popup.show()
+    }
+
+    private fun showEditMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add(getString(R.string.menu_undo))
+        popup.menu.add(getString(R.string.menu_redo))
+        popup.menu.add(getString(R.string.menu_cut))
+        popup.menu.add(getString(R.string.menu_copy))
+        popup.menu.add(getString(R.string.menu_paste))
+        popup.menu.add(getString(R.string.menu_select_all))
+        popup.menu.add(getString(R.string.menu_find)).setOnMenuItemClickListener {
+            toggleFindReplace()
+            true
+        }
+        popup.show()
+    }
+
+    private fun showSketchMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add(getString(R.string.action_verify)).setOnMenuItemClickListener {
+            performVerify()
+            true
+        }
+        popup.menu.add(getString(R.string.action_upload)).setOnMenuItemClickListener {
+            performUpload()
+            true
+        }
+        popup.show()
+    }
+
+    private fun showToolsMenu(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add(getString(R.string.action_serial_monitor))
+        popup.menu.add(getString(R.string.action_serial_plotter))
+        popup.menu.add(getString(R.string.menu_board_manager)).setOnMenuItemClickListener {
+            showBoardSelectionDialog()
+            true
+        }
+        popup.menu.add(getString(R.string.menu_library_manager))
+        popup.show()
+    }
+
+    // ── Sidebar ────────────────────────────────────────────────
+
+    private fun setupSidebar() {
+        binding.sidebarSketchbook.setOnClickListener {
+            Snackbar.make(binding.root, R.string.sidebar_sketchbook, Snackbar.LENGTH_SHORT).show()
+        }
+        binding.sidebarBoards.setOnClickListener {
+            showBoardSelectionDialog()
+        }
+        binding.sidebarLibraries.setOnClickListener {
+            Snackbar.make(binding.root, R.string.sidebar_library_manager, Snackbar.LENGTH_SHORT).show()
+        }
+        binding.sidebarDebug.setOnClickListener {
+            Snackbar.make(binding.root, R.string.sidebar_debug, Snackbar.LENGTH_SHORT).show()
+        }
+        binding.sidebarSearch.setOnClickListener {
+            toggleFindReplace()
+        }
+    }
+
+    private fun toggleFindReplace() {
+        val panel = binding.findReplacePanel
+        panel.visibility = if (panel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+    }
+
+    // ── Board Selector (Toolbar) ───────────────────────────────
+
+    private fun setupBoardSelector() {
+        binding.boardName.text = currentBoard.name
+        binding.boardSelector.setOnClickListener {
+            showBoardSelectionDialog()
+        }
+    }
+
+    // ── Status Bar ─────────────────────────────────────────────
+
+    private fun updateStatusBar() {
+        binding.statusLineCol.text = getString(R.string.status_line_col, currentLine, currentCol)
+        val portName = selectedDevice?.productName ?: getString(R.string.status_no_board)
+        binding.statusBoardInfo.text = getString(R.string.status_board_info, currentBoard.name, portName)
+    }
+
+    private fun updateCursorPosition(line: Int, col: Int) {
+        currentLine = line
+        currentCol = col
+        binding.statusLineCol.text = getString(R.string.status_line_col, line, col)
+    }
+
+    // ── Build / Upload ─────────────────────────────────────────
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -129,22 +268,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleUsbIntent(intent: Intent) {
         if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) {
-            // Refresh device list when a USB device is attached
             buildService.usbManager.refreshDevices()
             Snackbar.make(binding.root, R.string.usb_device_attached, Snackbar.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun setupBoardAndPortSelection() {
-        // Board selection chip
-        binding.boardChip.text = currentBoard.name
-        binding.boardChip.setOnClickListener {
-            showBoardSelectionDialog()
-        }
-
-        // Port selection chip - shows connected devices
-        binding.portChip.setOnClickListener {
-            showPortSelectionDialog()
         }
     }
 
@@ -157,7 +282,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.select_board_title)
             .setSingleChoiceItems(boardNames, currentIndex) { dialog, which ->
                 currentBoard = boards[which]
-                binding.boardChip.text = currentBoard.name
+                binding.boardName.text = currentBoard.name
+                updateStatusBar()
                 dialog.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -183,8 +309,6 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.select_port_title)
             .setSingleChoiceItems(deviceNames, currentIndex) { dialog, which ->
                 val device = devices[which]
-
-                // Request permission if needed
                 if (!buildService.usbManager.hasPermission(device)) {
                     buildService.usbManager.requestPermission(device) { granted ->
                         if (granted) {
@@ -204,71 +328,67 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectDevice(device: ArduinoDevice) {
         selectedDevice = device
-        binding.portChip.text = device.productName
-        binding.statusText.text = getString(R.string.device_selected, device.displayName)
+        updateStatusBar()
     }
 
     private fun observeUsbDevices() {
-        // Observe connected devices
         lifecycleScope.launch {
             buildService.usbManager.connectedDevices.collect { devices ->
-                updatePortChip(devices)
+                updateDeviceStatus(devices)
             }
         }
 
-        // Observe connection state
         lifecycleScope.launch {
             buildService.usbManager.connectionState.collect { state ->
                 when (state) {
                     is ConnectionState.Connected -> {
                         binding.statusIndicator.setBackgroundResource(R.drawable.status_indicator_connected)
-                        binding.statusText.text = getString(R.string.connected_to_device, state.device.displayName)
+                        updateStatusBar()
                     }
                     is ConnectionState.Disconnected -> {
                         binding.statusIndicator.setBackgroundResource(R.drawable.status_indicator)
-                        if (selectedDevice == null) {
-                            binding.statusText.text = getString(R.string.no_device_selected)
-                        }
+                        updateStatusBar()
                     }
                     is ConnectionState.Error -> {
                         binding.statusIndicator.setBackgroundResource(R.drawable.status_indicator_error)
-                        binding.statusText.text = state.message
+                        updateStatusBar()
                     }
                 }
             }
         }
     }
 
-    private fun updatePortChip(devices: List<ArduinoDevice>) {
+    private fun updateDeviceStatus(devices: List<ArduinoDevice>) {
         when {
             devices.isEmpty() -> {
-                binding.portChip.text = getString(R.string.no_device)
                 selectedDevice = null
+                updateStatusBar()
             }
             selectedDevice == null && devices.isNotEmpty() -> {
-                // Auto-select first device
                 val firstDevice = devices.first()
                 if (buildService.usbManager.hasPermission(firstDevice)) {
                     selectDevice(firstDevice)
-                } else {
-                    binding.portChip.text = getString(R.string.tap_to_connect)
                 }
             }
             selectedDevice != null && !devices.contains(selectedDevice) -> {
-                // Selected device was disconnected
-                binding.portChip.text = getString(R.string.device_disconnected)
                 selectedDevice = null
+                updateStatusBar()
                 Snackbar.make(binding.root, R.string.device_disconnected_message, Snackbar.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun setupBuildButtons() {
-        binding.uploadButton.setOnClickListener {
-            performUpload()
+        binding.uploadButton.setOnClickListener { performUpload() }
+        binding.verifyButton.setOnClickListener { performVerify() }
+        binding.serialMonitorButton.setOnClickListener {
+            Snackbar.make(binding.root, R.string.action_serial_monitor, Snackbar.LENGTH_SHORT).show()
         }
-        binding.verifyButton.setOnClickListener {
-            performVerify()
+        binding.serialPlotterButton.setOnClickListener {
+            Snackbar.make(binding.root, R.string.action_serial_plotter, Snackbar.LENGTH_SHORT).show()
+        }
+        binding.moreOptionsButton.setOnClickListener {
+            showPortSelectionDialog()
         }
     }
 
@@ -310,7 +430,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Request permission if needed
         if (!buildService.usbManager.hasPermission(device)) {
             buildService.usbManager.requestPermission(device) { granted ->
                 if (granted) {
@@ -350,17 +469,15 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             buildService.buildState.collect { state ->
                 when (state) {
-                    BuildState.Idle -> {
-                        binding.statusChip.text = getString(R.string.status_label)
-                    }
+                    BuildState.Idle -> { /* Status bar handles idle state */ }
                     BuildState.Compiling -> {
-                        binding.statusChip.text = getString(R.string.status_compiling)
+                        binding.outputLog.append("\n${getString(R.string.status_compiling)}")
                     }
                     BuildState.Uploading -> {
-                        binding.statusChip.text = getString(R.string.status_uploading)
+                        binding.outputLog.append("\n${getString(R.string.status_uploading)}")
                     }
                     BuildState.Failed -> {
-                        binding.statusChip.text = getString(R.string.status_failed)
+                        binding.outputLog.append("\n${getString(R.string.status_failed)}")
                     }
                 }
             }
@@ -380,17 +497,19 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 if (logText.isNotEmpty()) {
-                    binding.serialMonitorLog.text = logText
+                    binding.outputLog.text = logText
                 }
             }
         }
     }
 
+    // ── Tabs & Editor ──────────────────────────────────────────
+
     private fun setupTabs(project: SketchProject) {
         val restored = project.resolveTabOrder(tabStateRepository.loadOpenTabs())
         adapter = EditorTabAdapter(layoutInflater, restored.toMutableList())
         adapter.onCursorChange = { file, line ->
-            updateBreadcrumb(file, line)
+            updateCursorPosition(line, 1)
             maybeShowHelp(file, line)
         }
         adapter.loadState = { file -> tabStateRepository.loadEditorState(file.path) }
@@ -402,20 +521,14 @@ class MainActivity : AppCompatActivity() {
         }
         tabMediator.attach()
 
-        binding.moveTabLeft.setOnClickListener { moveTab(-1) }
-        binding.moveTabRight.setOnClickListener { moveTab(1) }
-
         binding.editorPager.registerOnPageChangeCallback(object : androidx.viewpager2.widget.ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
                 val file = adapter.getFile(position)
-                updateBreadcrumb(file, 1)
+                updateCursorPosition(1, 1)
+                updateTitleBar()
             }
         })
-
-        if (restored.isNotEmpty()) {
-            updateBreadcrumb(restored.first(), 1)
-        }
     }
 
     private fun createTabView(position: Int) = ViewEditorTabBinding.inflate(layoutInflater).apply {
@@ -424,7 +537,7 @@ class MainActivity : AppCompatActivity() {
         tabClose.setOnClickListener {
             closeTab(position)
         }
-        tabTitle.setTextColor(ContextCompat.getColor(root.context, R.color.arduino_on_primary))
+        tabTitle.setTextColor(ContextCompat.getColor(root.context, R.color.arduino_text_tab_active))
     }.root
 
     private fun recreateMediator() {
@@ -443,13 +556,7 @@ class MainActivity : AppCompatActivity() {
         binding.editorPager.currentItem = position.coerceAtMost(adapter.itemCount - 1)
     }
 
-    private fun moveTab(offset: Int) {
-        val current = binding.editorPager.currentItem
-        val target = (current + offset).coerceIn(0, adapter.itemCount - 1)
-        adapter.move(current, target)
-        recreateMediator()
-        binding.editorPager.currentItem = target
-    }
+    // ── Search ─────────────────────────────────────────────────
 
     private fun setupSearchControls() {
         val scopeAdapter = ArrayAdapter(
@@ -482,9 +589,6 @@ class MainActivity : AppCompatActivity() {
         val first = results.first()
         val message = getString(R.string.search_result_message, first.matches.size, first.file.name)
         Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
-        val lineNumber = first.file.content.substring(0, first.matches.first().first).lines().size
-        updateBreadcrumb(first.file, lineNumber)
-        maybeShowHelp(first.file, lineNumber)
     }
 
     private fun performReplace(single: Boolean) {
@@ -512,6 +616,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Language Server ────────────────────────────────────────
+
     private suspend fun attachLanguageServer(activeFile: SketchFile?, codeListing: String) {
         if (activeFile == null) return
         observeStatus(languageServerClient)
@@ -522,7 +628,6 @@ class MainActivity : AppCompatActivity() {
         }
         languageServerClient.openDocument(activeFileUri, "cpp", codeListing)
         observeDiagnostics(languageServerClient)
-        refreshEditorInsights(activeFile)
     }
 
     private fun observeStatus(client: LanguageServerClient) {
@@ -531,17 +636,12 @@ class MainActivity : AppCompatActivity() {
             client.status.collect { status ->
                 when (status) {
                     is LanguageServerStatus.Ready -> {
-                        binding.statusText.text = getString(R.string.status_connected)
-                        binding.statusChip.text = getString(R.string.status_label)
+                        updateStatusBar()
                     }
                     is LanguageServerStatus.Error -> {
-                        binding.statusText.text = status.message
-                        binding.diagnosticHint.text = status.recoveryHint ?: getString(R.string.status_label)
                         Snackbar.make(binding.root, status.message, Snackbar.LENGTH_LONG).show()
                     }
-                    LanguageServerStatus.Idle -> {
-                        binding.statusText.text = getString(R.string.status_label)
-                    }
+                    LanguageServerStatus.Idle -> { /* no-op */ }
                 }
             }
         }
@@ -551,9 +651,8 @@ class MainActivity : AppCompatActivity() {
         diagnosticJob?.cancel()
         diagnosticJob = lifecycleScope.launch {
             client.diagnostics.collect { diagnostic ->
-                binding.diagnosticMessage.text = diagnostic.message
-                val hint = diagnostic.recoveryHint
-                binding.diagnosticHint.text = hint ?: getString(R.string.status_connected)
+                // Show diagnostics in the output panel
+                binding.outputLog.append("\n${diagnostic.message}")
             }
         }
     }
@@ -561,45 +660,6 @@ class MainActivity : AppCompatActivity() {
     private fun showLspError(status: LanguageServerStatus.Error) {
         val message = status.recoveryHint ?: getString(R.string.status_connected)
         Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
-        binding.hoverText.text = getString(R.string.status_label)
-    }
-
-    private suspend fun refreshEditorInsights(activeFile: SketchFile) {
-        val line = activeFile.content.lines().size.coerceAtLeast(1)
-        val character = activeFile.content.lines().lastOrNull()?.length?.coerceAtLeast(0) ?: 0
-        val completions = languageServerClient.requestCompletions(
-            uri = activeFileUri,
-            line = line,
-            character = character
-        )
-        binding.completionList.text = completions.joinToString("\n") { item ->
-            buildString {
-                append(item.label)
-                item.detail?.let { append(" — ").append(it) }
-                item.autoImportText?.let { append(" (auto-import: ").append(it).append(")") }
-            }
-        }
-
-        val hover = languageServerClient.requestHover(
-            uri = activeFileUri,
-            line = line,
-            character = character
-        )
-        binding.hoverText.text = hover?.contents ?: getString(R.string.status_connected)
-    }
-
-    private fun updateBreadcrumb(file: SketchFile, line: Int) {
-        val function = DocumentSymbolHelper.contextForCursor(file.content, line)
-        val breadcrumb = buildString {
-            append(project.basePath.absolutePath)
-            append(" > ")
-            append(file.name)
-            if (!function.isNullOrBlank()) {
-                append(" > ")
-                append(function)
-            }
-        }
-        binding.breadcrumbs.text = breadcrumb
     }
 
     private fun maybeShowHelp(file: SketchFile, line: Int) {
@@ -630,6 +690,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Lifecycle ──────────────────────────────────────────────
+
     override fun onPause() {
         super.onPause()
         tabStateRepository.saveOpenTabs(adapter.openFiles().map { it.path })
@@ -640,10 +702,12 @@ class MainActivity : AppCompatActivity() {
         buildService.cleanup()
     }
 
+    // ── Snippet Panel ──────────────────────────────────────────
+
     private fun configureSnippetPanel() {
         val sheetBehavior = BottomSheetBehavior.from(binding.snippetBottomSheet)
-        sheetBehavior.peekHeight = resources.getDimensionPixelSize(R.dimen.snippet_peek_height)
-        sheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+        sheetBehavior.peekHeight = 0
+        sheetBehavior.state = BottomSheetBehavior.STATE_HIDDEN
 
         binding.snippetComposeView.setContent {
             MaterialTheme {

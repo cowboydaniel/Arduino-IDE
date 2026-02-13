@@ -1,3 +1,44 @@
 <resources>
     <dimen name="snippet_peek_height">260dp</dimen>
+
+    <!-- Toolbar -->
+    <dimen name="toolbar_height">48dp</dimen>
+    <dimen name="toolbar_icon_size">24dp</dimen>
+    <dimen name="toolbar_icon_padding">8dp</dimen>
+    <dimen name="toolbar_button_size">40dp</dimen>
+
+    <!-- Sidebar -->
+    <dimen name="sidebar_width">48dp</dimen>
+    <dimen name="sidebar_icon_size">24dp</dimen>
+    <dimen name="sidebar_icon_padding">12dp</dimen>
+    <dimen name="sidebar_active_border_width">2dp</dimen>
+
+    <!-- Tab bar -->
+    <dimen name="tab_height">36dp</dimen>
+    <dimen name="tab_padding_horizontal">16dp</dimen>
+    <dimen name="tab_text_size">13sp</dimen>
+    <dimen name="tab_close_size">16dp</dimen>
+
+    <!-- Editor -->
+    <dimen name="editor_text_size">14sp</dimen>
+    <dimen name="line_number_width">48dp</dimen>
+    <dimen name="minimap_width">60dp</dimen>
+
+    <!-- Output panel -->
+    <dimen name="output_panel_min_height">120dp</dimen>
+    <dimen name="output_panel_max_height">200dp</dimen>
+    <dimen name="output_header_height">32dp</dimen>
+    <dimen name="output_text_size">12sp</dimen>
+
+    <!-- Status bar -->
+    <dimen name="status_bar_height">24dp</dimen>
+    <dimen name="status_text_size">12sp</dimen>
+
+    <!-- Board selector -->
+    <dimen name="board_selector_height">32dp</dimen>
+    <dimen name="board_selector_text_size">13sp</dimen>
+
+    <!-- Spacing -->
+    <dimen name="toolbar_separator_width">1dp</dimen>
+    <dimen name="toolbar_separator_margin">8dp</dimen>
 </resources>

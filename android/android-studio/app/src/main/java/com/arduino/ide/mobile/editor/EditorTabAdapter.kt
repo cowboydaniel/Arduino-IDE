@@ -62,8 +62,6 @@ class EditorTabAdapter(
 
         fun bind(file: SketchFile) {
             val foldRegions = computeFoldRegions(file.content)
-            binding.minimap.setCode(file.content)
-            binding.minimap.setFoldRegions(foldRegions)
 
             binding.codeEditor.apply {
                 setEditorLanguage(language)
@@ -76,7 +74,6 @@ class EditorTabAdapter(
                 setHighlightCurrentBlock(true)
                 setTextSize(16f)
 
-                binding.minimap.updateViewport(firstVisibleLine, visibleLineCount())
                 onStateChange?.invoke(
                     file,
                     EditorState(
@@ -89,13 +86,10 @@ class EditorTabAdapter(
                 loadState?.invoke(file)?.let { state ->
                     scrollTo(scrollX, state.scrollY)
                     ensurePositionVisible(state.firstVisibleLine, 0)
-                    binding.minimap.updateViewport(state.firstVisibleLine, visibleLineCount())
                 }
 
                 subscribeAlways(ScrollEvent::class.java) { event ->
                     val first = firstVisibleLine
-                    val count = visibleLineCount()
-                    binding.minimap.updateViewport(first, count)
                     onStateChange?.invoke(
                         file,
                         EditorState(

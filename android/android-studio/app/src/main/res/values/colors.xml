@@ -1,13 +1,76 @@
 <resources>
+    <!-- Arduino IDE 2.x Primary Palette -->
     <color name="arduino_primary">#00979D</color>
+    <color name="arduino_primary_dark">#007A80</color>
+    <color name="arduino_primary_light">#00BCC2</color>
     <color name="arduino_on_primary">#FFFFFFFF</color>
-    <color name="arduino_surface">#FF121212</color>
+
+    <!-- Surface & Background Colors (Arduino IDE 2.x dark theme) -->
+    <color name="arduino_surface">#FF2D2D2D</color>
     <color name="arduino_surface_card">#FF1E1E1E</color>
+    <color name="arduino_surface_editor">#FF1E1E1E</color>
+    <color name="arduino_surface_sidebar">#FF252526</color>
+    <color name="arduino_surface_toolbar">#FF2D2D30</color>
+    <color name="arduino_surface_menubar">#FF3C3C3C</color>
+    <color name="arduino_surface_statusbar">#FF00979D</color>
+    <color name="arduino_surface_tab_active">#FF1E1E1E</color>
+    <color name="arduino_surface_tab_inactive">#FF2D2D30</color>
+    <color name="arduino_surface_output">#FF1E1E1E</color>
+    <color name="arduino_surface_titlebar">#FF00979D</color>
+
+    <!-- Text Colors -->
+    <color name="arduino_text_primary">#FFFFFFFF</color>
     <color name="arduino_text_secondary">#B3FFFFFF</color>
+    <color name="arduino_text_muted">#FF969696</color>
+    <color name="arduino_text_tab_active">#FFFFFFFF</color>
+    <color name="arduino_text_tab_inactive">#FF969696</color>
+
+    <!-- Dividers & Borders -->
+    <color name="arduino_divider">#FF3E3E42</color>
+    <color name="arduino_border">#FF3E3E42</color>
+
+    <!-- Status & Accent Colors -->
     <color name="arduino_chip_status">#1A00E6D2</color>
-    <color name="arduino_divider">#33FFFFFF</color>
-    <color name="arduino_code_keyword">#5FD3FF</color>
-    <color name="arduino_code_function">#F4BF75</color>
-    <color name="arduino_code_constant">#8AE234</color>
-    <color name="arduino_code_comment">#6A9955</color>
+    <color name="arduino_accent_verify">#FF00979D</color>
+    <color name="arduino_accent_upload">#FF00979D</color>
+    <color name="arduino_status_success">#FF4CAF50</color>
+    <color name="arduino_status_error">#FFF44336</color>
+    <color name="arduino_status_warning">#FFFFAB00</color>
+
+    <!-- Syntax Highlighting Colors (Arduino IDE 2.x) -->
+    <color name="arduino_code_keyword">#FF569CD6</color>
+    <color name="arduino_code_type">#FF4EC9B0</color>
+    <color name="arduino_code_function">#FFDCDCAA</color>
+    <color name="arduino_code_string">#FFCE9178</color>
+    <color name="arduino_code_comment">#FF6A9955</color>
+    <color name="arduino_code_constant">#FFB5CEA8</color>
+    <color name="arduino_code_number">#FFB5CEA8</color>
+    <color name="arduino_code_preprocessor">#FFC586C0</color>
+    <color name="arduino_code_plain">#FFD4D4D4</color>
+
+    <!-- Sidebar Icon Colors -->
+    <color name="arduino_sidebar_icon">#FFCCCCCC</color>
+    <color name="arduino_sidebar_icon_active">#FFFFFFFF</color>
+    <color name="arduino_sidebar_active_border">#FF00979D</color>
+
+    <!-- Toolbar Button Colors -->
+    <color name="arduino_toolbar_icon">#FFCCCCCC</color>
+    <color name="arduino_toolbar_icon_hover">#FFFFFFFF</color>
+
+    <!-- Line number -->
+    <color name="arduino_line_number">#FF858585</color>
+    <color name="arduino_line_number_active">#FFC6C6C6</color>
+
+    <!-- Selection -->
+    <color name="arduino_selection">#FF264F78</color>
+    <color name="arduino_current_line">#FF2A2D2E</color>
+
+    <!-- Output panel -->
+    <color name="arduino_output_text">#FFD4D4D4</color>
+    <color name="arduino_output_error">#FFF48771</color>
+    <color name="arduino_output_warning">#FFCCA700</color>
+
+    <!-- Board selector -->
+    <color name="arduino_board_selector_bg">#FF3C3C3C</color>
+    <color name="arduino_board_selector_text">#FFFFFFFF</color>
 </resources>
