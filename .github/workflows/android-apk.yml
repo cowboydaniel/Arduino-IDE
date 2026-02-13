@@ -76,7 +76,10 @@ jobs:
         run: yes | sdkmanager --licenses
 
       - name: Configure ccache
+        env:
+          CCACHE_DIR: ~/.ccache
         run: |
+          ccache --set-config=cache_dir="$HOME/.ccache"
           ccache --set-config=max_size=10G
           ccache --set-config=base_dir="$GITHUB_WORKSPACE"
           ccache --set-config=hash_dir=false
@@ -88,6 +91,7 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/26.1.10909125
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          CCACHE_DIR: ~/.ccache
           LLVM_TARGETS_TO_BUILD: AArch64
         run: |
           android/runtime/clangd/build-clangd-android.sh
@@ -113,21 +117,21 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: llvm-project/build-android
-          key: ${{ runner.os }}-llvm-build-android-${{ hashFiles('android/runtime/clangd/build-clangd-android.sh') }}
+          key: ${{ runner.os }}-llvm-build-android-${{ hashFiles('android/runtime/clangd/build-clangd-android.sh') }}-${{ github.run_id }}
 
       - name: Save ccache
         if: always()
         uses: actions/cache/save@v4
         with:
           path: ~/.ccache
-          key: ${{ runner.os }}-ccache-llvm-${{ hashFiles('android/runtime/clangd/build-clangd-android.sh') }}
+          key: ${{ runner.os }}-ccache-llvm-${{ hashFiles('android/runtime/clangd/build-clangd-android.sh') }}-${{ github.run_id }}
 
       - name: Save Android SDK cache
         if: always()
         uses: actions/cache/save@v4
         with:
           path: ${{ env.ANDROID_SDK_ROOT }}
-          key: ${{ runner.os }}-android-sdk-34-ndk26b-${{ hashFiles('android/BUILD_ANDROID.md') }}
+          key: ${{ runner.os }}-android-sdk-34-ndk26b-${{ hashFiles('android/BUILD_ANDROID.md') }}-${{ github.run_id }}
 
       # Release signing guidance:
       # - Define secrets for the keystore (e.g., ANDROID_KEYSTORE_BASE64) and credentials

@@ -170,7 +170,6 @@ object ArduinoLanguageDefinition {
      */
     private class FallbackLanguage : Language {
         override fun getAnalyzeManager(): AnalyzeManager = object : AnalyzeManager {
-            override fun setReceiver(receiver: io.github.rosemoe.sora.lang.styling.StyleReceiver?) {}
             override fun insert(p0: CharPosition, p1: CharPosition, p2: CharSequence) {}
             override fun delete(p0: CharPosition, p1: CharPosition, p2: CharSequence) {}
             override fun rerun() {}
