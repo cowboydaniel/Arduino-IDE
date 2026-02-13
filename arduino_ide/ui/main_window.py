@@ -2961,9 +2961,22 @@ void loop() {
         """Refresh available serial ports"""
         current_port = self.port_selector.currentText() if hasattr(self, 'port_selector') else None
 
-        # Get list of available ports
+        # Get list of available ports, filtering out generic "n/a" ports
+        # (e.g. /dev/ttyS* on Linux) and prioritising recognised devices.
         ports = serial.tools.list_ports.comports()
-        port_list = [f"{port.device} - {port.description}" for port in ports]
+
+        recognised = []
+        generic = []
+        for port in ports:
+            desc = (port.description or "").strip()
+            if desc.lower() in ("n/a", "") or port.vid is None:
+                generic.append(port)
+            else:
+                recognised.append(port)
+
+        # Show recognised devices first, then generic ones
+        ordered_ports = recognised + generic
+        port_list = [f"{port.device} - {port.description}" for port in ordered_ports]
 
         # Update combo box
         if hasattr(self, 'port_selector'):
