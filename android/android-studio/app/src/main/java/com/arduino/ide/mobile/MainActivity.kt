@@ -131,6 +131,11 @@ class MainActivity : AppCompatActivity() {
 
         // Build service
         buildService = ArduinoBuildService(this)
+        lifecycleScope.launch {
+            buildService.initialize { status ->
+                runOnUiThread { binding.outputLog.text = status }
+            }
+        }
         setupBuildButtons()
         observeBuildState()
         observeUsbDevices()

@@ -6,7 +6,6 @@ import com.arduino.ide.mobile.usb.ArduinoDevice
 import com.arduino.ide.mobile.usb.UsbDeviceManager
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,9 +15,9 @@ import java.io.File
 /**
  * Service for compiling and uploading Arduino sketches.
  *
- * Integrates with UsbDeviceManager for real USB device detection and
- * serial communication. Compilation currently uses simulated operations
- * pending arduino-cli integration for ARM64 Android.
+ * Uses the real arduino-cli ARM64 binary for compilation (avr-gcc, linker, etc.)
+ * and an STK500v1 protocol implementation for uploading firmware to AVR-based
+ * boards (Uno, Nano, Mega) over USB serial via [UsbDeviceManager].
  */
 class ArduinoBuildService(
     private val context: Context,
@@ -26,9 +25,9 @@ class ArduinoBuildService(
 ) {
     companion object {
         private const val TAG = "ArduinoBuildService"
-        private const val UPLOAD_BAUD_RATE = 115200
-        private const val UPLOAD_TIMEOUT_MS = 30000
     }
+
+    private val cliBridge = ArduinoCliBridge(context)
 
     private val _buildState = MutableStateFlow<BuildState>(BuildState.Idle)
     val buildState: StateFlow<BuildState> = _buildState.asStateFlow()
@@ -36,8 +35,43 @@ class ArduinoBuildService(
     private val _buildOutput = MutableStateFlow<List<BuildMessage>>(emptyList())
     val buildOutput: StateFlow<List<BuildMessage>> = _buildOutput.asStateFlow()
 
+    private var _cliReady = false
+
     init {
         usbManager.startMonitoring()
+    }
+
+    /**
+     * Initialize the build toolchain: extract arduino-cli, create config, install AVR core.
+     * Should be called once during app startup.
+     */
+    suspend fun initialize(onStatus: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        try {
+            onStatus("Installing arduino-cli runtime...")
+            cliBridge.install()
+
+            onStatus("Configuring arduino-cli...")
+            cliBridge.ensureConfig()
+
+            // Check if AVR core is installed, install if not
+            if (!cliBridge.isCoreInstalled("arduino:avr")) {
+                onStatus("Installing Arduino AVR core (first run, may take a minute)...")
+                val result = cliBridge.installCore("arduino:avr") { msg ->
+                    onStatus(msg)
+                }
+                if (!result.isSuccess) {
+                    Log.w(TAG, "AVR core install failed: ${result.stderr}")
+                    onStatus("Warning: AVR core install failed. Compilation may not work until connected to internet.")
+                }
+            }
+
+            _cliReady = true
+            onStatus("Build toolchain ready")
+            Log.d(TAG, "ArduinoBuildService initialized")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize build service: ${e.message}", e)
+            onStatus("Build toolchain setup failed: ${e.message}")
+        }
     }
 
     /**
@@ -50,9 +84,7 @@ class ArduinoBuildService(
 
     /**
      * Verify (compile) the sketch without uploading.
-     *
-     * TODO: Integrate with arduino-cli for actual compilation.
-     * Currently performs syntax validation and simulates compilation.
+     * Uses arduino-cli for real compilation with avr-gcc.
      */
     suspend fun verify(sketchPath: String, board: BoardConfig): BuildResult = withContext(Dispatchers.IO) {
         _buildState.value = BuildState.Compiling
@@ -64,67 +96,96 @@ class ArduinoBuildService(
         appendOutput(BuildMessage.Info("Compiling sketch: $sketchName"))
         appendOutput(BuildMessage.Info("Board: ${board.name} (${board.fqbn})"))
 
-        // Read and validate sketch content
-        val sketchContent = try {
-            if (sketchFile.exists()) {
-                sketchFile.readText()
-            } else {
-                // For demo projects, get content from SketchProject
-                ""
-            }
-        } catch (e: Exception) {
-            appendOutput(BuildMessage.Warning("Could not read sketch file: ${e.message}"))
-            ""
+        if (!_cliReady) {
+            appendOutput(BuildMessage.Warning("Build toolchain not initialized, attempting setup..."))
+            initialize { msg -> appendOutput(BuildMessage.Info(msg)) }
         }
 
-        // Perform basic syntax validation
-        val syntaxErrors = performBasicSyntaxCheck(sketchContent)
-        if (syntaxErrors.isNotEmpty()) {
-            syntaxErrors.forEach { error ->
-                appendOutput(BuildMessage.Error(error))
+        // Ensure the platform core is installed
+        val platformId = board.platform
+        if (!cliBridge.isCoreInstalled(platformId)) {
+            appendOutput(BuildMessage.Info("Installing platform $platformId..."))
+            val installResult = cliBridge.installCore(platformId) { msg ->
+                appendOutput(BuildMessage.Info(msg))
             }
+            if (!installResult.isSuccess) {
+                val error = "Failed to install platform $platformId: ${installResult.stderr}"
+                appendOutput(BuildMessage.Error(error))
+                _buildState.value = BuildState.Failed
+                return@withContext BuildResult.Failure(
+                    errors = listOf(error),
+                    message = "Platform installation failed"
+                )
+            }
+        }
+
+        // Run real compilation via arduino-cli
+        val compileResult = cliBridge.compile(sketchPath, board.fqbn) { line ->
+            // Parse arduino-cli output and emit appropriate message types
+            when {
+                line.contains("error:", ignoreCase = true) ||
+                line.contains("Error", ignoreCase = true) ->
+                    appendOutput(BuildMessage.Error(line))
+                line.contains("warning:", ignoreCase = true) ->
+                    appendOutput(BuildMessage.Warning(line))
+                else ->
+                    appendOutput(BuildMessage.Info(line))
+            }
+        }
+
+        if (!compileResult.isSuccess) {
+            val errors = compileResult.stderr.lines().filter {
+                it.contains("error:", ignoreCase = true)
+            }.ifEmpty {
+                listOf(compileResult.stderr.ifBlank { "Compilation failed" })
+            }
+
+            errors.forEach { appendOutput(BuildMessage.Error(it)) }
             _buildState.value = BuildState.Failed
             return@withContext BuildResult.Failure(
-                errors = syntaxErrors,
-                message = "Compilation failed with ${syntaxErrors.size} error(s)"
+                errors = errors,
+                message = "Compilation failed with ${errors.size} error(s)"
             )
         }
 
-        // Simulate compilation steps (TODO: replace with arduino-cli)
-        appendOutput(BuildMessage.Info("Detecting libraries..."))
-        delay(300)
-        appendOutput(BuildMessage.Info("Compiling core..."))
-        delay(400)
-        appendOutput(BuildMessage.Info("Compiling sketch..."))
-        delay(300)
-        appendOutput(BuildMessage.Info("Linking..."))
-        delay(200)
+        // Parse binary size from arduino-cli output
+        val outputDir = compileResult.stdout.trim()
+        val hexFile = cliBridge.findHexFile(outputDir, sketchName)
+        val binarySize = hexFile?.length()?.toInt() ?: 0
 
-        // Estimate binary size based on sketch content
-        val estimatedSize = estimateBinarySize(sketchContent)
-        val estimatedMemory = estimateMemoryUsage(sketchContent)
+        // Try to extract actual sizes from arduino-cli verbose output
+        val sizeInfo = extractSizeInfo(compileResult.stderr + compileResult.stdout)
 
         appendOutput(BuildMessage.Success("Compilation complete"))
-        appendOutput(BuildMessage.Info("Sketch uses $estimatedSize bytes (${estimatedSize * 100 / 32256}%) of program storage space."))
-        appendOutput(BuildMessage.Info("Global variables use $estimatedMemory bytes (${estimatedMemory * 100 / 2048}%) of dynamic memory."))
+        appendOutput(BuildMessage.Info(
+            "Sketch uses ${sizeInfo.programSize} bytes (${sizeInfo.programPercent}%) of program storage space. " +
+            "Maximum is ${sizeInfo.programMax} bytes."
+        ))
+        appendOutput(BuildMessage.Info(
+            "Global variables use ${sizeInfo.dataSize} bytes (${sizeInfo.dataPercent}%) of dynamic memory, " +
+            "leaving ${sizeInfo.dataMax - sizeInfo.dataSize} bytes for local variables. " +
+            "Maximum is ${sizeInfo.dataMax} bytes."
+        ))
 
         _buildState.value = BuildState.Idle
         BuildResult.Success(
-            binarySize = estimatedSize,
-            memoryUsage = estimatedMemory,
-            message = "Compilation successful"
+            binarySize = sizeInfo.programSize,
+            memoryUsage = sizeInfo.dataSize,
+            message = "Compilation successful",
+            outputDir = outputDir
         )
     }
 
     /**
      * Compile and upload the sketch to the connected board.
+     * Uses arduino-cli for compilation and STK500v1 protocol for upload.
      */
     suspend fun upload(
         sketchPath: String,
         board: BoardConfig,
         device: ArduinoDevice
     ): BuildResult = withContext(Dispatchers.IO) {
-        // First verify the sketch
+        // First verify (compile) the sketch
         val verifyResult = verify(sketchPath, board)
         if (verifyResult is BuildResult.Failure) {
             return@withContext verifyResult
@@ -132,6 +193,48 @@ class ArduinoBuildService(
 
         _buildState.value = BuildState.Uploading
         appendOutput(BuildMessage.Info("Uploading to ${device.displayName}..."))
+
+        val successResult = verifyResult as BuildResult.Success
+        val outputDir = successResult.outputDir
+            ?: run {
+                val error = "No build output directory"
+                appendOutput(BuildMessage.Error(error))
+                _buildState.value = BuildState.Failed
+                return@withContext BuildResult.Failure(
+                    errors = listOf(error),
+                    message = "Upload failed: no compiled firmware"
+                )
+            }
+
+        // Find the .hex file from compilation output
+        val sketchName = File(sketchPath).nameWithoutExtension
+        val hexFile = cliBridge.findHexFile(outputDir, sketchName)
+        if (hexFile == null || !hexFile.exists()) {
+            val error = "Compiled .hex file not found in $outputDir"
+            appendOutput(BuildMessage.Error(error))
+            _buildState.value = BuildState.Failed
+            return@withContext BuildResult.Failure(
+                errors = listOf(error),
+                message = "Upload failed: firmware file missing"
+            )
+        }
+
+        appendOutput(BuildMessage.Info("Firmware: ${hexFile.name} (${hexFile.length()} bytes)"))
+
+        // Parse the Intel HEX file
+        val hexData = try {
+            IntelHexParser.parse(hexFile)
+        } catch (e: HexParseException) {
+            val error = "Failed to parse hex file: ${e.message}"
+            appendOutput(BuildMessage.Error(error))
+            _buildState.value = BuildState.Failed
+            return@withContext BuildResult.Failure(
+                errors = listOf(error),
+                message = "Upload failed: bad firmware file"
+            )
+        }
+
+        appendOutput(BuildMessage.Info("Flash data: ${hexData.size} bytes starting at 0x${hexData.startAddress.toString(16)}"))
 
         // Check USB permission
         if (!usbManager.hasPermission(device)) {
@@ -144,10 +247,11 @@ class ArduinoBuildService(
             )
         }
 
-        // Connect to the device
+        // Connect to the device at the board's upload baud rate
+        val baudRate = getBaudRateForBoard(board)
         val connectionResult = usbManager.connect(
             device = device,
-            baudRate = getBaudRateForBoard(board),
+            baudRate = baudRate,
             dataBits = UsbSerialPort.DATABITS_8,
             stopBits = UsbSerialPort.STOPBITS_1,
             parity = UsbSerialPort.PARITY_NONE
@@ -164,26 +268,31 @@ class ArduinoBuildService(
         }
 
         try {
-            // Reset the board to enter bootloader mode
-            appendOutput(BuildMessage.Info("Resetting board..."))
-            usbManager.resetBoard()
-            delay(500)
-
-            // Simulate upload progress (TODO: implement actual STK500/avrdude protocol)
-            for (progress in listOf(10, 25, 50, 75, 90, 100)) {
-                delay(200)
-                appendOutput(BuildMessage.Progress("Uploading... $progress%", progress))
+            // Use the STK500v1 programmer for AVR boards
+            val programmer = Stk500v1Programmer(usbManager) { message, percent ->
+                appendOutput(BuildMessage.Progress(message, percent))
             }
 
-            appendOutput(BuildMessage.Success("Upload complete"))
-            _buildState.value = BuildState.Idle
+            val uploadSuccess = programmer.program(hexData)
 
-            val successResult = verifyResult as BuildResult.Success
-            return@withContext BuildResult.Success(
-                binarySize = successResult.binarySize,
-                memoryUsage = successResult.memoryUsage,
-                message = "Upload successful"
-            )
+            if (uploadSuccess) {
+                appendOutput(BuildMessage.Success("Upload complete"))
+                _buildState.value = BuildState.Idle
+                return@withContext BuildResult.Success(
+                    binarySize = successResult.binarySize,
+                    memoryUsage = successResult.memoryUsage,
+                    message = "Upload successful",
+                    outputDir = outputDir
+                )
+            } else {
+                val error = "STK500v1 programming failed"
+                appendOutput(BuildMessage.Error(error))
+                _buildState.value = BuildState.Failed
+                return@withContext BuildResult.Failure(
+                    errors = listOf(error),
+                    message = "Upload failed"
+                )
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Upload failed", e)
@@ -234,51 +343,7 @@ class ArduinoBuildService(
     /**
      * Get list of supported boards.
      */
-    fun getInstalledBoards(): List<BoardConfig> {
-        // TODO: Integrate with arduino-cli board list
-        return listOf(
-            BoardConfig(
-                fqbn = "arduino:avr:uno",
-                name = "Arduino Uno",
-                platform = "arduino:avr"
-            ),
-            BoardConfig(
-                fqbn = "arduino:avr:nano",
-                name = "Arduino Nano",
-                platform = "arduino:avr"
-            ),
-            BoardConfig(
-                fqbn = "arduino:avr:mega",
-                name = "Arduino Mega 2560",
-                platform = "arduino:avr"
-            ),
-            BoardConfig(
-                fqbn = "arduino:avr:leonardo",
-                name = "Arduino Leonardo",
-                platform = "arduino:avr"
-            ),
-            BoardConfig(
-                fqbn = "esp32:esp32:esp32",
-                name = "ESP32 Dev Module",
-                platform = "esp32:esp32"
-            ),
-            BoardConfig(
-                fqbn = "esp8266:esp8266:nodemcuv2",
-                name = "NodeMCU 1.0 (ESP-12E)",
-                platform = "esp8266:esp8266"
-            ),
-            BoardConfig(
-                fqbn = "arduino:samd:nano_33_iot",
-                name = "Arduino Nano 33 IoT",
-                platform = "arduino:samd"
-            ),
-            BoardConfig(
-                fqbn = "rp2040:rp2040:rpipico",
-                name = "Raspberry Pi Pico",
-                platform = "rp2040:rp2040"
-            )
-        )
-    }
+    fun getInstalledBoards(): List<BoardConfig> = getBuiltinBoards()
 
     /**
      * Clean up resources.
@@ -291,93 +356,96 @@ class ArduinoBuildService(
         _buildOutput.value = _buildOutput.value + message
     }
 
-    private fun performBasicSyntaxCheck(content: String): List<String> {
-        val errors = mutableListOf<String>()
+    /**
+     * Extract program/data size info from arduino-cli output.
+     * arduino-cli prints lines like:
+     *   Sketch uses 924 bytes (2%) of program storage space. Maximum is 32256 bytes.
+     *   Global variables use 9 bytes (0%) of dynamic memory...
+     */
+    private fun extractSizeInfo(output: String): SizeInfo {
+        val programRegex = Regex("""Sketch uses (\d+) bytes \((\d+)%\).*Maximum is (\d+)""")
+        val dataRegex = Regex("""Global variables use (\d+) bytes \((\d+)%\).*Maximum is (\d+)""")
 
-        if (content.isBlank()) {
-            return errors // Empty sketch is valid for demo
-        }
+        val programMatch = programRegex.find(output)
+        val dataMatch = dataRegex.find(output)
 
-        // Check for basic C++ syntax issues
-        val openBraces = content.count { it == '{' }
-        val closeBraces = content.count { it == '}' }
-        if (openBraces != closeBraces) {
-            errors.add("Mismatched braces: $openBraces '{' vs $closeBraces '}'")
-        }
-
-        val openParens = content.count { it == '(' }
-        val closeParens = content.count { it == ')' }
-        if (openParens != closeParens) {
-            errors.add("Mismatched parentheses: $openParens '(' vs $closeParens ')'")
-        }
-
-        // Check for required Arduino functions
-        if (!content.contains("void setup()") && !content.contains("void setup ()")) {
-            errors.add("Missing required function: void setup()")
-        }
-        if (!content.contains("void loop()") && !content.contains("void loop ()")) {
-            errors.add("Missing required function: void loop()")
-        }
-
-        // Check for common errors
-        val lines = content.lines()
-        lines.forEachIndexed { index, line ->
-            val trimmed = line.trim()
-            // Check for missing semicolons (simple heuristic)
-            if (trimmed.isNotEmpty() &&
-                !trimmed.endsWith(";") &&
-                !trimmed.endsWith("{") &&
-                !trimmed.endsWith("}") &&
-                !trimmed.endsWith(",") &&
-                !trimmed.startsWith("//") &&
-                !trimmed.startsWith("#") &&
-                !trimmed.startsWith("/*") &&
-                !trimmed.startsWith("*") &&
-                !trimmed.contains("void ") &&
-                !trimmed.contains("if ") &&
-                !trimmed.contains("else") &&
-                !trimmed.contains("for ") &&
-                !trimmed.contains("while ") &&
-                trimmed.contains("=") &&
-                !trimmed.contains("==")
-            ) {
-                // This is a simple assignment that might be missing semicolon
-                // Don't report as error since our heuristic isn't perfect
-            }
-        }
-
-        return errors
-    }
-
-    private fun estimateBinarySize(content: String): Int {
-        // Rough estimation based on content
-        val baseSize = 444 // Minimal Arduino sketch
-        val contentSize = content.length / 10 // Rough bytes per character
-        val functionCount = Regex("void\\s+\\w+\\s*\\(").findAll(content).count()
-        val variableCount = Regex("(int|long|float|char|byte|bool)\\s+\\w+").findAll(content).count()
-
-        return baseSize + contentSize + (functionCount * 50) + (variableCount * 10)
-    }
-
-    private fun estimateMemoryUsage(content: String): Int {
-        // Rough estimation of RAM usage
-        val baseMemory = 9 // Minimal RAM usage
-        val stringCount = Regex("\"[^\"]*\"").findAll(content).count()
-        val variableCount = Regex("(int|long|float|char|byte|bool)\\s+\\w+").findAll(content).count()
-
-        return baseMemory + (stringCount * 20) + (variableCount * 4)
+        return SizeInfo(
+            programSize = programMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0,
+            programPercent = programMatch?.groupValues?.get(2)?.toIntOrNull() ?: 0,
+            programMax = programMatch?.groupValues?.get(3)?.toIntOrNull() ?: 32256,
+            dataSize = dataMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0,
+            dataPercent = dataMatch?.groupValues?.get(2)?.toIntOrNull() ?: 0,
+            dataMax = dataMatch?.groupValues?.get(3)?.toIntOrNull() ?: 2048
+        )
     }
 
     private fun getBaudRateForBoard(board: BoardConfig): Int {
         return when {
+            board.fqbn.contains("leonardo") -> 57600
             board.fqbn.contains("esp32") -> 115200
             board.fqbn.contains("esp8266") -> 115200
-            board.fqbn.contains("leonardo") -> 57600
             board.fqbn.contains("mega") -> 115200
             else -> 115200
         }
     }
+
+    private fun getBuiltinBoards(): List<BoardConfig> = listOf(
+        BoardConfig(
+            fqbn = "arduino:avr:uno",
+            name = "Arduino Uno",
+            platform = "arduino:avr"
+        ),
+        BoardConfig(
+            fqbn = "arduino:avr:nano",
+            name = "Arduino Nano",
+            platform = "arduino:avr"
+        ),
+        BoardConfig(
+            fqbn = "arduino:avr:nano:cpu=atmega328old",
+            name = "Arduino Nano (Old Bootloader)",
+            platform = "arduino:avr"
+        ),
+        BoardConfig(
+            fqbn = "arduino:avr:mega",
+            name = "Arduino Mega 2560",
+            platform = "arduino:avr"
+        ),
+        BoardConfig(
+            fqbn = "arduino:avr:leonardo",
+            name = "Arduino Leonardo",
+            platform = "arduino:avr"
+        ),
+        BoardConfig(
+            fqbn = "esp32:esp32:esp32",
+            name = "ESP32 Dev Module",
+            platform = "esp32:esp32"
+        ),
+        BoardConfig(
+            fqbn = "esp8266:esp8266:nodemcuv2",
+            name = "NodeMCU 1.0 (ESP-12E)",
+            platform = "esp8266:esp8266"
+        ),
+        BoardConfig(
+            fqbn = "arduino:samd:nano_33_iot",
+            name = "Arduino Nano 33 IoT",
+            platform = "arduino:samd"
+        ),
+        BoardConfig(
+            fqbn = "rp2040:rp2040:rpipico",
+            name = "Raspberry Pi Pico",
+            platform = "rp2040:rp2040"
+        )
+    )
 }
+
+private data class SizeInfo(
+    val programSize: Int,
+    val programPercent: Int,
+    val programMax: Int,
+    val dataSize: Int,
+    val dataPercent: Int,
+    val dataMax: Int
+)
 
 /**
  * Build state for UI updates.
@@ -396,7 +464,8 @@ sealed class BuildResult {
     data class Success(
         val binarySize: Int,
         val memoryUsage: Int,
-        val message: String
+        val message: String,
+        val outputDir: String? = null
     ) : BuildResult()
 
     data class Failure(

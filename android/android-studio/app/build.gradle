@@ -51,6 +51,8 @@ android {
         main {
             // Package the clangd runtime asset directly from the checked-in staging directory.
             assets.srcDirs += ['../../runtime/clangd']
+            // Package the arduino-cli ARM64 binary for real compilation on device.
+            assets.srcDirs += ['../../runtime/arduino-cli']
         }
     }
 }
@@ -68,8 +70,22 @@ tasks.register('verifyClangdRuntime') {
     }
 }
 
+// Fail fast if the arduino-cli binary is missing to prevent shipping without compilation support.
+tasks.register('verifyArduinoCliRuntime') {
+    doLast {
+        def cliPath = project.rootDir.toPath().resolve('../runtime/arduino-cli/arduino-cli').normalize().toFile()
+        if (!cliPath.exists() || cliPath.length() < 1024) {
+            throw new GradleException("Packaged arduino-cli binary is missing or empty. Run fetch-arduino-cli-android.sh first.")
+        }
+        if (!cliPath.canExecute()) {
+            throw new GradleException("Packaged arduino-cli binary is not executable. Re-run fetch-arduino-cli-android.sh.")
+        }
+    }
+}
+
 tasks.matching { it.name.startsWith('assemble') || it.name.startsWith('bundle') }.configureEach {
     dependsOn tasks.named('verifyClangdRuntime')
+    dependsOn tasks.named('verifyArduinoCliRuntime')
 }
 
 dependencies {
