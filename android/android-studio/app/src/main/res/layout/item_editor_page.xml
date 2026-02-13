@@ -1,32 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="12dp"
-    android:background="@drawable/code_block_background">
+    android:layout_height="match_parent"
+    android:background="@color/arduino_surface_editor">
 
-    <FrameLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1">
-
-        <io.github.rosemoe.sora.widget.CodeEditor
-            android:id="@+id/code_editor"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="12dp"
-            android:contentDescription="@string/editor_content_description"
-            tools:text="void setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n}\n" />
-    </FrameLayout>
-
-    <com.arduino.ide.mobile.editor.MinimapView
-        android:id="@+id/minimap"
-        android:layout_width="72dp"
+    <io.github.rosemoe.sora.widget.CodeEditor
+        android:id="@+id/code_editor"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginStart="8dp"
         android:contentDescription="@string/editor_content_description"
-        tools:layout_height="160dp" />
+        tools:text="void setup() {\n  pinMode(LED_BUILTIN, OUTPUT);\n}\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(1000);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(1000);\n}\n" />
 
-</LinearLayout>
+</FrameLayout>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/arduino_surface_tab_active" />
+        </shape>
+    </item>
+    <item android:top="0dp" android:bottom="34dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/arduino_primary" />
+            <size android:height="2dp" />
+        </shape>
+    </item>
+</layer-list>
